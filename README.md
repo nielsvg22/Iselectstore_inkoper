@@ -28,7 +28,7 @@ docker compose up --build       # web op :3000, worker en Postgres inbegrepen
 
 ### Productie (Vercel + beheerde Postgres, bijv. Neon)
 1. Zet `DATABASE_URL`, `APP_SECRET`, `CRON_SECRET` als omgevingsvariabelen. Draai `npx prisma migrate deploy` (CI of lokaal tegen de productie-DB).
-2. `vercel.json` roept elke 5 minuten `/api/jobs/tick` aan (Vercel Cron stuurt `Authorization: Bearer $CRON_SECRET`). Cron-frequentie is plan-afhankelijk; op Hobby kan dit beperkt zijn — gebruik dan een externe scheduler of de Docker-worker.
+2. `vercel.json` voert tijdens de build `prisma migrate deploy` uit en roept dagelijks `/api/jobs/tick` aan (Vercel Cron stuurt `Authorization: Bearer $CRON_SECRET`). Het Hobby-plan staat alleen dagelijkse crons toe: laat voor frequentere controles een externe scheduler (bijv. cron-job.org) elke 5 minuten `POST /api/jobs/tick` aanroepen met header `Authorization: Bearer <CRON_SECRET>`, of verhoog de cron op een betaald plan. Gebruik voor Neon de directe (niet-pooler) URL met `?sslmode=require&connection_limit=5`.
 3. Op Vercel is geen permanente worker: de tick verwerkt per aanroep maximaal `jobsPerTick` jobs binnen 60 s.
 4. Eigen server: Docker Compose (hierboven) of `npm run build && npm start` + `npm run worker` onder systemd/pm2, achter HTTPS (cookies zijn `Secure` in productie).
 
