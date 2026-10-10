@@ -2,6 +2,7 @@ import { ArrowUpRight, Clock, MapPin } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { formatEuro, formatPct, timeAgo } from "@/lib/format";
+import { hiRes } from "@/lib/images";
 import type { DealBandKey, RiskLevelKey } from "@/lib/types";
 import { BandBadge, RiskBadge, ScoreRing, Stat } from "./ui";
 
@@ -48,7 +49,7 @@ export function DealCard({ d }: { d: DealRow }) {
         <div className="relative aspect-[16/10] overflow-hidden bg-muted-bg">
           {d.image ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={d.image} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
+            <img src={hiRes(d.image, "card")} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
           ) : (
             <div className="flex h-full items-center justify-center text-sm text-muted">Geen foto</div>
           )}

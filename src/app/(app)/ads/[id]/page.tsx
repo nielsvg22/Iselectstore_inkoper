@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, CircleHelp, ShieldAlert, ShieldCheck, TriangleAlert } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Check, CircleHelp, ShieldAlert, ShieldCheck, TriangleAlert } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -9,9 +9,11 @@ import { Gallery } from "@/components/ad/gallery";
 import { BandBadge, RiskBadge, ScoreRing } from "@/components/deal/ui";
 import { MaxBid } from "@/components/deal/deal-card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Notice } from "@/components/ui/states";
 import { cn } from "@/lib/cn";
+import { hiRes } from "@/lib/images";
 import { formatDate, formatEuro, formatPct, timeAgo } from "@/lib/format";
 import { getAdDetail } from "@/lib/queries";
 import { getConfig } from "@/lib/settings/store";
@@ -86,6 +88,13 @@ export default async function AdDetailPage({ params }: { params: Promise<{ id: s
             {ad.publishedAt ? ` · geplaatst ${formatDate(ad.publishedAt)}` : ""} · laatst gezien {timeAgo(ad.lastSeenAt)}
           </p>
         </div>
+        {ad.isDemo ? (
+          <Button variant="outline" disabled className="shrink-0 self-start" title="Voorbeelddata heeft geen echte advertentie">Geen echte advertentie</Button>
+        ) : (
+          <a href={ad.url} target="_blank" rel="noopener noreferrer" className="shrink-0 self-start" aria-label="Ga naar advertentie op Marktplaats (opent in nieuw tabblad)">
+            <Button size="lg">Ga naar advertentie <ArrowUpRight className="h-4 w-4" /></Button>
+          </a>
+        )}
       </div>
 
       {ad.needsManualReview && ad.risk && (
@@ -210,7 +219,7 @@ export default async function AdDetailPage({ params }: { params: Promise<{ id: s
                   {similar.map((s) => (
                     <li key={s.id}>
                       <Link href={`/ads/${s.id}`} className="flex items-center gap-3 rounded-2xl border border-card-border p-2.5 transition hover:bg-muted-bg">
-                        {s.images[0] ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={s.images[0].url} alt="" className="h-12 w-16 rounded-lg object-cover" /> : <span className="h-12 w-16 rounded-lg bg-muted-bg" />}
+                        {s.images[0] ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={hiRes(s.images[0].url, "thumb")} alt="" className="h-12 w-16 rounded-lg object-cover" /> : <span className="h-12 w-16 rounded-lg bg-muted-bg" />}
                         <span className="min-w-0 flex-1"><span className="line-clamp-1 text-sm font-medium">{s.title}</span><span className="tabular text-xs text-muted">{formatEuro(s.askingPriceCents)}{s.analyses[0] ? ` · score ${s.analyses[0].score}` : ""}</span></span>
                       </Link>
                     </li>

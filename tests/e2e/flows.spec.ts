@@ -88,6 +88,7 @@ test("advertentiedetail: analyse, kosten bewerken, correcties, favoriet, gekocht
   }
   await expect(page.getByText("Maximaal bod")).toBeVisible();
   await expect(page.getByText("Geen echte advertentie (voorbeeld)")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Geen echte advertentie", exact: true })).toBeVisible();
   await page.screenshot({ path: "tests/e2e/shots/03-detail.png", fullPage: true });
 
   // kosten bewerken -> herberekenen
@@ -238,6 +239,31 @@ test("mobiel: geen horizontale scroll en bottom-navigatie zichtbaar", async ({ b
   await page.goto("/");
   await page.screenshot({ path: "tests/e2e/shots/07-mobiel.png" });
   await ctx.close();
+});
+
+test("echte advertentie: knop 'Ga naar advertentie' rechtsboven en scherpe foto's", async ({ page }) => {
+  await login(page);
+  await page.request.post("/api/import/demo", { data: { action: "remove" } });
+  const csv = "id;titel;prijs;url;plaats;omschrijving;fotos\nR1;iPhone 14 128GB;450;https://www.marktplaats.nl/v/x/m999-a;Utrecht;Batterij 90% icloud vrij. Ophalen.;https://images.marktplaats.com/api/v1/hz-mp-pro-listing/images/abc?rule=ecg_mp_eps$_82.jpg";
+  expect((await page.request.post("/api/import/file", { data: { content: csv } })).status()).toBe(200);
+  await page.request.post("/api/jobs/tick", { data: {} });
+  await page.goto("/");
+  await expect(page.locator("article").first()).toBeVisible();
+  // kaart gebruikt 726×968 (code 85) i.p.v. de miniatuur (82)
+  await expect(page.locator("article img").first()).toHaveAttribute("src", /rule=ecg_mp_eps\$_85\.jpg$/);
+  await page.locator("article a[aria-label^='Analyse van']").first().click();
+  const link = page.getByRole("link", { name: /Ga naar advertentie/ });
+  await expect(link).toBeVisible();
+  await expect(link).toHaveAttribute("href", "https://www.marktplaats.nl/v/x/m999-a");
+  await expect(link).toHaveAttribute("target", "_blank");
+  await expect(link).toHaveAttribute("rel", /noopener/);
+  // knop staat rechtsboven naast de titel
+  const h1 = await page.getByRole("heading", { level: 1 }).boundingBox();
+  const btn = await link.boundingBox();
+  expect(btn!.x).toBeGreaterThan(h1!.x + 300);
+  expect(btn!.y).toBeLessThan(h1!.y + 200);
+  await expect(page.locator("main img").first()).toHaveAttribute("src", /rule=ecg_mp_eps\$_86\.jpg$/);
+  await page.screenshot({ path: "tests/e2e/shots/08-echte-advertentie.png" });
 });
 
 test("uitloggen", async ({ page }) => {

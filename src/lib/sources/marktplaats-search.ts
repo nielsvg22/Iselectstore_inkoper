@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { hiRes } from "../images";
 import { prisma } from "../db/client";
 import { Throttle } from "../security/ratelimit";
 import { getConfig } from "../settings/store";
@@ -96,7 +97,7 @@ export function mapSearchListing(o: Obj, now = new Date()): RawAd | null {
   const structured: Record<string, string | number> = {};
   for (const [k, v] of Object.entries(attrs)) if (k !== "delivery") structured[k] = v;
   if (priceType) structured.priceType = priceType;
-  const imgs = Array.isArray(o.imageUrls) ? (o.imageUrls as unknown[]).filter((u): u is string => typeof u === "string").map(absImg) : [];
+  const imgs = Array.isArray(o.imageUrls) ? (o.imageUrls as unknown[]).filter((u): u is string => typeof u === "string").map((u) => hiRes(absImg(u), "full")) : [];
   const seller = (o.sellerInformation ?? {}) as Obj;
   return {
     externalId: id.toLowerCase(),
