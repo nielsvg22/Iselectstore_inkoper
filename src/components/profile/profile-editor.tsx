@@ -1,5 +1,4 @@
 "use client";
-import { Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { useToast } from "@/components/toast";
@@ -7,52 +6,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, Input, Select, Switch } from "@/components/ui/form";
 import { Notice } from "@/components/ui/states";
-import { cn } from "@/lib/cn";
 import { api } from "@/lib/client-api";
 import { FIELD_DEFS } from "@/lib/engines/filters";
-import { KNOWN_CATEGORIES } from "@/lib/sources/search-categories";
+import { Chips } from "@/components/filters/chips";
+import { FilterBuilder } from "@/components/filters/filter-builder";
+import { searchPlanFor } from "@/lib/catalog/apple";
+import type { MarktplaatsCategory } from "@/lib/catalog/categories";
+import type { Group } from "@/lib/engines/filters";
 import { buildTree, emptyQuick, treeToQuick, type AdvancedGroup, type QuickFilters } from "@/lib/profile-quick";
 import type { ProfileFormValue } from "@/lib/profile-form";
 
-const MODEL_SUGGESTIONS = ["iphone-17", "iphone-16", "iphone-16-pro", "iphone-15", "iphone-15-pro", "iphone-15-pro-max", "iphone-14", "iphone-14-pro", "iphone-13", "iphone-12", "iphone-11", "macbook-air-m1-13", "macbook-air-m2-13", "macbook-air-m3-13", "macbook-pro-m3-pro-14", "ipad-pro-11-m2", "watch-series-9", "airpods-pro-2"];
-
-function Chips({ id, value, onChange, placeholder, listId }: { id: string; value: string[]; onChange: (v: string[]) => void; placeholder: string; listId?: string }) {
-  const [draft, setDraft] = React.useState("");
-  const add = () => {
-    const v = draft.trim().toLowerCase();
-    if (v && !value.includes(v)) onChange([...value, v]);
-    setDraft("");
-  };
-  return (
-    <div>
-      <div className="flex flex-wrap gap-1.5">
-        {value.map((v) => (
-          <span key={v} className="inline-flex items-center gap-1 rounded-full bg-accent-soft px-2.5 py-1 text-xs font-medium text-accent">
-            {v}
-            <button type="button" aria-label={`Verwijder ${v}`} onClick={() => onChange(value.filter((x) => x !== v))} className="rounded-full px-0.5 hover:bg-accent/20">×</button>
-          </span>
-        ))}
-      </div>
-      <Input
-        id={id}
-        className="mt-2"
-        list={listId}
-        placeholder={placeholder}
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === ",") {
-            e.preventDefault();
-            add();
-          }
-        }}
-        onBlur={add}
-      />
-    </div>
-  );
-}
-
-export function ProfileEditor({ initial }: { initial: ProfileFormValue }) {
+export function ProfileEditor({ initial, savedFilters = [], categories = [] }: { initial: ProfileFormValue; savedFilters?: Array<{ id: string; name: string; tree: Group }>; categories?: MarktplaatsCategory[] }) {
   const router = useRouter();
   const toast = useToast();
   const parsed = React.useMemo(() => treeToQuick(initial.tree), [initial.tree]);
@@ -61,7 +25,26 @@ export function ProfileEditor({ initial }: { initial: ProfileFormValue }) {
   const [groups, setGroups] = React.useState<AdvancedGroup[]>(parsed.groups);
   const [busy, setBusy] = React.useState(false);
   const [err, setErr] = React.useState<string | null>(null);
-  const setQuick = <K extends keyof QuickFilters>(k: K, val: QuickFilters[K]) => setQ((s) => ({ ...s, [k]: val }));
+  const [autoQueries, setAutoQueries] = React.useState(initial.queries.length === 0);
+  const [filterName, setFilterName] = React.useState("");
+  const catOptions = React.useMemo(() => {
+    const dev = categories.filter((c) => c.group === "device");
+    const list = [{ path: "", label: "Alle categorieën" }, ...dev.map((c) => ({ path: c.path, label: c.label }))];
+    if (v.category && !list.some((c) => c.path === v.category)) list.push({ path: v.category, label: v.category });
+    return list;
+  }, [categories, v.category]);
+
+  // Zoektermen + categorie uit de gekozen modellen (automatisch zolang de gebruiker ze niet zelf heeft ingevuld)
+  const applyPlan = (models: string[]) => {
+    const plan = searchPlanFor(models);
+    setV((cur) => ({ ...cur, queries: plan.queries, category: plan.category }));
+  };
+  const onFilterChange = (st: { quick: QuickFilters; groups: AdvancedGroup[] }) => {
+    const modelsChanged = st.quick.models.join("|") !== q.models.join("|");
+    setQ(st.quick);
+    setGroups(st.groups);
+    if (modelsChanged && autoQueries && v.sourceKind === "SEARCH") applyPlan(st.quick.models);
+  };
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -100,16 +83,6 @@ export function ProfileEditor({ initial }: { initial: ProfileFormValue }) {
     }
   }
 
-  const num = (k: keyof QuickFilters, label: string, hint?: string, unit?: string) => (
-    <Field label={label} hint={hint} htmlFor={`q-${k}`}>
-      <div className="relative">
-        <Input id={`q-${k}`} type="number" inputMode="decimal" min="0" value={q[k] as string} onChange={(e) => setQuick(k, e.target.value as never)} className={unit ? "pr-12" : ""} />
-        {unit && <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-sm text-muted">{unit}</span>}
-      </div>
-    </Field>
-  );
-  const check = (k: keyof QuickFilters, label: string) => <Switch checked={q[k] as boolean} onChange={(x) => setQuick(k, x as never)} label={label} />;
-
   return (
     <form onSubmit={save} className="space-y-6">
       <Card>
@@ -135,12 +108,13 @@ export function ProfileEditor({ initial }: { initial: ProfileFormValue }) {
           {v.sourceKind === "SEARCH" && (
             <div className="space-y-4 rounded-2xl bg-accent-soft p-4">
               <Field label="Zoektermen" htmlFor="p-queries" hint="Bijv. ‘iphone 15 pro’. Elke zoekterm wordt apart doorzocht; Enter om toe te voegen. Leeg laten? Dan worden de gekozen productmodellen bij Filters als zoekterm gebruikt.">
-                <Chips id="p-queries" value={v.queries} onChange={(qs) => setV({ ...v, queries: qs })} placeholder="iphone 15 pro" />
+                <Chips id="p-queries" value={v.queries} onChange={(qs) => { setAutoQueries(false); setV({ ...v, queries: qs }); }} placeholder="iphone 15 pro" />
+                <button type="button" className="mt-2 text-xs text-accent hover:underline" onClick={() => { applyPlan(q.models); setAutoQueries(true); }} disabled={!q.models.length}>Zoektermen en categorie overnemen uit de gekozen modellen</button>
               </Field>
               <div className="grid gap-4 sm:grid-cols-3">
                 <Field label="Categorie" htmlFor="p-cat">
-                  <Select id="p-cat" value={v.category} onChange={(e) => setV({ ...v, category: e.target.value })}>
-                    {KNOWN_CATEGORIES.map((c) => (<option key={c.path} value={c.path}>{c.label}</option>))}
+                  <Select id="p-cat" value={v.category} onChange={(e) => { setAutoQueries(false); setV({ ...v, category: e.target.value }); }}>
+                    {catOptions.map((c) => (<option key={c.path} value={c.path}>{c.label}</option>))}
                   </Select>
                 </Field>
                 <Field label="Pagina’s per zoekterm" htmlFor="p-pages" hint="30 resultaten per pagina, nieuwste eerst.">
@@ -168,103 +142,52 @@ export function ProfileEditor({ initial }: { initial: ProfileFormValue }) {
       </Card>
 
       <Card>
-        <CardHeader><div><CardTitle>Filters</CardTitle><CardDescription>Alle ingevulde filters moeten tegelijk kloppen (EN). Gebruik hieronder groepen voor OF-logica.</CardDescription></div></CardHeader>
-        <CardContent className="space-y-6">
-          <datalist id="models">{MODEL_SUGGESTIONS.map((m) => (<option key={m} value={m} />))}</datalist>
-          <Field label="Productmodellen" hint="Model-sleutels, bijv. iphone-15-pro. Meerdere toegestaan; Enter om toe te voegen. Leeg = alle modellen." htmlFor="q-models">
-            <Chips id="q-models" value={q.models} onChange={(m) => setQuick("models", m)} placeholder="iphone-15-pro" listId="models" />
+        <CardHeader><div><CardTitle>Eigen filters</CardTitle><CardDescription>Laad een opgeslagen filter, of sla de filters hieronder op om ze later (en op het dashboard) te hergebruiken.</CardDescription></div></CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-2">
+          <Field label="Laad opgeslagen filter" htmlFor="p-load">
+            <Select
+              id="p-load"
+              value=""
+              onChange={(e) => {
+                const f = savedFilters.find((x) => x.id === e.target.value);
+                if (!f) return;
+                const t = treeToQuick(f.tree);
+                setQ(t.quick);
+                setGroups(t.groups);
+                if (autoQueries && v.sourceKind === "SEARCH") applyPlan(t.quick.models);
+                toast(`Filter “${f.name}” geladen`);
+              }}
+            >
+              <option value="">{savedFilters.length ? "Kies een filter…" : "Nog geen eigen filters (maak ze in Instellingen)"}</option>
+              {savedFilters.map((f) => (<option key={f.id} value={f.id}>{f.name}</option>))}
+            </Select>
           </Field>
-          <div>
-            <p className="mb-1.5 text-[13px] font-medium text-foreground/80">Opslag</p>
-            <div className="flex flex-wrap gap-2">
-              {[64, 128, 256, 512, 1024].map((s) => (
-                <button key={s} type="button" aria-pressed={q.storage.includes(s)} onClick={() => setQuick("storage", q.storage.includes(s) ? q.storage.filter((x) => x !== s) : [...q.storage, s])} className={cn("rounded-full border px-4 py-1.5 text-sm transition", q.storage.includes(s) ? "border-accent bg-accent-soft text-accent" : "border-border text-foreground/80 hover:bg-muted-bg")}>
-                  {s >= 1024 ? `${s / 1024} TB` : `${s} GB`}
-                </button>
-              ))}
+          <Field label="Huidige filters opslaan als" htmlFor="p-savename">
+            <div className="flex gap-2">
+              <Input id="p-savename" placeholder="Naam van het filter" maxLength={80} value={filterName} onChange={(e) => setFilterName(e.target.value)} />
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={!filterName.trim()}
+                onClick={async () => {
+                  try {
+                    await api("/api/filters", { body: { name: filterName.trim(), tree: buildTree(q, groups, FIELD_DEFS) } });
+                    toast("Filter opgeslagen in Mijn filters");
+                    setFilterName("");
+                    router.refresh();
+                  } catch (error) {
+                    toast((error as Error).message, "err");
+                  }
+                }}
+              >
+                Opslaan
+              </Button>
             </div>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {num("maxPrice", "Maximale inkoopprijs", undefined, "€")}
-            {num("minProfit", "Minimale verwachte winst", undefined, "€")}
-            {num("minRoi", "Minimaal rendement", undefined, "%")}
-            {num("maxDistance", "Maximale afstand", "Advertenties zonder afstand komen door.", "km")}
-            {num("minBattery", "Batterijconditie minimaal", "Alleen getoetst als bekend.", "%")}
-            {num("maxAgeHours", "Maximale advertentieleeftijd", undefined, "uur")}
-            {num("minScore", "Minimale dealscore", undefined, "/100")}
-            <Field label="Maximale risico-inschatting" htmlFor="q-risk">
-              <Select id="q-risk" value={q.maxRisk} onChange={(e) => setQuick("maxRisk", e.target.value as QuickFilters["maxRisk"])}>
-                <option value="">Geen beperking</option>
-                <option value="LOW">Alleen laag risico</option>
-                <option value="MEDIUM">Tot gemiddeld risico</option>
-                <option value="HIGH">Tot hoog risico (zonder blokkades)</option>
-              </Select>
-            </Field>
-            <Field label="Verzending / ophalen" htmlFor="q-ship">
-              <Select id="q-ship" value={q.shipping} onChange={(e) => setQuick("shipping", e.target.value as QuickFilters["shipping"])}>
-                <option value="">Maakt niet uit</option>
-                <option value="shipping">Verzenden mogelijk</option>
-                <option value="pickup">Ophalen mogelijk</option>
-              </Select>
-            </Field>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Inclusiezoekwoorden (minstens één)" htmlFor="q-inc"><Chips id="q-inc" value={q.includeWords} onChange={(w) => setQuick("includeWords", w)} placeholder="bijv. zgan" /></Field>
-            <Field label="Uitsluitingszoekwoorden" htmlFor="q-exc"><Chips id="q-exc" value={q.excludeWords} onChange={(w) => setQuick("excludeWords", w)} placeholder="bijv. defect, kapot" /></Field>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {check("excludeDefects", "Defecte producten uitsluiten")}
-            {check("excludeLocked", "iCloud-/MDM-vergrendeling uitsluiten")}
-            {check("requirePhotos", "Alleen advertenties met foto's")}
-            {check("requireInfo", "Alleen advertenties met voldoende informatie")}
-          </div>
+          </Field>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <div><CardTitle>Geavanceerde groepen (EN / OF)</CardTitle><CardDescription>Elke groep telt als één voorwaarde in het geheel. Binnen een groep kies je EN of OF.</CardDescription></div>
-          <Button type="button" variant="outline" size="sm" onClick={() => setGroups([...groups, { op: "OR", conditions: [{ field: "modelKey", operator: "eq", value: "" }] }])}><Plus className="h-3.5 w-3.5" />Groep</Button>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {groups.length === 0 && <p className="text-sm text-muted">Geen extra groepen. Voeg er een toe voor bijvoorbeeld &ldquo;model A OF model B&rdquo;.</p>}
-          {groups.map((g, gi) => (
-            <div key={gi} className="rounded-2xl border border-border p-4">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="text-muted">Voldoe aan</span>
-                  <Select aria-label="Logica" className="h-9 w-28" value={g.op} onChange={(e) => setGroups(groups.map((x, i) => (i === gi ? { ...x, op: e.target.value as "AND" | "OR" } : x)))}>
-                    <option value="AND">alle (EN)</option>
-                    <option value="OR">één van (OF)</option>
-                  </Select>
-                  <span className="text-muted">onderstaande regels</span>
-                </div>
-                <Button type="button" variant="ghost" size="icon" aria-label="Verwijder groep" onClick={() => setGroups(groups.filter((_, i) => i !== gi))}><Trash2 className="h-4 w-4" /></Button>
-              </div>
-              <div className="space-y-2">
-                {g.conditions.map((c, ci) => {
-                  const def = FIELD_DEFS.find((f) => f.key === c.field) ?? FIELD_DEFS[0];
-                  const update = (patch: Partial<typeof c>) => setGroups(groups.map((x, i) => (i === gi ? { ...x, conditions: x.conditions.map((y, j) => (j === ci ? { ...y, ...patch } : y)) } : x)));
-                  const noValue = ["isTrue", "isFalse", "isKnown"].includes(c.operator);
-                  return (
-                    <div key={ci} className="grid grid-cols-[1fr_auto] gap-2 sm:grid-cols-[1.2fr_1fr_1.2fr_auto]">
-                      <Select aria-label="Veld" className="h-10" value={c.field} onChange={(e) => { const d = FIELD_DEFS.find((f) => f.key === e.target.value)!; update({ field: d.key, operator: d.operators[0], value: "" }); }}>
-                        {FIELD_DEFS.map((f) => (<option key={f.key} value={f.key}>{f.label}</option>))}
-                      </Select>
-                      <Select aria-label="Operator" className="h-10 col-start-1 sm:col-start-auto" value={c.operator} onChange={(e) => update({ operator: e.target.value })}>
-                        {def.operators.map((o) => (<option key={o} value={o}>{OP_LABEL[o] ?? o}</option>))}
-                      </Select>
-                      <Input aria-label="Waarde" className="h-10" disabled={noValue} placeholder={def.help ?? (def.type === "number" ? "getal" : "waarde, meerdere met komma")} value={noValue ? "" : c.value} onChange={(e) => update({ value: e.target.value })} />
-                      <Button type="button" variant="ghost" size="icon" aria-label="Verwijder regel" className="row-start-1 col-start-2 sm:col-start-auto sm:row-start-auto" onClick={() => setGroups(groups.map((x, i) => (i === gi ? { ...x, conditions: x.conditions.filter((_, j) => j !== ci) } : x)))}><Trash2 className="h-4 w-4" /></Button>
-                    </div>
-                  );
-                })}
-              </div>
-              <Button type="button" variant="ghost" size="sm" className="mt-2" onClick={() => setGroups(groups.map((x, i) => (i === gi ? { ...x, conditions: [...x.conditions, { field: "modelKey", operator: "eq", value: "" }] } : x)))}><Plus className="h-3.5 w-3.5" />Regel toevoegen</Button>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+      <FilterBuilder state={{ quick: q, groups }} onChange={onFilterChange} />
 
       <Card>
         <CardHeader><div><CardTitle>Meldingen</CardTitle><CardDescription>Per profiel. Kanalen en tokens stel je in bij Instellingen.</CardDescription></div></CardHeader>
@@ -294,10 +217,5 @@ export function ProfileEditor({ initial }: { initial: ProfileFormValue }) {
     </form>
   );
 }
-
-const OP_LABEL: Record<string, string> = {
-  eq: "is gelijk aan", neq: "is niet gelijk aan", in: "is één van", nin: "is geen van", gte: "≥", lte: "≤", between: "tussen (min, max)", gte_if_known: "≥ (indien bekend)", lte_if_known: "≤ (indien bekend)",
-  containsAny: "bevat één van", containsAll: "bevat alle", containsNone: "bevat geen van", isTrue: "is waar", isFalse: "is onwaar", isKnown: "is bekend",
-};
 
 export { emptyQuick };

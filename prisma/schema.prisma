@@ -107,6 +107,7 @@ model User {
   watchlist    Watchlist[]
   purchases    Purchase[]
   auditLogs    AuditLog[]
+  savedFilters SavedFilter[]
 }
 
 model SearchProfile {
@@ -179,6 +180,8 @@ model Advertisement {
   firstSeenAt      DateTime         @default(now())
   lastSeenAt       DateTime         @default(now())
   lastCheckedOkAt  DateTime?
+  // Moment waarop de volledige detailpagina (alle foto's + volledige tekst) is opgehaald
+  detailFetchedAt  DateTime?
   fingerprint      String
   rawPayload       Json?
   status           ProcessingStatus @default(NEW)
@@ -489,4 +492,17 @@ model AuditLog {
 
   @@index([createdAt])
   @@index([action])
+}
+
+// Door de gebruiker gemaakte, herbruikbare filters (zelfde regelboom als zoekprofielen)
+model SavedFilter {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  tree      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, name])
 }

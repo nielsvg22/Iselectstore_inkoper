@@ -37,6 +37,9 @@ docker compose up --build       # web op :3000, worker en Postgres inbegrepen
 | Onderdeel | Status |
 |---|---|
 | **Automatisch zoeken op Marktplaats** (zoektermen + categorie + filters, alle resultaten, nieuwste eerst, volledige tekst van nieuwe advertenties) | ✅ live getest |
+| **Eigen filters** (Instellingen → Mijn filters): maken, wijzigen, toepassen op het dashboard en laden in zoekprofielen | ✅ |
+| **Volledige Apple-lijst** (±130 modellen + accessoires) als doorzoekbare productkiezer; **Apple-categorieën van Marktplaats** (live opgehaald, vernieuwbaar) | ✅ |
+| **Alle foto's** van een advertentie (detailpagina, hoge resolutie, automatisch bij openen) | ✅ |
 | Data acquisition: URL-import, JSON/CSV-import, feed-profielen, demodata; adapter-architectuur; dedup op id + titel/foto/prijs/plaats | ✅ |
 | Productherkenning: iPhone 11+/SE, MacBook Air/Pro (Intel/M1–M5), iPad, Watch, AirPods, Mac mini/iMac/Studio, accessoires; spelfouten ("ipone 14", "iphone 15pro 256 batterij 91"); onderscheid *vastgesteld / volgens verkoper / AI-inschatting / onbekend*; verzint niets | ✅ |
 | Optionele AI-verrijking (Anthropic/OpenAI/compatibel), gevalideerd JSON, cache, dagbudget, optioneel foto's | ✅ (vereist uw API-sleutel) |
@@ -63,7 +66,7 @@ Instelbaar onder *Instellingen*: vraagprijs→verkoopprijs-factor (0,92), opslag
 
 ## Testen
 ```bash
-npm test               # 208 unit- + integratietests (Postgres vereist; gebruikt DB dealhunter_test)
+npm test               # 355 unit- + integratietests (Postgres vereist; gebruikt DB dealhunter_test)
 npm run lint           # TypeScript
 npm run test:e2e       # Playwright (bouwt niet; draai eerst `npm run build`; DB dealhunter_e2e)
 ```

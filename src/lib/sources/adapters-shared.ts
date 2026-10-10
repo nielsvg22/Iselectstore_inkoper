@@ -31,7 +31,7 @@ export async function fetchListingUrl(url: string, opts: { allowlist: string[]; 
   }
   try {
     const ad = parseListingHtml(res.text, res.url);
-    return ad;
+    return { ...ad, detailLoaded: true };
   } catch (e) {
     if (e instanceof ParseError) throw new SourceError(`Pagina kon niet worden uitgelezen: ${e.message}`, false);
     throw e;

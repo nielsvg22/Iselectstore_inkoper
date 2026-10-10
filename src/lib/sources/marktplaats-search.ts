@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { hiRes } from "../images";
+import { hiRes, mergeImages } from "../images";
 import { prisma } from "../db/client";
 import { Throttle } from "../security/ratelimit";
 import { getConfig } from "../settings/store";
@@ -112,7 +112,7 @@ export function mapSearchListing(o: Obj, now = new Date()): RawAd | null {
     shipping,
     conditionText: attrs.condition ?? null,
     publishedAt: parseListingDate(o.date, now),
-    imageUrls: [...new Set(imgs)].slice(0, 12),
+    imageUrls: mergeImages(imgs).slice(0, 12),
     attributes: structured,
   };
 }
@@ -148,7 +148,9 @@ export function mergeDetail(list: RawAd, detail: RawAd): RawAd {
   return {
     ...list,
     description: (detail.description ?? "").length > (list.description ?? "").length ? detail.description : list.description,
-    imageUrls: [...new Set([...list.imageUrls, ...detail.imageUrls])].slice(0, 12),
+    // Detailpagina eerst: die heeft de volledige fotoset; zoekresultaat-foto's vullen alleen aan
+    imageUrls: mergeImages(detail.imageUrls.map((u) => hiRes(u, "full")), list.imageUrls).slice(0, 20),
+    detailLoaded: true,
     askingCents: list.askingCents ?? detail.askingCents ?? null,
     location: list.location ?? detail.location ?? null,
   };
@@ -194,17 +196,18 @@ export const searchAdapter: SourceAdapter = {
     }
     let ads = [...seen.values()];
 
-    // Volledige beschrijving alleen voor nieuwe advertenties (beperkt aantal requests)
+    // Volledige tekst + alle foto's van de detailpagina voor advertenties waarvan we die nog niet hebben
+    // (nieuw, of eerder niet aan de beurt gekomen door de limiet). Nieuwste eerst, begrensd per run.
     if (sc.fetchDetails && ads.length) {
-      const known = await prisma.advertisement.findMany({ where: { source: "marktplaats", externalId: { in: ads.map((a) => a.externalId) } }, select: { externalId: true } });
-      const knownSet = new Set(known.map((k) => k.externalId));
-      const fresh = ads.filter((a) => !knownSet.has(a.externalId)).slice(0, 15);
-      for (const a of fresh) {
+      const known = await prisma.advertisement.findMany({ where: { source: "marktplaats", externalId: { in: ads.map((a) => a.externalId) } }, select: { externalId: true, detailFetchedAt: true } });
+      const done = new Set(known.filter((k) => k.detailFetchedAt).map((k) => k.externalId));
+      const todo = ads.filter((a) => !done.has(a.externalId)).slice(0, cfg.limits.maxDetailsPerRun);
+      for (const a of todo) {
         try {
           const d = await fetchListingUrl(a.url, { allowlist: cfg.sources.urlAllowlist, minSecondsBetween: gap / 1000, fetchImpl: ctx.fetchImpl, lookup: ctx.lookup, throttleId: "search-detail" });
           ads = ads.map((x) => (x.externalId === a.externalId ? mergeDetail(x, d) : x));
         } catch {
-          /* detailpagina niet beschikbaar: zoekresultaat-gegevens blijven gelden */
+          /* detailpagina niet beschikbaar (verkocht/verwijderd/geweigerd): zoekresultaat-gegevens blijven gelden */
         }
       }
     }

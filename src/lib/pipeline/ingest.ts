@@ -1,6 +1,7 @@
 import type { DataOrigin, Prisma } from "@prisma/client";
 import { prisma } from "../db/client";
 import { contentHash, findDuplicate, fingerprint, type DupCandidate } from "../engines/dedupe";
+import { mergeImages } from "../images";
 import { recognizeByRules } from "../engines/recognition";
 import { enqueue } from "../jobs/queue";
 import type { RawAd } from "../sources/types";
@@ -13,15 +14,23 @@ export interface IngestResult {
   duplicateOfId: string | null;
 }
 
-export async function ingestAd(raw: RawAd, opts: { origin: DataOrigin; isDemo?: boolean; source?: string; enqueueAnalysis?: boolean }): Promise<IngestResult> {
+export async function ingestAd(raw: RawAd, opts: { origin: DataOrigin; isDemo?: boolean; source?: string; enqueueAnalysis?: boolean; /** bronnen die alleen een samenvatting leveren (zoekresultaten): overschrijf nooit volledige tekst/foto's */ partial?: boolean }): Promise<IngestResult> {
   const source = opts.source ?? (opts.isDemo ? "demo" : "marktplaats");
-  const imageUrls = raw.imageUrls ?? [];
-  const description = raw.description ?? "";
+  const existing = await prisma.advertisement.findUnique({
+    where: { source_externalId: { source, externalId: raw.externalId } },
+    select: { id: true, askingPriceCents: true, contentHash: true, status: true, description: true, detailFetchedAt: true, images: { select: { url: true }, orderBy: { position: "asc" } } },
+  });
+  let imageUrls = raw.imageUrls ?? [];
+  let description = raw.description ?? "";
+  // Samenvattingen (zoekresultaten) mogen de volledige tekst en fotoset uit de detailpagina nooit verdringen
+  if (opts.partial && !raw.detailLoaded && existing) {
+    if (existing.detailFetchedAt || existing.description.length > description.length) description = existing.description;
+    imageUrls = existing.detailFetchedAt ? existing.images.map((i) => i.url) : mergeImages(existing.images.map((i) => i.url), imageUrls);
+  }
   const rec = recognizeByRules({ title: raw.title, description, structured: raw.attributes ?? null });
   const storage = typeof rec.facts.storageGb?.value === "number" ? rec.facts.storageGb.value : null;
   const fp = fingerprint(raw.title, rec.modelKey, storage);
   const hash = contentHash({ title: raw.title, description, askingCents: raw.askingCents ?? null, imageUrls });
-  const existing = await prisma.advertisement.findUnique({ where: { source_externalId: { source, externalId: raw.externalId } }, select: { id: true, askingPriceCents: true, contentHash: true, status: true } });
   const now = new Date();
 
   const data = {
@@ -41,6 +50,7 @@ export async function ingestAd(raw: RawAd, opts: { origin: DataOrigin; isDemo?: 
     publishedAt: raw.publishedAt ?? null,
     lastSeenAt: now,
     lastCheckedOkAt: now,
+    ...(raw.detailLoaded ? { detailFetchedAt: now } : {}),
     fingerprint: fp,
     contentHash: hash,
     rawPayload: (raw.attributes ? { attributes: raw.attributes } : undefined) as Prisma.InputJsonValue | undefined,

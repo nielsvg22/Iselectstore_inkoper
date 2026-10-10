@@ -157,7 +157,7 @@ describe("volledige advertentietekst uit de pagina-HTML", () => {
   });
 });
 
-import { hiRes } from "@/lib/images";
+import { hiRes, imageKey, mergeImages } from "@/lib/images";
 describe("scherpe foto's", () => {
   const thumb = "https://images.marktplaats.com/api/v1/hz-mp-pro-listing/images/c523?rule=ecg_mp_eps$_82.jpg";
   it("schaalt de miniatuur (82) op naar de gevraagde maat", () => {
@@ -170,6 +170,14 @@ describe("scherpe foto's", () => {
     expect(hiRes("https://cdn.example/a_82.jpg")).toBe("https://cdn.example/a_82.jpg");
     expect(hiRes("/api/demo-image/iphone")).toBe("/api/demo-image/iphone");
     expect(hiRes(null)).toBe("");
+  });
+  it("herkent dezelfde foto in verschillende maten en voegt lijsten samen zonder dubbelen", () => {
+    const a = "https://images.marktplaats.com/api/v1/hz-mp-pro-listing/images/abc?rule=ecg_mp_eps$_82.jpg";
+    const b = "https://images.marktplaats.com/api/v1/hz-mp-pro-listing/images/abc?rule=ecg_mp_eps$_86";
+    const c = "//images.marktplaats.com/api/v1/hz-mp-pro-listing/images/def?rule=ecg_mp_eps$_86";
+    expect(imageKey(a)).toBe(imageKey(b));
+    expect(mergeImages([b, c], [a])).toEqual([b, c]);
+    expect(mergeImages([], [a, b, c])).toEqual([a, c]);
   });
   it("zoekresultaten worden meteen met hoge resolutie opgeslagen", () => {
     const a = parseSearchPage(fixture, NOW).ads[0];

@@ -1,4 +1,7 @@
+import { HttpError } from "@/lib/auth";
 import { route } from "@/lib/api";
+import { prisma } from "@/lib/db/client";
+import type { Group } from "@/lib/engines/filters";
 import { listDeals } from "@/lib/queries";
 import { z } from "zod";
 
@@ -8,6 +11,7 @@ const q = z.object({
   minScore: z.coerce.number().int().min(0).max(100).optional(),
   family: z.string().max(30).optional(),
   profileId: z.string().max(40).optional(),
+  filter: z.string().max(40).optional(),
   userState: z.enum(["NONE", "INTERESTING", "FAVORITE", "IGNORED"]).optional(),
   review: z.enum(["1", "0"]).optional(),
   showBlocked: z.enum(["1", "0"]).optional(),
@@ -16,9 +20,11 @@ const q = z.object({
   offset: z.coerce.number().int().min(0).optional(),
 });
 
-export const GET = route(async (req) => {
+export const GET = route(async (req, { user }) => {
   const p = q.parse(Object.fromEntries(new URL(req.url).searchParams));
-  const { rows, total } = await listDeals({ ...p, review: p.review === "1", showBlocked: p.showBlocked === "1" });
+  const saved = p.filter ? await prisma.savedFilter.findFirst({ where: { id: p.filter, userId: user.id } }) : null;
+  if (p.filter && !saved) throw new HttpError(404, "Filter niet gevonden");
+  const { rows, total } = await listDeals({ ...p, savedTree: saved ? (saved.tree as unknown as Group) : undefined, review: p.review === "1", showBlocked: p.showBlocked === "1" });
   return {
     total,
     items: rows.map((a) => ({

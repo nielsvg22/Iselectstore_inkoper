@@ -9,11 +9,12 @@ import { saveTree } from "@/lib/pipeline/tree";
 import { processJobs } from "@/lib/jobs/queue";
 import { handlers } from "@/lib/jobs/handlers";
 import { saveConfig } from "@/lib/settings/store";
-import { makeUser, resetDb } from "../helpers";
+import { ctx, makeUser, req, resetDb } from "../helpers";
+import { POST as refreshAd } from "@/app/api/ads/[id]/refresh/route";
 
 const SEARCH_HTML = readFileSync("tests/fixtures/mp-search.html", "utf8");
 const ROBOTS = "User-agent: *\nDisallow: /lrp/api/search*\nDisallow: /search?q=*\nDisallow: /lp/api/listings*\nDisallow: */n/*";
-const detailHtml = (id: string, title: string, price: number) => `<html><head><script type="application/ld+json">${JSON.stringify({ "@context": "https://schema.org", "@type": "Product", name: title, description: "Volledige tekst: batterij 90%. icloud vrij, simlockvrij. Prima staat, ophalen in Utrecht. ".repeat(3), sku: id, image: ["https://images.marktplaats.com/a.jpg"], offers: { "@type": "Offer", price: String(price), priceCurrency: "EUR" } })}</script></head></html>`;
+const detailHtml = (id: string, title: string, price: number) => `<html><head><script type="application/ld+json">${JSON.stringify({ "@context": "https://schema.org", "@type": "Product", name: title, description: "Volledige tekst: batterij 90%. icloud vrij, simlockvrij. Prima staat, ophalen in Utrecht. ".repeat(3), sku: id, image: [1, 2, 3, 4].map((n) => `https://images.marktplaats.com/api/v1/hz-mp-pro-listing/images/${id}-${n}?rule=ecg_mp_eps$_86`), offers: { "@type": "Offer", price: String(price), priceCurrency: "EUR" } })}</script></head></html>`;
 
 let requested: string[] = [];
 function stubFetch(over: { searchStatus?: number; page2?: string } = {}) {
@@ -158,5 +159,78 @@ describe("automatisch zoeken op Marktplaats", () => {
     expect(profileInput.safeParse({ name: "x", sourceKind: "SEARCH", sourceConfig: {} }).success).toBe(false);
     expect(profileInput.safeParse({ name: "x", sourceKind: "SEARCH", sourceConfig: { queries: ["iphone 15"] } }).success).toBe(true);
     expect(profileInput.safeParse({ name: "x", sourceKind: "SEARCH", sourceConfig: { queries: ["iphone"], category: "../../x" } }).success).toBe(false);
+  });
+
+  it("alle foto's: zoekresultaat heeft 1 foto, de detailpagina levert de volledige set", async () => {
+    stubFetch();
+    const p = await searchProfile({ op: "AND", children: [] }, { fetchDetails: true });
+    await runProfileCheck(p.id);
+    const ad = await prisma.advertisement.findFirstOrThrow({ include: { images: { orderBy: { position: "asc" } } } });
+    expect(ad.images.length).toBeGreaterThanOrEqual(4);
+    expect(ad.detailFetchedAt).toBeTruthy();
+    expect(ad.images.every((i) => /\$_86/.test(i.url))).toBe(true);
+    // geen dubbele foto's van dezelfde afbeelding in verschillende maten
+    const keys = ad.images.map((i) => i.url.replace(/\$_\d+.*$/, ""));
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it("een volgende zoekronde overschrijft de volledige tekst en fotoset niet met de afgekapte samenvatting", async () => {
+    stubFetch();
+    const p = await searchProfile({ op: "AND", children: [] }, { fetchDetails: true });
+    await runProfileCheck(p.id);
+    const before = await prisma.advertisement.findFirstOrThrow({ include: { images: true } });
+    const jobsBefore = await prisma.backgroundJob.count({ where: { type: "ANALYZE_AD" } });
+    stubFetch();
+    const second = await runProfileCheck(p.id);
+    const after = await prisma.advertisement.findUniqueOrThrow({ where: { id: before.id }, include: { images: true } });
+    expect(after.description).toBe(before.description);
+    expect(after.images.length).toBe(before.images.length);
+    expect(second.changed).toBe(0);
+    expect(await prisma.backgroundJob.count({ where: { type: "ANALYZE_AD" } })).toBe(jobsBefore);
+  });
+
+  it("begrenst het aantal detailpagina's per run en haalt de rest in een volgende run op", async () => {
+    await saveConfig({ limits: { maxDetailsPerRun: 1 } });
+    stubFetch();
+    const p = await searchProfile({ op: "AND", children: [] }, { fetchDetails: true });
+    await runProfileCheck(p.id);
+    expect(requested.filter((x) => x.startsWith("/v/")).length).toBe(1);
+    expect(await prisma.advertisement.count({ where: { detailFetchedAt: { not: null } } })).toBe(1);
+    stubFetch();
+    await runProfileCheck(p.id);
+    expect(requested.filter((x) => x.startsWith("/v/")).length).toBe(1);
+    expect(await prisma.advertisement.count({ where: { detailFetchedAt: { not: null } } })).toBe(2);
+  });
+
+  it("op aanvraag verversen: foto's en tekst van één advertentie worden direct opgehaald", async () => {
+    stubFetch();
+    const p = await searchProfile({ op: "AND", children: [] }, { fetchDetails: false });
+    await runProfileCheck(p.id);
+    const ad = await prisma.advertisement.findFirstOrThrow({ include: { images: true } });
+    expect(ad.detailFetchedAt).toBeNull();
+    const imagesBefore = ad.images.length;
+    const { cookie } = await makeUser("ADMIN", "refresh@example.com");
+    const res = await refreshAd(req(`/api/ads/${ad.id}/refresh`, { method: "POST", cookie, body: {} }), ctx({ id: ad.id }));
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { ok: boolean; images: number };
+    expect(body.ok).toBe(true);
+    expect(body.images).toBeGreaterThan(imagesBefore);
+    const after = await prisma.advertisement.findUniqueOrThrow({ where: { id: ad.id } });
+    expect(after.detailFetchedAt).toBeTruthy();
+    expect(after.description).toContain("Volledige tekst");
+    expect(await prisma.dealAnalysis.count({ where: { adId: ad.id, isCurrent: true } })).toBe(1);
+  });
+
+  it("verversen van een verwijderde advertentie geeft een nette melding", async () => {
+    stubFetch();
+    const p = await searchProfile({ op: "AND", children: [] }, { fetchDetails: false });
+    await runProfileCheck(p.id);
+    const ad = await prisma.advertisement.findFirstOrThrow();
+    vi.stubGlobal("fetch", async (u: string) => (new URL(u).pathname === "/robots.txt" ? new Response(ROBOTS) : new Response("weg", { status: 410 })));
+    const { cookie } = await makeUser("ADMIN", "gone@example.com");
+    const res = await refreshAd(req(`/api/ads/${ad.id}/refresh`, { method: "POST", cookie, body: {} }), ctx({ id: ad.id }));
+    const body = (await res.json()) as { ok: boolean; error: string };
+    expect(body.ok).toBe(false);
+    expect(body.error).toMatch(/niet meer beschikbaar/);
   });
 });

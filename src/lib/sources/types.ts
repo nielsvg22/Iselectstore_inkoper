@@ -17,6 +17,8 @@ export interface RawAd {
   imageUrls: string[];
   attributes?: Record<string, string | number>;
   raw?: unknown;
+  /** true = afkomstig van de volledige detailpagina (alle foto's + volledige tekst) */
+  detailLoaded?: boolean;
 }
 
 export interface FetchContext {

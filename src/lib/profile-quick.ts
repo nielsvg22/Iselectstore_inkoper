@@ -127,3 +127,27 @@ export function buildTree(q: QuickFilters, groups: AdvancedGroup[], defs: Array<
   }
   return { op: "AND", children };
 }
+
+/** Korte, leesbare samenvatting van een filter (voor lijsten). */
+export function summarizeFilter(q: QuickFilters, groups: AdvancedGroup[]): string[] {
+  const out: string[] = [];
+  if (q.models.length) out.push(q.models.length === 1 ? q.models[0] : `${q.models.length} modellen`);
+  if (q.storage.length) out.push(q.storage.map((s) => (s >= 1024 ? `${s / 1024} TB` : `${s} GB`)).join("/"));
+  if (q.maxPrice) out.push(`≤ €${q.maxPrice}`);
+  if (q.minProfit) out.push(`winst ≥ €${q.minProfit}`);
+  if (q.minRoi) out.push(`rendement ≥ ${q.minRoi}%`);
+  if (q.maxDistance) out.push(`≤ ${q.maxDistance} km`);
+  if (q.minBattery) out.push(`batterij ≥ ${q.minBattery}%`);
+  if (q.maxAgeHours) out.push(`≤ ${q.maxAgeHours} uur oud`);
+  if (q.minScore) out.push(`score ≥ ${q.minScore}`);
+  if (q.maxRisk) out.push(`risico ≤ ${q.maxRisk === "LOW" ? "laag" : q.maxRisk === "MEDIUM" ? "gemiddeld" : "hoog"}`);
+  if (q.includeWords.length) out.push(`bevat: ${q.includeWords.join("/")}`);
+  if (q.excludeWords.length) out.push(`zonder: ${q.excludeWords.join("/")}`);
+  if (q.excludeDefects) out.push("geen defecten");
+  if (q.excludeLocked) out.push("geen iCloud/MDM-slot");
+  if (q.requirePhotos) out.push("met foto's");
+  if (q.requireInfo) out.push("voldoende info");
+  if (q.shipping) out.push(q.shipping === "shipping" ? "verzenden" : "ophalen");
+  if (groups.length) out.push(`${groups.length} extra groep${groups.length > 1 ? "en" : ""}`);
+  return out;
+}

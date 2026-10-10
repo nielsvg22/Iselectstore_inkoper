@@ -147,8 +147,10 @@ test("zoekprofiel aanmaken met filters en AND/OR-groep, bewerken en pauzeren", a
   await page.getByLabel("Minimaal rendement").fill("25");
   await page.getByRole("button", { name: "128 GB" }).click();
   await page.getByRole("button", { name: "256 GB" }).click();
-  await page.getByLabel("Productmodellen").fill("iphone-15-pro");
-  await page.getByLabel("Productmodellen").press("Enter");
+  await page.getByLabel("Zoek product").fill("15 pro");
+  await page.getByRole("button", { name: "iPhone 15 Pro", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Verwijder iPhone 15 Pro", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "iPhone 15 Pro Max", exact: true }).click();
   await page.getByText("Defecte producten uitsluiten").click();
   await page.getByRole("button", { name: /Groep/ }).click();
   await page.getByLabel("Waarde").first().fill("zgan, als nieuw");
@@ -163,11 +165,49 @@ test("zoekprofiel aanmaken met filters en AND/OR-groep, bewerken en pauzeren", a
   await page.getByRole("link", { name: "Bewerken" }).first().click();
   await expect(page.getByLabel("Maximale inkoopprijs")).toHaveValue("400");
   await expect(page.getByLabel("Pagina’s per zoekterm")).toHaveValue("3");
+  await expect(page.getByRole("button", { name: "Verwijder iPhone 15 Pro Max", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "256 GB" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByLabel("Waarde").first()).toHaveValue("zgan, als nieuw");
   await page.getByRole("button", { name: "Annuleren" }).click();
   await page.getByRole("button", { name: "Pauzeren" }).first().click();
   await expect(page.getByText("Gepauzeerd").first()).toBeVisible();
+});
+
+test("eigen filters: maken in Instellingen met productlijst, toepassen op dashboard, laden in profiel", async ({ page }) => {
+  await login(page);
+  await page.goto("/settings");
+  // Apple-categorielijst van Marktplaats
+  await expect(page.getByText("Apple op Marktplaats")).toBeVisible();
+  await expect(page.getByText("Apple iPhones", { exact: true })).toBeVisible();
+  await expect(page.getByText("telecommunicatie/mobiele-telefoons-apple-iphone").first()).toBeVisible();
+  // nieuw filter met modellen uit de lijst
+  await page.getByRole("button", { name: /Nieuw filter/ }).click();
+  await page.getByLabel("Naam van het filter").fill("MacBooks onder €900");
+  await page.getByRole("tab", { name: "MacBook" }).click();
+  await page.getByRole("button", { name: "MacBook Air 13″ M2", exact: true }).click();
+  await page.getByRole("button", { name: "MacBook Air 13″ M1", exact: true }).click();
+  await page.locator("#q-maxPrice").fill("900");
+  await page.getByRole("button", { name: "Filter opslaan" }).click();
+  await expect(page.getByText("Filter opgeslagen")).toBeVisible();
+  await expect(page.getByText("MacBooks onder €900")).toBeVisible();
+  await expect(page.getByText("2 modellen")).toBeVisible();
+  await expect(page.getByText("≤ €900")).toBeVisible();
+  // toepassen op het dashboard
+  await page.goto("/");
+  await page.getByLabel("Mijn filters").selectOption({ label: "MacBooks onder €900" });
+  await expect(page).toHaveURL(/filter=/);
+  await expect(page.getByText(/volgens je filter “MacBooks onder €900”/)).toBeVisible();
+  for (const t of await page.locator("article h3").allTextContents()) expect(t.toLowerCase()).toContain("macbook");
+  // laden in een nieuw zoekprofiel
+  await page.goto("/profiles/new");
+  await page.getByLabel("Laad opgeslagen filter").selectOption({ label: "MacBooks onder €900" });
+  await expect(page.getByLabel("Maximale inkoopprijs")).toHaveValue("900");
+  await expect(page.getByRole("button", { name: "Verwijder MacBook Air 13″ M2", exact: true })).toBeVisible();
+  // verwijderen
+  await page.goto("/settings");
+  page.once("dialog", (d) => d.accept());
+  await page.getByRole("button", { name: "Verwijder MacBooks onder €900" }).click();
+  await expect(page.getByText("Filter verwijderd")).toBeVisible();
 });
 
 test("instellingen: geheimen worden nooit teruggetoond", async ({ page }) => {

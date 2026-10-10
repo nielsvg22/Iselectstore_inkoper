@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState, Skeleton } from "@/components/ui/states";
 import { getCurrentUser } from "@/lib/auth";
+import type { Group } from "@/lib/engines/filters";
 import { prisma } from "@/lib/db/client";
 import { formatEuro, formatPct } from "@/lib/format";
 import { dashboardStats, listDeals } from "@/lib/queries";
@@ -45,14 +46,17 @@ async function Stats() {
   );
 }
 
-async function Deals({ sp }: { sp: Awaited<SP> }) {
+async function Deals({ sp, userId }: { sp: Awaited<SP>; userId: string }) {
   const cfg = await getConfig();
+  const filterId = one(sp.filter);
+  const saved = filterId ? await prisma.savedFilter.findFirst({ where: { id: filterId, userId } }) : null;
   const sort = one(sp.sort) as never;
   const { rows, total } = await listDeals({
     q: one(sp.q),
     band: one(sp.band),
     family: one(sp.family),
     profileId: one(sp.profile),
+    savedTree: saved ? (saved.tree as unknown as Group) : undefined,
     review: one(sp.review) === "1",
     showBlocked: one(sp.blocked) === "1",
     sort: sort ?? "score",
@@ -83,7 +87,7 @@ async function Deals({ sp }: { sp: Awaited<SP> }) {
     url: a.ad.url,
     priceKnown: a.ad.askingPriceCents != null && a.ad.askingPriceCents > 0,
   }));
-  const filtered = Boolean(one(sp.q) || one(sp.band) || one(sp.family) || one(sp.profile) || one(sp.review));
+  const filtered = Boolean(one(sp.q) || one(sp.band) || one(sp.family) || one(sp.profile) || one(sp.review) || saved);
   if (!data.length) {
     const any = await prisma.advertisement.count({ where: { isDemo: cfg.demoMode } });
     return filtered ? (
@@ -107,7 +111,7 @@ async function Deals({ sp }: { sp: Awaited<SP> }) {
   const view = one(sp.view) === "table" ? "table" : "cards";
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted" aria-live="polite">{total} {total === 1 ? "deal" : "deals"}{total > data.length ? ` · eerste ${data.length} getoond` : ""}</p>
+      <p className="text-sm text-muted" aria-live="polite">{total} {total === 1 ? "deal" : "deals"}{saved ? ` volgens je filter “${saved.name}”` : ""}{total > data.length ? ` · eerste ${data.length} getoond` : ""}</p>
       {view === "table" ? <DealTable rows={data} /> : <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{data.map((d) => <DealCard key={d.adId} d={d} />)}</div>}
     </div>
   );
@@ -124,7 +128,10 @@ function DealsSkeleton() {
 export default async function DashboardPage({ searchParams }: { searchParams: SP }) {
   const sp = await searchParams;
   const user = await getCurrentUser();
-  const profiles = await prisma.searchProfile.findMany({ where: { userId: user!.id }, select: { id: true, name: true }, orderBy: { name: "asc" } });
+  const [profiles, savedFilters] = await Promise.all([
+    prisma.searchProfile.findMany({ where: { userId: user!.id }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.savedFilter.findMany({ where: { userId: user!.id }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+  ]);
   return (
     <div className="space-y-8">
       <div>
@@ -137,10 +144,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: SP
       </Suspense>
       <section className="space-y-4" aria-label="Deals">
         <Suspense fallback={<Skeleton className="h-11" />}>
-          <FiltersBar profiles={profiles} />
+          <FiltersBar profiles={profiles} savedFilters={savedFilters} />
         </Suspense>
         <Suspense key={JSON.stringify(sp)} fallback={<DealsSkeleton />}>
-          <Deals sp={sp} />
+          <Deals sp={sp} userId={user!.id} />
         </Suspense>
       </section>
     </div>

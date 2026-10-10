@@ -71,6 +71,14 @@ describe("authenticatie en autorisatie", () => {
     expect(await prisma.auditLog.count({ where: { action: "login.failed" } })).toBeGreaterThan(0);
   });
 
+  it("geslaagde logins verbruiken het inlogbudget niet", async () => {
+    await makeUser("ADMIN", "many@example.com");
+    for (let i = 0; i < 15; i++) {
+      const r = await login(req("/api/auth/login", { method: "POST", body: { email: "many@example.com", password: "correct-horse-battery" } }));
+      expect(r.status).toBe(200);
+    }
+  });
+
   it("setup werkt alleen als er nog geen gebruikers zijn", async () => {
     const first = await setup(req("/api/auth/setup", { method: "POST", body: { email: "a@example.com", password: "een-lang-wachtwoord" } }));
     expect(first.status).toBe(200);

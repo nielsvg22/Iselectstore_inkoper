@@ -43,7 +43,7 @@ export async function runProfileCheck(profileId: string): Promise<{ fetched: num
     let created = 0;
     let changed = 0;
     for (const raw of ads) {
-      const r = await ingestAd(raw, { origin: adapter.origin, isDemo: adapter.origin === "DEMO" });
+      const r = await ingestAd(raw, { origin: adapter.origin, isDemo: adapter.origin === "DEMO", partial: adapter.origin === "SEARCH" });
       if (r.created) created++;
       if (r.changed) changed++;
     }

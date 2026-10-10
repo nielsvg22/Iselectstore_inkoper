@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AdActions } from "@/components/ad/ad-actions";
+import { AutoEnrich } from "@/components/ad/auto-enrich";
 import { CorrectionsForm, CostEditor, NotesEditor } from "@/components/ad/ad-editors";
 import { PriceHistoryChart } from "@/components/ad/charts";
 import { Gallery } from "@/components/ad/gallery";
@@ -96,6 +97,8 @@ export default async function AdDetailPage({ params }: { params: Promise<{ id: s
           </a>
         )}
       </div>
+
+      {!ad.isDemo && ad.origin === "SEARCH" && !ad.detailFetchedAt && <AutoEnrich adId={ad.id} />}
 
       {ad.needsManualReview && ad.risk && (
         <Notice tone="warning"><strong>Handmatige controle vereist.</strong> Controleer deze advertentie zorgvuldig voordat je contact opneemt; de automatische analyse is hier onvoldoende zeker.</Notice>

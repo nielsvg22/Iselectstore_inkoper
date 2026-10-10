@@ -1,7 +1,7 @@
-/** Geverifieerde categoriepaden (client-veilig; geen server-imports). */
+import { APPLE_CATEGORIES } from "../catalog/categories";
+
+/** Categoriekeuze voor zoekprofielen: "Alle categorieën" + de Apple-apparaatcategorieën. */
 export const KNOWN_CATEGORIES: Array<{ path: string; label: string }> = [
   { path: "", label: "Alle categorieën" },
-  { path: "telecommunicatie/mobiele-telefoons-apple-iphone", label: "iPhones" },
-  { path: "computers-en-software/apple-macbooks", label: "MacBooks" },
-  { path: "computers-en-software/apple-ipads", label: "iPads" },
+  ...APPLE_CATEGORIES.filter((c) => c.group === "device").map((c) => ({ path: c.path, label: c.label })),
 ];

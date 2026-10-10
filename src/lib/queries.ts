@@ -1,5 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./db/client";
+import { evaluate, type Group } from "./engines/filters";
+import { contextFromRow } from "./pipeline/context";
 import { getConfig } from "./settings/store";
 
 export interface DealFilters {
@@ -8,6 +10,8 @@ export interface DealFilters {
   minScore?: number;
   family?: string;
   profileId?: string;
+  /** Eigen (opgeslagen) filter: wordt in-memory op de resultaten toegepast */
+  savedTree?: Group;
   userState?: string;
   review?: boolean;
   showBlocked?: boolean;
@@ -35,14 +39,18 @@ export async function listDeals(f: DealFilters) {
   };
   const orderBy: Prisma.DealAnalysisOrderByWithRelationInput =
     f.sort === "profit" ? { netProfitCents: "desc" } : f.sort === "roi" ? { roiPct: "desc" } : f.sort === "new" ? { ad: { firstSeenAt: "desc" } } : f.sort === "price" ? { askingCents: "asc" } : { score: "desc" };
+  const include = { ad: { include: { images: { orderBy: { position: "asc" as const }, take: 1 }, _count: { select: { images: true } }, product: { include: { specs: true } }, risk: true } } };
+  const take = Math.min(200, f.limit ?? 48);
+  const skip = f.offset ?? 0;
+  if (f.savedTree) {
+    // Eigen filter: laad een ruime, gesorteerde kandidatenset en pas de regelboom per advertentie toe
+    const candidates = await prisma.dealAnalysis.findMany({ where, orderBy: [orderBy, { createdAt: "desc" }], take: 1500, include });
+    const tree = f.savedTree;
+    const matched = candidates.filter((r) => evaluate(tree, contextFromRow(r)));
+    return { rows: matched.slice(skip, skip + take), total: matched.length };
+  }
   const [rows, total] = await Promise.all([
-    prisma.dealAnalysis.findMany({
-      where,
-      orderBy: [orderBy, { createdAt: "desc" }],
-      take: Math.min(200, f.limit ?? 48),
-      skip: f.offset ?? 0,
-      include: { ad: { include: { images: { orderBy: { position: "asc" }, take: 1 }, product: true, risk: true } } },
-    }),
+    prisma.dealAnalysis.findMany({ where, orderBy: [orderBy, { createdAt: "desc" }], take, skip, include }),
     prisma.dealAnalysis.count({ where }),
   ]);
   return { rows, total };

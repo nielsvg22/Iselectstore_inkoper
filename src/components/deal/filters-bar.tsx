@@ -5,7 +5,7 @@ import * as React from "react";
 import { Input, Select } from "@/components/ui/form";
 import { cn } from "@/lib/cn";
 
-export function FiltersBar({ profiles }: { profiles: Array<{ id: string; name: string }> }) {
+export function FiltersBar({ profiles, savedFilters = [] }: { profiles: Array<{ id: string; name: string }>; savedFilters?: Array<{ id: string; name: string }> }) {
   const router = useRouter();
   const path = usePathname();
   const sp = useSearchParams();
@@ -32,7 +32,7 @@ export function FiltersBar({ profiles }: { profiles: Array<{ id: string; name: s
         <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
         <Input aria-label="Zoek in advertenties" placeholder="Zoek op titel…" className="pl-10" value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
         <Select aria-label="Sorteren" value={sp.get("sort") ?? "score"} onChange={(e) => set({ sort: e.target.value === "score" ? null : e.target.value })}>
           <option value="score">Beste score</option>
           <option value="profit">Hoogste winst</option>
@@ -55,6 +55,10 @@ export function FiltersBar({ profiles }: { profiles: Array<{ id: string; name: s
           <option value="ipad">iPad</option>
           <option value="watch">Apple Watch</option>
           <option value="airpods">AirPods</option>
+        </Select>
+        <Select aria-label="Mijn filters" value={sp.get("filter") ?? ""} onChange={(e) => set({ filter: e.target.value || null })}>
+          <option value="">{savedFilters.length ? "Mijn filters" : "Geen eigen filters"}</option>
+          {savedFilters.map((f) => (<option key={f.id} value={f.id}>{f.name}</option>))}
         </Select>
         <Select aria-label="Zoekprofiel" value={sp.get("profile") ?? ""} onChange={(e) => set({ profile: e.target.value || null })}>
           <option value="">Alle profielen</option>

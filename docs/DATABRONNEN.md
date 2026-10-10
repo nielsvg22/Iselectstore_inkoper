@@ -16,7 +16,7 @@
 1. Je geeft **zoektermen** (bijv. `iphone 15 pro`), optioneel een **categorie** en het aantal **pagina's** (30 resultaten per pagina).
 2. De app haalt de zoekpagina's op (robots.txt-controle, SSRF-bescherming, vertraging) en leest alle advertenties uit.
 3. **Jouw filters** (maximale prijs, model, afstand, winst, risico, …) worden door de app zelf toegepast — Marktplaats' eigen filters zijn niet via toegestane URL's beschikbaar. Prijs- en modelfilters werken al als voorselectie vóór het opslaan; koopadvertenties ("gezocht") en losse accessoires worden altijd weggefilterd.
-4. Van **nieuwe** advertenties wordt de volledige tekst van de detailpagina opgehaald (max. 15 per run), want de zoekresultaten zijn op 200 tekens afgekapt en risico's (bijv. iCloud) staan vaak verderop.
+4. Van advertenties waarvan we de detailpagina nog niet hebben wordt die opgehaald (nieuwste eerst, max. `maxDetailsPerRun` = 40 per run): de zoekresultaten bevatten maar 1–3 foto's en een tekst die op 200 tekens is afgekapt, terwijl risico's (bijv. iCloud) vaak verderop staan. Bij het openen van een advertentie in de app wordt dit zo nodig direct nog eens gedaan. Volledige tekst en fotoset worden daarna nooit meer door een kortere samenvatting overschreven.
 5. Daarna: herkenning → waardering → winst → risico → score → melding via Telegram.
 
 ## Overige bronnen
@@ -33,3 +33,7 @@
 - Afstand is onbekend zonder ingestelde locatie (`distanceMeters = -1000`); afstandsfilters laten zulke advertenties door ("indien bekend").
 - Publicatiedatum is bij benadering ("Vandaag", "Gisteren", "5 okt.").
 - De prijs van advertenties met "bieden vanaf" wordt als vraagprijs behandeld; "zie omschrijving"/"op aanvraag" geeft geen prijs.
+
+## Apple-categorieën en productlijst
+- **Productlijst**: `src/lib/catalog/apple.ts` bevat alle Apple-modellen (iPhone 11 t/m 17, SE, MacBook Air/Pro per chip en formaat, iPad, Watch, AirPods, Mac mini/iMac/Studio, accessoires). Een test bewijst dat elke zoekterm weer op dezelfde modelsleutel uitkomt.
+- **Categorieën op Marktplaats**: live bepaald via de categoriefacetten van de zoekresultaten voor 13 Apple-zoektermen (alleen hoofdcategorieën telecommunicatie, computers, audio/tv/foto en sieraden/smartwatches; auto's en boeken worden als ruis genegeerd). Te vernieuwen in *Instellingen → Apple op Marktplaats → Vernieuw vanaf Marktplaats* (±45 s, 3 s tussen requests, robots.txt-conform).

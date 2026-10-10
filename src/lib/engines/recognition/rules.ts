@@ -113,7 +113,8 @@ const cap = (s: string) => s.split(" ").map((w) => w[0].toUpperCase() + w.slice(
 function screenOf(t: string): number | null {
   const m = /(?<![0-9.,])(11|12|13(?:[.,][36])?|14|15(?:[.,]3)?|16|17|21[.,]5|24|27)\s*(?:inch|"|''|-inch|in\b)/.exec(t);
   if (!m) return null;
-  return Math.round(Number(m[1].replace(",", ".")));
+  // 13,6 → 13 en 21,5 → 21: sleutels gebruiken de afgeronde-naar-beneden maat
+  return Math.floor(Number(m[1].replace(",", ".")));
 }
 
 function yearOf(t: string): number | null {
@@ -235,7 +236,7 @@ function detectAccessory(t: string): Partial | null {
   for (const [re, key, label] of defs) {
     if (re.test(t)) {
       const g = /(?:pencil|mouse|keyboard)\s*(?:\(?\s*)?(?:(\d)(?:e|nd)?\s*gen\w*|gen(?:eratie)?\s*(\d)|usb-?\s*c)/.exec(t);
-      const gen = g ? (g[1] ?? g[2]) : /usb-?\s*c/.test(t) && key === "apple-pencil" ? "usbc" : null;
+      const gen = g ? (g[1] ?? g[2] ?? (key === "apple-pencil" ? "usbc" : null)) : null;
       return { family: "accessory", modelKey: gen ? `accessory-${key}-${gen}` : `accessory-${key}`, modelLabel: gen ? `${label} (${gen})` : label, specificity: 0.6 };
     }
   }

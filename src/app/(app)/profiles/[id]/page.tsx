@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ProfileEditor } from "@/components/profile/profile-editor";
+import type { Group } from "@/lib/engines/filters";
+import { getAppleCategories } from "@/lib/sources/category-discovery";
 import type { ProfileFormValue } from "@/lib/profile-form";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
@@ -12,7 +14,7 @@ export const metadata: Metadata = { title: "Zoekprofiel bewerken" };
 export default async function EditProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await getCurrentUser();
-  const p = await prisma.searchProfile.findUnique({ where: { id } });
+  const [p, saved, cats] = await Promise.all([prisma.searchProfile.findUnique({ where: { id } }), prisma.savedFilter.findMany({ where: { userId: user!.id }, orderBy: { name: "asc" } }), getAppleCategories()]);
   if (!p || p.userId !== user!.id) notFound();
   const cfg = (p.sourceConfig ?? {}) as { urls?: string[]; feedUrl?: string; queries?: string[]; category?: string; maxPages?: number; fetchDetails?: boolean };
   const value: ProfileFormValue = {
@@ -37,7 +39,7 @@ export default async function EditProfilePage({ params }: { params: Promise<{ id
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <h1 className="text-[32px] font-semibold tracking-tight">{p.name}</h1>
-      <ProfileEditor initial={value} />
+      <ProfileEditor initial={value} savedFilters={saved.map((f) => ({ id: f.id, name: f.name, tree: f.tree as unknown as Group }))} categories={cats.categories} />
     </div>
   );
 }

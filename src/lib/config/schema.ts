@@ -116,6 +116,7 @@ export const configSchema = z.object({
   limits: z
     .object({
       maxAdsPerRun: z.number().int().min(1).max(1000).default(120),
+      maxDetailsPerRun: z.number().int().min(0).max(200).default(40),
       requestsPerDayPerSource: z.number().int().min(1).default(500),
       minSecondsBetweenRequests: z.number().min(0).default(3),
       jobsPerTick: z.number().int().min(1).max(200).default(25),
