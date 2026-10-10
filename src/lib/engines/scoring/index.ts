@@ -17,6 +17,8 @@ export interface ScoreInput {
   needsManualReview: boolean;
   activationUnverified: boolean;
   recognitionConfidence: number;
+  /** Geen vaste vraagprijs (bieden / op aanvraag): winst en score zijn niet te bepalen */
+  priceUnknown?: boolean;
 }
 
 export interface ScoreFactor {
@@ -126,6 +128,10 @@ export function scoreDeal(i: ScoreInput, cfg: AppConfig): ScoreResult {
   if (i.netProfitCents <= 0) cap("Geen verwachte winst", 39);
   else if (i.conservativeProfitCents <= 0) cap("Conservatief scenario geeft verlies: geen topdeal", 89);
 
+  if (i.priceUnknown && !i.blocked) {
+    score = 0;
+    adjustments.push({ label: "Geen vaste vraagprijs (bieden/op aanvraag): winst niet te bepalen", cap: 0 });
+  }
   if (i.blocked) {
     score = 0;
     adjustments.push({ label: "Risicoblokkade: niet kopen zonder handmatige verificatie", cap: 0 });

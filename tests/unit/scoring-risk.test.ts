@@ -39,6 +39,13 @@ describe("dealscore", () => {
     expect(s.band).toBe("NOT_INTERESTING");
   });
 
+  it("onbekende prijs (bieden) geeft score 0 maar is geen risicoblokkade", () => {
+    const s = scoreDeal({ ...good, priceUnknown: true }, defaultConfig);
+    expect(s.score).toBe(0);
+    expect(s.blocked).toBe(false);
+    expect(s.adjustments.some((a) => /vaste vraagprijs/.test(a.label))).toBe(true);
+  });
+
   it("geen winst => niet interessant", () => {
     const s = scoreDeal({ ...good, netProfitCents: -5000, conservativeProfitCents: -9000, roiPct: -10 }, defaultConfig);
     expect(s.score).toBeLessThanOrEqual(39);
