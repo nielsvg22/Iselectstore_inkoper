@@ -21,7 +21,7 @@ services:
       APP_SECRET: ${APP_SECRET:?zet APP_SECRET in .env (openssl rand -hex 32)}
       CRON_SECRET: ${CRON_SECRET:-}
       INSECURE_COOKIES: ${INSECURE_COOKIES:-}
-    ports: ["3000:3000"]
+    expose: ["3000"]
 
   worker:
     build: .
