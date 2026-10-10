@@ -136,6 +136,10 @@ test("zoekprofiel aanmaken met filters en AND/OR-groep, bewerken en pauzeren", a
   await login(page);
   await page.getByRole("link", { name: "Zoekprofielen" }).first().click();
   await page.getByRole("link", { name: /Nieuw profiel/ }).click();
+  await expect(page.getByLabel("Databron")).toHaveValue("SEARCH");
+  await expect(page.getByLabel("Zoektermen")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Verwijder iphone 15 pro" })).toBeVisible();
+  await expect(page.getByLabel("Categorie")).toHaveValue("telecommunicatie/mobiele-telefoons-apple-iphone");
   await page.getByLabel("Naam").fill("E2E iPhone 15 Pro");
   await page.getByLabel("Maximale inkoopprijs").fill("400");
   await page.getByLabel("Minimale verwachte winst").fill("100");
@@ -157,6 +161,7 @@ test("zoekprofiel aanmaken met filters en AND/OR-groep, bewerken en pauzeren", a
   // terug bewerken: waarden bewaard
   await page.getByRole("link", { name: "Bewerken" }).first().click();
   await expect(page.getByLabel("Maximale inkoopprijs")).toHaveValue("400");
+  await expect(page.getByLabel("Pagina’s per zoekterm")).toHaveValue("3");
   await expect(page.getByRole("button", { name: "256 GB" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByLabel("Waarde").first()).toHaveValue("zgan, als nieuw");
   await page.getByRole("button", { name: "Annuleren" }).click();

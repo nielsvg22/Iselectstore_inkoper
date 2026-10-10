@@ -130,7 +130,7 @@ export default async function AdDetailPage({ params }: { params: Promise<{ id: s
               ) : (
                 <p className="text-sm text-muted">Geen specificaties herkend.</p>
               )}
-              <p className="mt-3 text-xs text-muted"><strong>Vastgesteld</strong> = handmatig of gestructureerd bevestigd · <strong>Volgens verkoper</strong> = uit de advertentietekst, niet geverifieerd · <strong>AI-inschatting</strong> = door AI afgeleid · ontbrekende gegevens worden nooit verzonnen.</p>
+              <p className="mt-3 text-xs text-muted"><strong>Vastgesteld</strong> = door jou handmatig bevestigd · <strong>Volgens verkoper</strong> = uit de advertentietekst of door de verkoper ingevulde kenmerken, niet geverifieerd · <strong>AI-inschatting</strong> = door AI afgeleid · ontbrekende gegevens worden nooit verzonnen.</p>
             </CardContent>
           </Card>
 

@@ -58,6 +58,12 @@ describe("productherkenning", () => {
     expect(y.facts.cycles.value).toBe(120);
   });
 
+  it("herkent 'batterijconditie is nog 88%' en 'battery health 83 %'", () => {
+    expect(r("iPhone 15 Pro 128GB", "De batterijconditie is nog 88%, zoals te zien op de foto.").facts.batteryHealth.value).toBe(88);
+    expect(recognizeByRules({ title: "iPhone 15", structured: { "battery health": "83 %" } }).facts.batteryHealth.value).toBe(83);
+    expect(r("iPhone 15", "batterij 2 jaar oud").facts.batteryHealth).toBeUndefined();
+  });
+
   it("gebruikt batterijpercentage niet voor opslag en 'batterij 100 cycli' niet als percentage", () => {
     const x = r("iPhone 13 128GB", "Accu 100 cycli, batterij 87%");
     expect(x.facts.storageGb.value).toBe(128);
@@ -82,10 +88,10 @@ describe("productherkenning", () => {
     expect(fixed.unknown).not.toContain("storageGb");
   });
 
-  it("gestructureerde attributen zijn CONFIRMED", () => {
+  it("door verkoper ingevulde attributen zijn SELLER_CLAIM en winnen van tekst", () => {
     const x = recognizeByRules({ title: "iPhone 14", structured: { Opslagcapaciteit: "256 GB", Kleur: "Zwart" } });
-    expect(x.facts.storageGb).toMatchObject({ value: 256, source: "CONFIRMED" });
-    expect(x.facts.color).toMatchObject({ value: "Black", source: "CONFIRMED" });
+    expect(x.facts.storageGb).toMatchObject({ value: 256, source: "SELLER_CLAIM" });
+    expect(x.facts.color).toMatchObject({ value: "Black", source: "SELLER_CLAIM" });
   });
 });
 

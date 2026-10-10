@@ -108,14 +108,14 @@ export const configSchema = z.object({
 
   sources: z
     .object({
-      allowed: z.array(z.enum(["MANUAL_URL", "IMPORT", "FEED", "PARTNER_API", "DEMO"])).default(["MANUAL_URL", "IMPORT", "FEED", "DEMO"]),
+      allowed: z.array(z.enum(["MANUAL_URL", "IMPORT", "FEED", "PARTNER_API", "DEMO", "SEARCH"])).default(["MANUAL_URL", "IMPORT", "FEED", "DEMO", "SEARCH"]),
       urlAllowlist: z.array(z.string().max(100)).default(["marktplaats.nl"]),
     })
     .default({}),
 
   limits: z
     .object({
-      maxAdsPerRun: z.number().int().min(1).max(1000).default(50),
+      maxAdsPerRun: z.number().int().min(1).max(1000).default(120),
       requestsPerDayPerSource: z.number().int().min(1).default(500),
       minSecondsBetweenRequests: z.number().min(0).default(3),
       jobsPerTick: z.number().int().min(1).max(200).default(25),

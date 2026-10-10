@@ -24,6 +24,11 @@ export interface FetchContext {
   query: string;
   config: Record<string, unknown>;
   maxAds: number;
+  /** Goedkope voorselectie (op basis van het profiel) zodat niet alles wordt opgeslagen/geanalyseerd */
+  prefilter?: (ad: RawAd) => boolean;
+  /** Alleen voor tests */
+  fetchImpl?: typeof fetch;
+  lookup?: (host: string) => Promise<string[]>;
 }
 
 export interface AdapterStatus {

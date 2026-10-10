@@ -2,7 +2,7 @@
 
 Webapp voor handelaren in tweedehands Apple-producten: advertenties verzamelen, producten herkennen, marktwaarde schatten, winst berekenen, risico's detecteren, scoren (0–100) en de beste inkoopdeals melden via Telegram.
 
-> **Eerlijk vooraf:** er is geen publiek gedocumenteerde Marktplaats-zoek-API en vanuit de bouwomgeving was Marktplaats niet bereikbaar. De live-ophaling is dus **niet geverifieerd**. Lees [docs/DATABRONNEN.md](docs/DATABRONNEN.md) en voer `npm run verify:source -- <url>` uit in uw eigen omgeving. De rest (herkenning, waardering, winst, scoring, filters, meldingen, dashboard, administratie) is volledig werkend en getest.
+> **Marktplaats:** de app zoekt zelf op jouw zoektermen via de publieke zoekpagina's die robots.txt toestaat (de verboden JSON-API wordt niet gebruikt), past jouw filters toe en haalt alle resultaten op. Dit is live getest, maar robots.txt is geen gebruiksvoorwaarde: lees [docs/DATABRONNEN.md](docs/DATABRONNEN.md) en controleer de voorwaarden van Marktplaats.
 
 ## Stack
 Next.js 15 (App Router) · TypeScript · Tailwind CSS 4 · shadcn/ui-stijl componenten · PostgreSQL + Prisma 6 · Zod · Recharts · DB-gebaseerde jobwachtrij · Telegram/Discord · Vitest + Playwright.
@@ -36,6 +36,7 @@ docker compose up --build       # web op :3000, worker en Postgres inbegrepen
 
 | Onderdeel | Status |
 |---|---|
+| **Automatisch zoeken op Marktplaats** (zoektermen + categorie + filters, alle resultaten, nieuwste eerst, volledige tekst van nieuwe advertenties) | ✅ live getest |
 | Data acquisition: URL-import, JSON/CSV-import, feed-profielen, demodata; adapter-architectuur; dedup op id + titel/foto/prijs/plaats | ✅ |
 | Productherkenning: iPhone 11+/SE, MacBook Air/Pro (Intel/M1–M5), iPad, Watch, AirPods, Mac mini/iMac/Studio, accessoires; spelfouten ("ipone 14", "iphone 15pro 256 batterij 91"); onderscheid *vastgesteld / volgens verkoper / AI-inschatting / onbekend*; verzint niets | ✅ |
 | Optionele AI-verrijking (Anthropic/OpenAI/compatibel), gevalideerd JSON, cache, dagbudget, optioneel foto's | ✅ (vereist uw API-sleutel) |
@@ -52,7 +53,7 @@ docker compose up --build       # web op :3000, worker en Postgres inbegrepen
 | Beveiliging: login (scrypt + JWT-cookie), server-side autorisatie, CSRF-origincheck, SSRF-bescherming, AES-256-GCM voor geheimen, geheimen nooit terug naar frontend, log-redactie, ad-tekst nooit als instructie | ✅ |
 
 ## Externe integraties die uw credentials/toestemming vereisen
-- **Marktplaats-toegang** (partner-API of toestemming voor geautomatiseerd gebruik) — zie docs/DATABRONNEN.md.
+- **Toestemming/voorwaarden van Marktplaats** voor geautomatiseerd gebruik (de app gebruikt alleen door robots.txt toegestane pagina's) — zie docs/DATABRONNEN.md.
 - **Telegram**: bot-token (@BotFather) + chat-ID. **Discord**: webhook-URL.
 - **AI-provider** (optioneel, betaald): API-sleutel; kosten worden begrensd via dag-limieten.
 - Gerealiseerde marktprijzen: er is geen publieke bron; vul ze in via *Mijn inkopen* of *Marktdata*.
@@ -62,7 +63,7 @@ Instelbaar onder *Instellingen*: vraagprijs→verkoopprijs-factor (0,92), opslag
 
 ## Testen
 ```bash
-npm test               # 182 unit- + integratietests (Postgres vereist; gebruikt DB dealhunter_test)
+npm test               # 208 unit- + integratietests (Postgres vereist; gebruikt DB dealhunter_test)
 npm run lint           # TypeScript
 npm run test:e2e       # Playwright (bouwt niet; draai eerst `npm run build`; DB dealhunter_e2e)
 ```

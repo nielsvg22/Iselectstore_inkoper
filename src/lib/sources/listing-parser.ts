@@ -31,6 +31,17 @@ function decodeHtml(s: string): string {
     .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)));
 }
 
+/** Volledige advertentietekst uit <div data-collapsable="description">…</div> (tags gestript, entiteiten gedecodeerd). */
+export function extractHtmlDescription(html: string): string | null {
+  const m = /<div[^>]*data-collapsable="description"[^>]*>([\s\S]*?)<\/div>/i.exec(html);
+  if (!m) return null;
+  const text = decodeHtml(m[1].replace(/<br\s*\/?>/gi, "\n").replace(/<\/p>/gi, "\n").replace(/<[^>]+>/g, ""))
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return text.length >= 5 ? text.slice(0, 20000) : null;
+}
+
 function metaContent(html: string, prop: string): string | null {
   const re = new RegExp(`<meta[^>]+(?:property|name)=["']${prop}["'][^>]*content=["']([^"']*)["']|<meta[^>]+content=["']([^"']*)["'][^>]+(?:property|name)=["']${prop}["']`, "i");
   const m = re.exec(html);
@@ -198,6 +209,9 @@ export function parseListingHtml(html: string, pageUrl: string): RawAd {
 
   if (!candidates.length) throw new ParseError("Geen advertentiegegevens gevonden in de pagina");
 
+  // Volledige beschrijving uit de zichtbare pagina-HTML (JSON-LD en zoekresultaten zijn afgekapt/ingekort)
+  const htmlDesc = extractHtmlDescription(html);
+
   // Rijkste kandidaat eerst, aanvullen met rest
   const score = (c: Partial<RawAd>) => (c.title ? 2 : 0) + (c.askingCents != null ? 2 : 0) + (c.description ? 1 : 0) + (c.imageUrls?.length ? 1 : 0) + (c.externalId ? 2 : 0) + (c.location ? 1 : 0);
   candidates.sort((a, b) => score(b) - score(a));
@@ -209,6 +223,7 @@ export function parseListingHtml(html: string, pageUrl: string): RawAd {
       if (empty && v != null && v !== "") (merged as Record<string, unknown>)[k] = v;
     }
   }
+  if (htmlDesc && htmlDesc.length > (merged.description ?? "").length) merged.description = htmlDesc;
   const externalId = merged.externalId ?? extractExternalId(pageUrl) ?? extractExternalId(merged.url ?? "");
   if (!merged.title) throw new ParseError("Titel ontbreekt");
   if (!externalId) throw new ParseError("Kon geen advertentie-ID bepalen uit de URL of pagina");

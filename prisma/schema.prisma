@@ -33,6 +33,7 @@ enum DataOrigin {
   FEED
   PARTNER_API
   DEMO
+  SEARCH
 }
 
 enum FactSource {

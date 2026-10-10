@@ -268,7 +268,7 @@ function capacityValues(t: string): Array<{ gb: number; idx: number; text: strin
 function batteryOf(t: string): { value: number; evidence: string } | null {
   const notUnit = "(?!\\d)(?!\\s*(?:cycli|cycles|cycle|keer|x\\b|maanden|maand|uur|jaar|dagen|euro|eur))";
   const res: RegExp[] = [
-    new RegExp(`\\b(?:batterij|battery|batt?|accu|bgz)\\s*(?:conditie|gezondheid|health|capaciteit|status|percentage|%)?\\s*(?:van|is|op|:|=|-)?\\s*(\\d{2,3})\\s*%?${notUnit}`, "g"),
+    new RegExp(`\\b(?:batterij|battery|batt?|accu|bgz)(?:conditie|gezondheid|health|capaciteit|status|percentage)?[^0-9\\n]{0,16}?(\\d{2,3})\\s*%?${notUnit}`, "g"),
     new RegExp(`\\b(?:gezondheid|health|maximale\\s*capaciteit|max\\.?\\s*capaciteit)\\s*(?:van|is|op|:|=|-)?\\s*(\\d{2,3})\\s*%?${notUnit}`, "g"),
     new RegExp(`(?<![0-9])(\\d{2,3})\\s*%\\s*(?:batterij|battery|batt?|accu|health|gezondheid|bgz|conditie|capaciteit)`, "g"),
   ];
@@ -308,7 +308,7 @@ function conditionOf(t: string): "A" | "B" | "C" | null {
 export interface RecognitionInput {
   title: string;
   description?: string;
-  /** Gestructureerde advertentie-attributen (bijv. uit een export); wegen als CONFIRMED. */
+  /** Door de verkoper ingevulde advertentiekenmerken (bijv. 'battery health'); gelden als SELLER_CLAIM, nooit als vastgesteld. */
   structured?: Record<string, string | number> | null;
 }
 
@@ -405,23 +405,23 @@ export function recognizeByRules(input: RecognitionInput): Recognition {
   const color = colorOf(specText);
   if (color && fam !== "unknown") facts.color = claim(color.value, color.evidence);
 
-  // Gestructureerde attributen => CONFIRMED
+  // Gestructureerde (door verkoper ingevulde) attributen => SELLER_CLAIM, en winnen van losse tekst
   if (input.structured) {
     for (const [k, v] of Object.entries(input.structured)) {
       const key = k.toLowerCase();
       const str = String(v);
       if (/storage|opslag|capacit/.test(key)) {
         const c = capacityValues(normalizeText(str))[0];
-        if (c) facts.storageGb = { value: c.gb, source: "CONFIRMED", evidence: `${k}: ${str}` };
+        if (c) facts.storageGb = { value: c.gb, source: "SELLER_CLAIM", evidence: `${k}: ${str}` };
       } else if (/colou?r|kleur/.test(key)) {
         const c = colorOf(normalizeText(str));
-        facts.color = { value: c?.value ?? str, source: "CONFIRMED", evidence: `${k}: ${str}` };
+        facts.color = { value: c?.value ?? str, source: "SELLER_CLAIM", evidence: `${k}: ${str}` };
       } else if (/batter|accu/.test(key)) {
         const n = Number(str.replace(/[^0-9]/g, ""));
-        if (n >= 40 && n <= 100) facts.batteryHealth = { value: n, source: "CONFIRMED", evidence: `${k}: ${str}` };
+        if (n >= 40 && n <= 100) facts.batteryHealth = { value: n, source: "SELLER_CLAIM", evidence: `${k}: ${str}` };
       } else if (/\bram\b|geheugen|memory/.test(key)) {
         const c = capacityValues(normalizeText(str))[0];
-        if (c) facts.ramGb = { value: c.gb, source: "CONFIRMED", evidence: `${k}: ${str}` };
+        if (c) facts.ramGb = { value: c.gb, source: "SELLER_CLAIM", evidence: `${k}: ${str}` };
       }
     }
   }

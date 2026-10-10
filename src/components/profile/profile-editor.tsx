@@ -10,6 +10,7 @@ import { Notice } from "@/components/ui/states";
 import { cn } from "@/lib/cn";
 import { api } from "@/lib/client-api";
 import { FIELD_DEFS } from "@/lib/engines/filters";
+import { KNOWN_CATEGORIES } from "@/lib/sources/search-categories";
 import { buildTree, emptyQuick, treeToQuick, type AdvancedGroup, type QuickFilters } from "@/lib/profile-quick";
 import type { ProfileFormValue } from "@/lib/profile-form";
 
@@ -73,7 +74,14 @@ export function ProfileEditor({ initial }: { initial: ProfileFormValue }) {
         active: v.active,
         query: v.query,
         sourceKind: v.sourceKind,
-        sourceConfig: v.sourceKind === "MANUAL_URL" ? { urls } : v.sourceKind === "FEED" ? { feedUrl: v.feedUrl } : {},
+        sourceConfig:
+          v.sourceKind === "SEARCH"
+            ? { queries: v.queries.length ? v.queries : q.models.map((m) => m.replace(/-/g, " ")), category: v.category, maxPages: v.maxPages, fetchDetails: v.fetchDetails }
+            : v.sourceKind === "MANUAL_URL"
+              ? { urls }
+              : v.sourceKind === "FEED"
+                ? { feedUrl: v.feedUrl }
+                : {},
         intervalMinutes: v.intervalMinutes,
         notifyEnabled: v.notifyEnabled,
         notifyChannels: v.notifyChannels,
@@ -116,6 +124,7 @@ export function ProfileEditor({ initial }: { initial: ProfileFormValue }) {
             </Field>
             <Field label="Databron" htmlFor="p-src">
               <Select id="p-src" value={v.sourceKind} onChange={(e) => setV({ ...v, sourceKind: e.target.value as ProfileFormValue["sourceKind"] })}>
+                <option value="SEARCH">Zoeken op Marktplaats (automatisch alle resultaten)</option>
                 <option value="MANUAL_URL">Advertentie-URL&apos;s (periodiek herchecken)</option>
                 <option value="FEED">Geautoriseerde feed (JSON/CSV-URL)</option>
                 <option value="DEMO">Demonstratiedata</option>
@@ -123,6 +132,27 @@ export function ProfileEditor({ initial }: { initial: ProfileFormValue }) {
             </Field>
             <Field label="Omschrijving / zoekopdracht" htmlFor="p-q" hint="Alleen ter documentatie voor jezelf."><Input id="p-q" maxLength={200} value={v.query} onChange={(e) => setV({ ...v, query: e.target.value })} /></Field>
           </div>
+          {v.sourceKind === "SEARCH" && (
+            <div className="space-y-4 rounded-2xl bg-accent-soft p-4">
+              <Field label="Zoektermen" htmlFor="p-queries" hint="Bijv. ‘iphone 15 pro’. Elke zoekterm wordt apart doorzocht; Enter om toe te voegen. Leeg laten? Dan worden de gekozen productmodellen bij Filters als zoekterm gebruikt.">
+                <Chips id="p-queries" value={v.queries} onChange={(qs) => setV({ ...v, queries: qs })} placeholder="iphone 15 pro" />
+              </Field>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <Field label="Categorie" htmlFor="p-cat">
+                  <Select id="p-cat" value={v.category} onChange={(e) => setV({ ...v, category: e.target.value })}>
+                    {KNOWN_CATEGORIES.map((c) => (<option key={c.path} value={c.path}>{c.label}</option>))}
+                  </Select>
+                </Field>
+                <Field label="Pagina’s per zoekterm" htmlFor="p-pages" hint="30 resultaten per pagina, nieuwste eerst.">
+                  <Select id="p-pages" value={v.maxPages} onChange={(e) => setV({ ...v, maxPages: Number(e.target.value) })}>
+                    {[1, 2, 3, 5, 8, 10].map((n) => (<option key={n} value={n}>{n} ({n * 30} advertenties)</option>))}
+                  </Select>
+                </Field>
+                <div className="flex items-end pb-1"><Switch checked={v.fetchDetails} onChange={(x) => setV({ ...v, fetchDetails: x })} label="Volledige tekst ophalen (nieuwe advertenties)" /></div>
+              </div>
+              <p className="text-xs text-muted">Prijs-, afstands-, model- en winstfilters hieronder worden door Deal Hunter zelf toegepast op alle gevonden advertenties. Er wordt rustig gezocht (min. 3 s tussen requests) en robots.txt wordt gerespecteerd.</p>
+            </div>
+          )}
           {v.sourceKind === "MANUAL_URL" && (
             <Field label="Advertentie-URL's (één per regel)" htmlFor="p-urls" hint="Alleen https-URL's van toegestane domeinen (zie Instellingen). Wordt periodiek opnieuw gecontroleerd op prijswijzigingen.">
               <textarea id="p-urls" rows={4} className="w-full rounded-xl border border-border bg-card px-3.5 py-2.5 text-sm focus:border-accent focus:outline-none focus:ring-4 focus:ring-accent-soft" placeholder="https://www.marktplaats.nl/v/…" value={v.urls} onChange={(e) => setV({ ...v, urls: e.target.value })} />

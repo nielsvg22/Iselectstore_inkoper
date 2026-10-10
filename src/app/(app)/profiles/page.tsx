@@ -14,7 +14,7 @@ import { adapterForOrigin } from "@/lib/sources/adapters";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Zoekprofielen" };
 
-const SOURCE = { MANUAL_URL: "Advertentie-URL's", FEED: "Feed", DEMO: "Demodata", IMPORT: "Import", PARTNER_API: "Partner-API" } as const;
+const SOURCE = { SEARCH: "Marktplaats-zoekopdracht", MANUAL_URL: "Advertentie-URL's", FEED: "Feed", DEMO: "Demodata", IMPORT: "Import", PARTNER_API: "Partner-API" } as const;
 
 export default async function ProfilesPage() {
   const user = await getCurrentUser();
@@ -39,7 +39,7 @@ export default async function ProfilesPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <h2 className="truncate text-lg font-semibold tracking-tight">{p.name}</h2>
-                    <p className="mt-0.5 text-sm text-muted">{SOURCE[p.sourceKind]} · elke {p.intervalMinutes >= 60 ? `${p.intervalMinutes / 60} uur` : `${p.intervalMinutes} min`}</p>
+                    <p className="mt-0.5 text-sm text-muted">{SOURCE[p.sourceKind]}{p.sourceKind === "SEARCH" && ((p.sourceConfig as { queries?: string[] })?.queries ?? []).length ? ` (“${((p.sourceConfig as { queries?: string[] }).queries ?? []).join("”, “")}”)` : ""} · elke {p.intervalMinutes >= 60 ? `${p.intervalMinutes / 60} uur` : `${p.intervalMinutes} min`}</p>
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1.5">
                     <Badge tone={p.active ? "success" : "neutral"}>{p.active ? "Actief" : "Gepauzeerd"}</Badge>

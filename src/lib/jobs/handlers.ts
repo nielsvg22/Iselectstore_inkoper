@@ -6,6 +6,8 @@ import { analyzeAd } from "../pipeline/analyze";
 import { ingestAd } from "../pipeline/ingest";
 import { getConfig } from "../settings/store";
 import { adapterForOrigin } from "../sources/adapters";
+import { loadTree } from "../pipeline/tree";
+import { buildPrefilter } from "../sources/prefilter";
 import { SourceError } from "../sources/types";
 import { enqueue, PermanentJobError, type Handler, type JobType } from "./queue";
 
@@ -36,7 +38,8 @@ export async function runProfileCheck(profileId: string): Promise<{ fetched: num
     throw new PermanentJobError("Dagelijkse requestlimiet bereikt");
   }
   try {
-    const ads = await adapter.fetchProfile({ profileId, query: profile.query, config: (profile.sourceConfig ?? {}) as Record<string, unknown>, maxAds: cfg.limits.maxAdsPerRun });
+    const prefilter = adapter.origin === "SEARCH" ? buildPrefilter(await loadTree(profileId)) : undefined;
+    const ads = await adapter.fetchProfile({ profileId, query: profile.query, config: (profile.sourceConfig ?? {}) as Record<string, unknown>, maxAds: cfg.limits.maxAdsPerRun, prefilter });
     let created = 0;
     let changed = 0;
     for (const raw of ads) {

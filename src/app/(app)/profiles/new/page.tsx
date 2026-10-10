@@ -9,7 +9,7 @@ export default function NewProfilePage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <h1 className="text-[32px] font-semibold tracking-tight">Nieuw zoekprofiel</h1>
-      <ProfileEditor initial={{ ...base, name: "iPhone 15 Pro inkoop" }} />
+      <ProfileEditor initial={{ ...base, name: "iPhone 15 Pro inkoop", queries: ["iphone 15 pro"], category: "telecommunicatie/mobiele-telefoons-apple-iphone" }} />
     </div>
   );
 }

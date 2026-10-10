@@ -4,7 +4,11 @@ export interface ProfileFormValue {
   id?: string;
   name: string;
   active: boolean;
-  sourceKind: "MANUAL_URL" | "FEED" | "DEMO";
+  sourceKind: "SEARCH" | "MANUAL_URL" | "FEED" | "DEMO";
+  queries: string[];
+  category: string;
+  maxPages: number;
+  fetchDetails: boolean;
   urls: string;
   feedUrl: string;
   intervalMinutes: number;
@@ -16,4 +20,4 @@ export interface ProfileFormValue {
   tree: Group;
 }
 
-export const defaultProfile = (): ProfileFormValue => ({ name: "", active: true, sourceKind: "MANUAL_URL", urls: "", feedUrl: "", intervalMinutes: 60, notifyEnabled: true, notifyMinScore: 75, notifyChannels: ["TELEGRAM"], prioritizeNew: true, query: "", tree: { op: "AND", children: [] } });
+export const defaultProfile = (): ProfileFormValue => ({ name: "", active: true, sourceKind: "SEARCH", queries: [], category: "", maxPages: 3, fetchDetails: true, urls: "", feedUrl: "", intervalMinutes: 60, notifyEnabled: true, notifyMinScore: 75, notifyChannels: ["TELEGRAM"], prioritizeNew: true, query: "", tree: { op: "AND", children: [] } });

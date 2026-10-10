@@ -12,7 +12,7 @@ import { api } from "@/lib/client-api";
 import type { AppConfig } from "@/lib/config/schema";
 
 type Secrets = Record<string, boolean>;
-const ORIGINS: Array<[AppConfig["sources"]["allowed"][number], string]> = [["MANUAL_URL", "Advertentie-URL's"], ["IMPORT", "Bestandsimport (JSON/CSV)"], ["FEED", "Feeds (JSON/CSV-URL)"], ["DEMO", "Demonstratiedata"], ["PARTNER_API", "Officiële partner-API (vereist toegang)"]];
+const ORIGINS: Array<[AppConfig["sources"]["allowed"][number], string]> = [["SEARCH", "Zoeken op Marktplaats (zoekopdrachten)"], ["MANUAL_URL", "Advertentie-URL's"], ["IMPORT", "Bestandsimport (JSON/CSV)"], ["FEED", "Feeds (JSON/CSV-URL)"], ["DEMO", "Demonstratiedata"], ["PARTNER_API", "Officiële partner-API (vereist toegang)"]];
 
 export function SettingsForm({ initial, secrets, isAdmin }: { initial: AppConfig; secrets: Secrets; isAdmin: boolean }) {
   const router = useRouter();
