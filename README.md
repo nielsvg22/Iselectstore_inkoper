@@ -1,0 +1,72 @@
+# Apple Deal Hunter
+
+Webapp voor handelaren in tweedehands Apple-producten: advertenties verzamelen, producten herkennen, marktwaarde schatten, winst berekenen, risico's detecteren, scoren (0–100) en de beste inkoopdeals melden via Telegram.
+
+> **Eerlijk vooraf:** er is geen publiek gedocumenteerde Marktplaats-zoek-API en vanuit de bouwomgeving was Marktplaats niet bereikbaar. De live-ophaling is dus **niet geverifieerd**. Lees [docs/DATABRONNEN.md](docs/DATABRONNEN.md) en voer `npm run verify:source -- <url>` uit in uw eigen omgeving. De rest (herkenning, waardering, winst, scoring, filters, meldingen, dashboard, administratie) is volledig werkend en getest.
+
+## Stack
+Next.js 15 (App Router) · TypeScript · Tailwind CSS 4 · shadcn/ui-stijl componenten · PostgreSQL + Prisma 6 · Zod · Recharts · DB-gebaseerde jobwachtrij · Telegram/Discord · Vitest + Playwright.
+
+## Snel starten (lokaal)
+
+```bash
+cp .env.example .env            # vul APP_SECRET (openssl rand -hex 32) en DATABASE_URL in
+npm install
+npx prisma migrate deploy       # of: npm run db:migrate
+npm run db:seed                 # optioneel: admin + voorbeeldprofiel (SEED_DEMO=1 voor demodata)
+npm run dev                     # http://localhost:3000  (eerste bezoek: /setup)
+npm run worker                  # in een tweede terminal: achtergrondjobs
+```
+
+Zonder database-seed maakt u het eerste account via `/setup`. Wilt u eerst rondkijken: *Importeren → Voorbeelddata laden*.
+
+### Docker
+```bash
+echo "APP_SECRET=$(openssl rand -hex 32)" > .env
+docker compose up --build       # web op :3000, worker en Postgres inbegrepen
+```
+
+### Productie (Vercel + beheerde Postgres, bijv. Neon)
+1. Zet `DATABASE_URL`, `APP_SECRET`, `CRON_SECRET` als omgevingsvariabelen. Draai `npx prisma migrate deploy` (CI of lokaal tegen de productie-DB).
+2. `vercel.json` roept elke 5 minuten `/api/jobs/tick` aan (Vercel Cron stuurt `Authorization: Bearer $CRON_SECRET`). Cron-frequentie is plan-afhankelijk; op Hobby kan dit beperkt zijn — gebruik dan een externe scheduler of de Docker-worker.
+3. Op Vercel is geen permanente worker: de tick verwerkt per aanroep maximaal `jobsPerTick` jobs binnen 60 s.
+4. Eigen server: Docker Compose (hierboven) of `npm run build && npm start` + `npm run worker` onder systemd/pm2, achter HTTPS (cookies zijn `Secure` in productie).
+
+## Functies (gerealiseerd)
+
+| Onderdeel | Status |
+|---|---|
+| Data acquisition: URL-import, JSON/CSV-import, feed-profielen, demodata; adapter-architectuur; dedup op id + titel/foto/prijs/plaats | ✅ |
+| Productherkenning: iPhone 11+/SE, MacBook Air/Pro (Intel/M1–M5), iPad, Watch, AirPods, Mac mini/iMac/Studio, accessoires; spelfouten ("ipone 14", "iphone 15pro 256 batterij 91"); onderscheid *vastgesteld / volgens verkoper / AI-inschatting / onbekend*; verzint niets | ✅ |
+| Optionele AI-verrijking (Anthropic/OpenAI/compatibel), gevalideerd JSON, cache, dagbudget, optioneel foto's | ✅ (vereist uw API-sleutel) |
+| Marktwaarde: gewogen mediaan, IQR-uitschieters, vraag vs. gerealiseerd, batterij/conditie, laag/verwacht/optimistisch, betrouwbaarheid, expliciet "onzeker", handmatige verkoopprijzen | ✅ |
+| Winst: alle kosten, btw (geen/standaard/margeregeling alleen bij bevestiging), bruto/netto marge, rendement, **minimale verkoopprijs en maximaal bod**, conservatief/optimistisch | ✅ |
+| Dealscore 0–100 (aanpasbare gewichten/grenzen), caps bij onzekerheid, uitleg | ✅ |
+| Risico: blokkades (iCloud/MDM/gestolen/IMEI/defect/onderdelen/water), oplichtingspatronen, "te mooi om waar te zijn", prompt-injectie, *handmatige controle vereist* | ✅ |
+| Zoekprofielen met AND/OR-regelboom (relationeel opgeslagen), snelle filters | ✅ |
+| Telegram (en Discord) meldingen, per profiel, zonder duplicaten | ✅ |
+| E-mail, Web Push | ❌ niet geïmplementeerd |
+| Dashboard (kaarten/tabel, filters, sorteren), detailpagina, light/dark, responsive | ✅ |
+| Inkoop-/verkoopadministratie + statistieken; verkopen voeden waardering | ✅ |
+| Jobs: wachtrij, retry/backoff, rate limiting, dagelijkse requestlimiet, foutregistratie, statuspagina | ✅ |
+| Beveiliging: login (scrypt + JWT-cookie), server-side autorisatie, CSRF-origincheck, SSRF-bescherming, AES-256-GCM voor geheimen, geheimen nooit terug naar frontend, log-redactie, ad-tekst nooit als instructie | ✅ |
+
+## Externe integraties die uw credentials/toestemming vereisen
+- **Marktplaats-toegang** (partner-API of toestemming voor geautomatiseerd gebruik) — zie docs/DATABRONNEN.md.
+- **Telegram**: bot-token (@BotFather) + chat-ID. **Discord**: webhook-URL.
+- **AI-provider** (optioneel, betaald): API-sleutel; kosten worden begrensd via dag-limieten.
+- Gerealiseerde marktprijzen: er is geen publieke bron; vul ze in via *Mijn inkopen* of *Marktdata*.
+
+## Aannames die u moet beoordelen
+Instelbaar onder *Instellingen*: vraagprijs→verkoopprijs-factor (0,92), opslagstap (10%/verdubbeling), reparatiekosten (scherm €120, achterkant €100, camera €80), batterijkorting, verkoopbaarheidsprioriteiten per productfamilie, "verdacht lage prijs" < 55% van marktwaarde. Het zijn startwaarden, geen marktfeiten. Winstberekeningen zijn indicatief en geen fiscaal advies.
+
+## Testen
+```bash
+npm test               # 182 unit- + integratietests (Postgres vereist; gebruikt DB dealhunter_test)
+npm run lint           # TypeScript
+npm run test:e2e       # Playwright (bouwt niet; draai eerst `npm run build`; DB dealhunter_e2e)
+```
+Testdatabases: maak `dealhunter_test` en `dealhunter_e2e` aan (zie `TEST_DATABASE_URL` / `E2E_DATABASE_URL`).
+
+## Projectstructuur
+`src/lib/engines/*` (herkenning, waardering, winst, scoring, risico, filters, dedup — pure functies) · `src/lib/pipeline/*` (ingest, analyse, matching) · `src/lib/sources/*` (adapters) · `src/lib/jobs/*` (wachtrij, handlers) · `src/lib/notify/*` · `src/app/api/*` · `src/app/(app)/*` (UI) · `prisma/` (schema, migraties, seed).

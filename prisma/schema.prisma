@@ -1,0 +1,491 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum ProcessingStatus {
+  NEW
+  QUEUED
+  ANALYZED
+  FAILED
+  STALE
+}
+
+enum UserState {
+  NONE
+  INTERESTING
+  FAVORITE
+  IGNORED
+}
+
+enum DataOrigin {
+  MANUAL_URL
+  IMPORT
+  FEED
+  PARTNER_API
+  DEMO
+}
+
+enum FactSource {
+  CONFIRMED
+  SELLER_CLAIM
+  AI_ESTIMATE
+  UNKNOWN
+}
+
+enum PriceKind {
+  ASKING_CURRENT
+  ASKING_HISTORIC
+  REALIZED
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  BLOCKED
+}
+
+enum DealBand {
+  TOP
+  VERY_INTERESTING
+  INTERESTING
+  MODERATE
+  NOT_INTERESTING
+}
+
+enum PurchaseStatus {
+  INTERESTING
+  CONTACTED
+  NEGOTIATING
+  BOUGHT
+  LISTED
+  SOLD
+  REJECTED
+}
+
+enum JobStatus {
+  PENDING
+  RUNNING
+  DONE
+  FAILED
+  DEAD
+}
+
+enum NotificationChannel {
+  TELEGRAM
+  DISCORD
+  EMAIL
+  WEBPUSH
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  name         String?
+  passwordHash String
+  role         Role          @default(ADMIN)
+  createdAt    DateTime      @default(now())
+  profiles     SearchProfile[]
+  watchlist    Watchlist[]
+  purchases    Purchase[]
+  auditLogs    AuditLog[]
+}
+
+model SearchProfile {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name             String
+  active           Boolean  @default(true)
+  // Query dat naar de databron gaat (vrije tekst / zoektermen)
+  query            String   @default("")
+  sourceKind       DataOrigin @default(MANUAL_URL)
+  sourceConfig     Json     @default("{}")
+  intervalMinutes  Int      @default(60)
+  notifyEnabled    Boolean  @default(true)
+  notifyChannels   Json     @default("[\"TELEGRAM\"]")
+  notifyMinScore   Int      @default(75)
+  prioritizeNew    Boolean  @default(true)
+  lastCheckedAt    DateTime?
+  lastSuccessAt    DateTime?
+  lastError        String?
+  discoveredCount  Int      @default(0)
+  interestingCount Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  rules            SearchRule[]
+  matches          ProfileMatch[]
+
+  @@index([userId, active])
+}
+
+// Regelboom: GROUP-knopen (AND/OR) bevatten CONDITION-knopen en andere groepen.
+model SearchRule {
+  id        String        @id @default(cuid())
+  profileId String
+  profile   SearchProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  parentId  String?
+  parent    SearchRule?   @relation("RuleTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children  SearchRule[]  @relation("RuleTree")
+  kind      String        // GROUP | CONDITION
+  op        String?       // AND | OR (alleen GROUP)
+  field     String?
+  operator  String?
+  value     Json?
+  position  Int           @default(0)
+  createdAt DateTime      @default(now())
+
+  @@index([profileId])
+  @@index([parentId])
+}
+
+model Advertisement {
+  id               String           @id @default(cuid())
+  source           String           @default("marktplaats")
+  origin           DataOrigin
+  isDemo           Boolean          @default(false)
+  externalId       String
+  url              String
+  title            String
+  description      String           @default("")
+  askingPriceCents Int?
+  currency         String           @default("EUR")
+  location         String?
+  postalCode       String?
+  distanceKm       Float?
+  category         String?
+  sellerType       String?
+  shippingOptions  Json             @default("[]")
+  conditionText    String?
+  publishedAt      DateTime?
+  firstSeenAt      DateTime         @default(now())
+  lastSeenAt       DateTime         @default(now())
+  lastCheckedOkAt  DateTime?
+  fingerprint      String
+  rawPayload       Json?
+  status           ProcessingStatus @default(NEW)
+  statusError      String?
+  userState        UserState        @default(NONE)
+  needsManualReview Boolean         @default(false)
+  notes            String           @default("")
+  contentHash      String           @default("")
+  // Handmatige kostenaanpassingen: {repairCents, shippingCents, transportCents, otherCents, marginSchemeEligible, targetBuyCents}
+  overrides        Json             @default("{}")
+  duplicateOfId    String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  images       AdvertisementImage[]
+  product      AppleProduct?
+  analyses     DealAnalysis[]
+  risk         RiskAssessment?
+  priceHistory PriceHistory[]
+  notifications Notification[]
+  watchlist    Watchlist[]
+  purchase     Purchase?
+  matches      ProfileMatch[]
+
+  @@unique([source, externalId])
+  @@index([fingerprint])
+  @@index([status])
+  @@index([firstSeenAt])
+  @@index([userState])
+  @@index([isDemo])
+}
+
+model AdvertisementImage {
+  id     String        @id @default(cuid())
+  adId   String
+  ad     Advertisement @relation(fields: [adId], references: [id], onDelete: Cascade)
+  url    String
+  position Int         @default(0)
+
+  @@index([adId])
+}
+
+model PriceHistory {
+  id         String        @id @default(cuid())
+  adId       String
+  ad         Advertisement @relation(fields: [adId], references: [id], onDelete: Cascade)
+  priceCents Int
+  observedAt DateTime      @default(now())
+
+  @@index([adId, observedAt])
+}
+
+// Afgeleide productherkenning (gescheiden van bron-advertentie)
+model AppleProduct {
+  id             String        @id @default(cuid())
+  adId           String        @unique
+  ad             Advertisement @relation(fields: [adId], references: [id], onDelete: Cascade)
+  family         String        // iphone, macbook_air, macbook_pro, ipad, watch, airpods, mac_mini, imac, mac_studio, accessory, unknown
+  modelKey       String        // genormaliseerd, bv. "iphone-15-pro"
+  modelLabel     String
+  recognizedBy   String        @default("rules") // rules | ai | rules+ai
+  confidence     Float         @default(0)
+  conditionGrade String?       // A/B/C/D/defect
+  specs          ProductSpecification[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([modelKey])
+  @@index([family])
+}
+
+model ProductSpecification {
+  id        String       @id @default(cuid())
+  productId String
+  product   AppleProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  key       String       // storageGb, color, batteryHealth, ramGb, chip, screenInch, cycles, damage, simlock, activationLock, mdm, repaired, ...
+  value     String
+  source    FactSource
+  evidence  String?      // citaat uit advertentie
+
+  @@unique([productId, key])
+}
+
+model MarketComparable {
+  id          String    @id @default(cuid())
+  modelKey    String
+  storageGb   Int?
+  ramGb       Int?
+  variantKey  String    @default("")
+  priceCents  Int
+  kind        PriceKind
+  batteryHealth Int?
+  conditionGrade String?
+  source      String    @default("marktplaats")
+  sourceUrl   String?
+  sourceAdId  String?
+  isDemo      Boolean   @default(false)
+  observedAt  DateTime  @default(now())
+
+  @@index([modelKey, storageGb])
+  @@index([modelKey, kind])
+}
+
+model ValuationHistory {
+  id           String   @id @default(cuid())
+  adId         String
+  modelKey     String
+  lowCents     Int
+  expectedCents Int
+  highCents    Int
+  confidence   Float
+  sampleSize   Int
+  realizedUsed Int      @default(0)
+  uncertain    Boolean  @default(false)
+  methodology  Json
+  computedAt   DateTime @default(now())
+
+  @@index([adId, computedAt])
+  @@index([modelKey, computedAt])
+}
+
+model DealAnalysis {
+  id               String        @id @default(cuid())
+  adId             String
+  ad               Advertisement @relation(fields: [adId], references: [id], onDelete: Cascade)
+  valuationId      String?
+  askingCents      Int
+  lowCents         Int
+  expectedCents    Int
+  highCents        Int
+  valuationConfidence Float
+  sampleSize       Int
+  uncertain        Boolean       @default(false)
+  costs            Json          // uitsplitsing
+  netProfitCents   Int
+  conservativeProfitCents Int
+  optimisticProfitCents Int
+  grossMarginPct   Float
+  netMarginPct     Float
+  roiPct           Float
+  minSalePriceCents Int
+  maxBidCents      Int
+  score            Int
+  band             DealBand
+  scoreBreakdown   Json
+  explanation      String
+  blocked          Boolean       @default(false)
+  settingsSnapshot Json
+  isCurrent        Boolean       @default(true)
+  createdAt        DateTime      @default(now())
+
+  @@index([adId, isCurrent])
+  @@index([score])
+  @@index([createdAt])
+}
+
+model RiskAssessment {
+  id        String        @id @default(cuid())
+  adId      String        @unique
+  ad        Advertisement @relation(fields: [adId], references: [id], onDelete: Cascade)
+  level     RiskLevel
+  score     Int           // 0 (veilig) .. 100 (zeer riskant)
+  flags     Json          // [{code,label,severity,evidence}]
+  blocked   Boolean       @default(false)
+  needsManualReview Boolean @default(false)
+  updatedAt DateTime      @updatedAt
+}
+
+model ProfileMatch {
+  id        String        @id @default(cuid())
+  profileId String
+  profile   SearchProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  adId      String
+  ad        Advertisement @relation(fields: [adId], references: [id], onDelete: Cascade)
+  matched   Boolean
+  createdAt DateTime      @default(now())
+
+  @@unique([profileId, adId])
+}
+
+model Notification {
+  id        String              @id @default(cuid())
+  adId      String
+  ad        Advertisement       @relation(fields: [adId], references: [id], onDelete: Cascade)
+  profileId String?
+  channel   NotificationChannel
+  dedupeKey String              @unique
+  status    NotificationStatus  @default(PENDING)
+  payload   Json?
+  error     String?
+  sentAt    DateTime?
+  createdAt DateTime            @default(now())
+
+  @@index([adId])
+}
+
+model Watchlist {
+  id        String        @id @default(cuid())
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  adId      String
+  ad        Advertisement @relation(fields: [adId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now())
+
+  @@unique([userId, adId])
+}
+
+model Purchase {
+  id                 String         @id @default(cuid())
+  userId             String
+  user               User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  adId               String?        @unique
+  ad                 Advertisement? @relation(fields: [adId], references: [id], onDelete: SetNull)
+  title              String
+  modelKey           String?
+  storageGb          Int?
+  status             PurchaseStatus @default(INTERESTING)
+  askingCents        Int?
+  buyPriceCents      Int?
+  boughtAt           DateTime?
+  conditionNote      String?
+  repairCostCents    Int            @default(0)
+  extraCostCents     Int            @default(0)
+  notes              String         @default("")
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  sale               Sale?
+
+  @@index([userId, status])
+}
+
+model Sale {
+  id              String   @id @default(cuid())
+  purchaseId      String   @unique
+  purchase        Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  salePriceCents  Int
+  soldAt          DateTime
+  extraCostCents  Int      @default(0)
+  platform        String?
+  note            String?
+  createdAt       DateTime @default(now())
+}
+
+model AppSettings {
+  key       String   @id
+  value     Json
+  secret    Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+}
+
+model BackgroundJob {
+  id          String    @id @default(cuid())
+  type        String    // CHECK_PROFILE | ANALYZE_AD | NOTIFY
+  payload     Json
+  status      JobStatus @default(PENDING)
+  priority    Int       @default(0)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(4)
+  runAt       DateTime  @default(now())
+  lockedAt    DateTime?
+  lastError   String?
+  uniqueKey   String?   @unique
+  createdAt   DateTime  @default(now())
+  finishedAt  DateTime?
+
+  @@index([status, runAt, priority])
+  @@index([type])
+}
+
+model SourceHealth {
+  id          String   @id // adapter id
+  ok          Boolean  @default(true)
+  lastOkAt    DateTime?
+  lastErrorAt DateTime?
+  lastError   String?
+  requestsToday Int    @default(0)
+  day         String   @default("")
+  updatedAt   DateTime @updatedAt
+}
+
+model AiUsage {
+  id        String   @id @default(cuid())
+  day       String
+  provider  String
+  calls     Int      @default(0)
+  inputTokens  Int   @default(0)
+  outputTokens Int   @default(0)
+  costMicros   Int   @default(0)
+
+  @@unique([day, provider])
+}
+
+model AiCache {
+  key       String   @id
+  value     Json
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String
+  entity    String?
+  entityId  String?
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([action])
+}

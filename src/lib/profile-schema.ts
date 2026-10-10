@@ -1,0 +1,26 @@
+import { z } from "zod";
+import { groupSchema } from "./engines/filters";
+
+const httpsUrl = z.string().url().max(500).refine((u) => u.startsWith("https://"), "Alleen https-URL's zijn toegestaan");
+
+export const profileInput = z.object({
+  name: z.string().trim().min(1, "Naam is verplicht").max(100),
+  active: z.boolean().default(true),
+  query: z.string().max(200).default(""),
+  sourceKind: z.enum(["MANUAL_URL", "FEED", "DEMO", "PARTNER_API", "IMPORT"]).default("MANUAL_URL"),
+  sourceConfig: z
+    .object({
+      urls: z.array(httpsUrl).max(100).optional(),
+      feedUrl: httpsUrl.optional(),
+      allowedHosts: z.array(z.string().max(100)).max(10).optional(),
+    })
+    .passthrough()
+    .default({}),
+  intervalMinutes: z.number().int().min(5).max(1440).default(60),
+  notifyEnabled: z.boolean().default(true),
+  notifyChannels: z.array(z.enum(["TELEGRAM", "DISCORD"])).default(["TELEGRAM"]),
+  notifyMinScore: z.number().int().min(0).max(100).default(75),
+  prioritizeNew: z.boolean().default(true),
+  tree: groupSchema.default({ op: "AND", children: [] }),
+});
+export type ProfileInput = z.infer<typeof profileInput>;

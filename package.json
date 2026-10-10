@@ -1,0 +1,52 @@
+{
+  "name": "apple-deal-hunter",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run tests/unit",
+    "test:int": "vitest run tests/integration",
+    "db:migrate": "prisma migrate deploy",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:reset": "prisma migrate reset --force",
+    "worker": "tsx src/worker/run.ts",
+    "postinstall": "prisma generate",
+    "test:e2e": "playwright test",
+    "verify:source": "tsx scripts/verify-source.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.3",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "jose": "^5.10.0",
+    "lucide-react": "0.577.0",
+    "next": "15.5.27",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "recharts": "2.15.4",
+    "tailwind-merge": "^3.3.0",
+    "undici": "^7.30.0",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "@tailwindcss/postcss": "^4.1.0",
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "postcss": "^8.5.0",
+    "prisma": "6.19.3",
+    "tailwindcss": "^4.1.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0",
+    "vitest": "3.2.7"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  }
+}
