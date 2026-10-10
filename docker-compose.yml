@@ -28,7 +28,7 @@ services:
     restart: unless-stopped
     depends_on: { web: { condition: service_started } }
     environment: *env
-    command: ["npm", "run", "worker"]
+    command: ["sh", "-c", "npx prisma migrate deploy && npm run worker"]
 
 volumes:
   dbdata:
