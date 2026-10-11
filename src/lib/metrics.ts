@@ -1,4 +1,5 @@
 import { prisma } from "./db/client";
+import { getCooldown } from "./jobs/cooldown";
 import { getConfig } from "./settings/store";
 
 export function percentile(values: number[], p: number): number | null {
@@ -38,6 +39,8 @@ export interface PerformanceData {
   notifications7d: { sent: number; failed: number; pending: number; skipped: number };
   estimatedMaxDetectionDelayMinutes: number | null;
   queue: { pending: number; running: number; dead: number };
+  cooldown: { until: string; reason: string } | null;
+  fast: { enabled: boolean; profiles: number; intervalSeconds: number };
 }
 
 export async function getPerformance(days = 7): Promise<PerformanceData> {
@@ -46,7 +49,7 @@ export async function getPerformance(days = 7): Promise<PerformanceData> {
   const since = new Date(now.getTime() - days * 86400_000);
   const since24 = new Date(now.getTime() - 86400_000);
   const [profiles, runs, ads, notifs, jobs] = await Promise.all([
-    prisma.searchProfile.findMany({ select: { id: true, name: true, active: true, intervalMinutes: true, lastSuccessAt: true, lastError: true, sourceKind: true } }),
+    prisma.searchProfile.findMany({ select: { id: true, name: true, active: true, intervalMinutes: true, lastSuccessAt: true, lastError: true, sourceKind: true, sourceConfig: true } }),
     prisma.checkRun.findMany({ where: { startedAt: { gte: since24 } }, select: { ok: true, durationMs: true, pages: true, cacheHits: true } }),
     prisma.advertisement.findMany({ where: { isDemo: false, firstSeenAt: { gte: since } }, select: { firstSeenAt: true, prefilteredAt: true, analyzedAt: true } }),
     prisma.notification.findMany({ where: { createdAt: { gte: since } }, select: { createdAt: true, sentAt: true, status: true, ad: { select: { firstSeenAt: true, isDemo: true } } } }),
@@ -81,7 +84,8 @@ export async function getPerformance(days = 7): Promise<PerformanceData> {
     endToEnd: summarize(sent.map((n) => sec(n.ad.firstSeenAt, n.sentAt!))),
   };
   const searchProfiles = active.filter((p) => p.intervalMinutes);
-  const maxInterval = searchProfiles.length ? Math.min(...searchProfiles.map((p) => p.intervalMinutes)) : null;
+  const fastMin = cfg.scheduler.fast.enabled && profiles.some((p) => p.active && p.sourceKind === "SEARCH" && (p.sourceConfig as { fastMode?: boolean } | null)?.fastMode === true) ? cfg.scheduler.fast.intervalSeconds / 60 : null;
+  const maxInterval = fastMin ?? (searchProfiles.length ? Math.min(...searchProfiles.map((p) => p.intervalMinutes)) : null);
   const jobMap = Object.fromEntries(jobs.map((j) => [j.status, j._count._all]));
   return {
     generatedAt: now.toISOString(),
@@ -95,6 +99,8 @@ export async function getPerformance(days = 7): Promise<PerformanceData> {
     notifications7d: { sent: real.filter((n) => n.status === "SENT").length, failed: real.filter((n) => n.status === "FAILED").length, pending: real.filter((n) => n.status === "PENDING").length, skipped: real.filter((n) => n.status === "SKIPPED").length },
     // Schatting: een nieuwe advertentie wordt uiterlijk één controle-interval + verwerkingstijd na plaatsing gezien (mits hij in de opgehaalde pagina's staat)
     estimatedMaxDetectionDelayMinutes: maxInterval == null ? null : maxInterval + (dist.endToEnd.p95 ?? dist.fullAnalysis.p95 ?? 0) / 60,
+    cooldown: await getCooldown("marktplaats-search").then((c) => (c ? { until: c.until.toISOString(), reason: c.reason } : null)),
+    fast: { enabled: cfg.scheduler.fast.enabled, profiles: profiles.filter((p) => p.active && p.sourceKind === "SEARCH" && (p.sourceConfig as { fastMode?: boolean } | null)?.fastMode === true).length, intervalSeconds: cfg.scheduler.fast.intervalSeconds },
     queue: { pending: jobMap.PENDING ?? 0, running: jobMap.RUNNING ?? 0, dead: (jobMap.DEAD ?? 0) + (jobMap.FAILED ?? 0) },
   };
 }

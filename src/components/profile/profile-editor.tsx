@@ -59,7 +59,7 @@ export function ProfileEditor({ initial, savedFilters = [], categories = [] }: {
         sourceKind: v.sourceKind,
         sourceConfig:
           v.sourceKind === "SEARCH"
-            ? { queries: v.queries.length ? v.queries : q.models.map((m) => m.replace(/-/g, " ")), category: v.category, maxPages: v.maxPages, fetchDetails: v.fetchDetails }
+            ? { queries: v.queries.length ? v.queries : q.models.map((m) => m.replace(/-/g, " ")), category: v.category, maxPages: v.maxPages, fetchDetails: v.fetchDetails, fastMode: v.fastMode }
             : v.sourceKind === "MANUAL_URL"
               ? { urls }
               : v.sourceKind === "FEED"
@@ -123,6 +123,10 @@ export function ProfileEditor({ initial, savedFilters = [], categories = [] }: {
                   </Select>
                 </Field>
                 <div className="flex items-end pb-1"><Switch checked={v.fetchDetails} onChange={(x) => setV({ ...v, fetchDetails: x })} label="Volledige tekst ophalen (nieuwe advertenties)" /></div>
+              </div>
+              <div className="rounded-2xl border border-border bg-card p-4">
+                <Switch checked={v.fastMode} onChange={(x) => setV({ ...v, fastMode: x })} label="Snelle modus: elke ±minuut kijken en direct een voorlopige push sturen" />
+                <p className="mt-2 text-xs text-muted">Gebruik dit voor smalle zoektermen (bijv. ‘iphone 16 pro’). We kijken dan alleen naar de eerste pagina’s en sturen meteen een voorlopige melding; enkele seconden later volgt de definitieve. Werkt alleen als Snelle modus ook is ingeschakeld bij <a href="/settings#snelheid" className="font-medium text-accent-strong underline">Instellingen → Snelheid</a>. Geen realtime-garantie; bij een blokkade door Marktplaats pauzeert de app automatisch.</p>
               </div>
               <p className="text-xs text-muted">Prijs-, afstands-, model- en winstfilters hieronder worden door Deal Hunter zelf toegepast op alle gevonden advertenties. Er wordt rustig gezocht (min. 3 s tussen requests) en robots.txt wordt gerespecteerd.</p>
             </div>

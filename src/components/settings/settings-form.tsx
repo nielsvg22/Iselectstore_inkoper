@@ -184,12 +184,23 @@ export function SettingsForm({ initial, secrets, isAdmin }: { initial: AppConfig
           </CardContent>
         </Card>
 
-        <Card>
+        <Card id="snelheid">
           <CardHeader><div><CardTitle>Snelheid &amp; controle-interval</CardTitle><CardDescription>We controleren Marktplaats periodiek via de toegestane zoekpagina’s — dit is geen realtime. Hoe korter het interval, hoe sneller nieuwe advertenties worden gevonden; houd rekening met de voorwaarden van Marktplaats.</CardDescription></div></CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-3">
             <Field label="Kortste interval per zoekprofiel (min)" htmlFor="sc-int" hint="Ondergrens 5 minuten."><Input id="sc-int" type="number" min="5" max="1440" value={c.scheduler.minIntervalMinutes} onChange={(e) => set("scheduler", { minIntervalMinutes: Number(e.target.value) })} /></Field>
             <Field label="Parallelle analyses" htmlFor="sc-con" hint="Alleen analyse/meldingen; ophalen blijft gepaceerd."><Input id="sc-con" type="number" min="1" max="8" value={c.scheduler.concurrency} onChange={(e) => set("scheduler", { concurrency: Number(e.target.value) })} /></Field>
             <Field label="Gedeelde paginacache (sec)" htmlFor="sc-cache" hint="Profielen met dezelfde zoekterm halen een pagina niet dubbel op."><Input id="sc-cache" type="number" min="0" max="900" value={c.scheduler.pageCacheSeconds} onChange={(e) => set("scheduler", { pageCacheSeconds: Number(e.target.value) })} /></Field>
+            <div className="space-y-4 rounded-2xl border border-border p-4 sm:col-span-3">
+              <Switch checked={c.scheduler.fast.enabled} onChange={(v) => set("scheduler", { fast: { ...c.scheduler.fast, enabled: v } })} label="Snelle modus toestaan (per zoekprofiel in te schakelen)" />
+              <p className="text-xs text-muted">Profielen in snelle modus worden elke ±minuut gecontroleerd (alleen de eerste pagina’s) en sturen direct een voorlopige push; de definitieve volgt na de volledige beoordeling. Dit is <strong>geen realtime</strong> en geeft meer verkeer naar Marktplaats. Krijgt de app een blokkade (HTTP 403/429), dan pauzeert hij automatisch (15 min, oplopend tot 2 uur) en omzeilt dat niet. Gebruik smalle zoektermen en houd het aantal snelle profielen laag.</p>
+              {c.scheduler.fast.enabled && (
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <Field label="Interval snelle profielen (sec)" htmlFor="sf-int" hint="Minimaal 30."><Input id="sf-int" type="number" min="30" max="600" value={c.scheduler.fast.intervalSeconds} onChange={(e) => set("scheduler", { fast: { ...c.scheduler.fast, intervalSeconds: Number(e.target.value) } })} /></Field>
+                  <Field label="Pagina’s per zoekterm" htmlFor="sf-pages"><Input id="sf-pages" type="number" min="1" max="3" value={c.scheduler.fast.pages} onChange={(e) => set("scheduler", { fast: { ...c.scheduler.fast, pages: Number(e.target.value) } })} /></Field>
+                  <Field label="Max. pagina-requests per minuut (totaal)" htmlFor="sf-max" hint="Rem over alle snelle profielen samen."><Input id="sf-max" type="number" min="1" max="30" value={c.scheduler.fast.maxRequestsPerMinute} onChange={(e) => set("scheduler", { fast: { ...c.scheduler.fast, maxRequestsPerMinute: Number(e.target.value) } })} /></Field>
+                </div>
+              )}
+            </div>
             <div className="sm:col-span-3"><Switch checked={c.notifications.requireFullAnalysis} onChange={(v) => set("notifications", { requireFullAnalysis: v })} label="Melding pas versturen na volledige beoordeling (detailpagina opgehaald)" /></div>
           </CardContent>
         </Card>

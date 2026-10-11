@@ -34,6 +34,15 @@ Marktplaats → scraper → voorselectie → analyse → profielmatch → meldin
 - **Verkopersbetrouwbaarheid:** uitlegbare score met per signaal de herkomst *Bevestigd / Volgens verkoper / Automatisch ingeschat / Onbekend*. Onbekend telt nooit als betrouwbaar; niveau "Voldoende onderbouwd" vereist minstens één door het platform bevestigd positief signaal. Zie ook "beperkingen".
 - **Test deze filters op bestaande advertenties** (profiel-editor én Mijn filters): aantal treffers, meest blokkerende voorwaarden, per advertentie de boom met werkelijke waarde per voorwaarde.
 
+### Snelle modus (aanvulling)
+Voor "zo snel mogelijk handelen" — alles in de app, geen externe diensten:
+- **Instellingen → Snelheid:** schakelaar *Snelle modus toestaan* (standaard **uit**), interval (standaard 60 s, min. 30 s), pagina's per zoekterm (standaard 2) en een totaalrem (standaard 6 pagina-requests/min over alle snelle profielen).
+- **Per zoekprofiel:** schakelaar *Snelle modus*. Aanbevolen: smalle profielen per model (bijv. "iphone 16 pro", "iphone 15 pro max") i.p.v. één brede "iphone"-zoekopdracht — bij duizenden resultaten kijken we maar naar de eerste ±60.
+- **Direct voorlopige push** zodra een nieuwe advertentie je filters haalt (op basis van lijstgegevens), daarna de **definitieve push** na de detailpagina. Beide hebben dezelfde `tag`, dus de tweede vervangt de eerste op je toestel. Geen dubbele meldingen bij herhaalde analyse.
+- **Voorrang:** snelle controle (28) gaat vóór detailpagina's (25), zodat veel nieuwe advertenties de volgende controle niet vertragen.
+- **Blokkade-rem:** HTTP 403/429 ⇒ automatische pauze 15 min, verdubbelend tot max. 2 uur; tijdens de pauze geen enkel request; zichtbaar op *Prestaties*. Er wordt niets omzeild.
+- **Verwachte vertraging** (plaatsing → voorlopige push): gemiddeld ±30–40 s, in het slechtste geval ±70 s (60 s interval + ±1–5 s ophalen/verwerken). Gemeten eigen verwerking na ophalen: <1 s (testscenario). **Geen realtime-garantie**: staat een nieuwe advertentie buiten de opgehaalde pagina's of pauzeert de bron, dan komt de melding later. Meer verkeer naar Marktplaats kan in strijd zijn met hun voorwaarden; dat risico is een bewuste keuze van de gebruiker.
+
 ## 2. Gewijzigde/nieuwe bestanden (hoofdlijnen)
 `prisma/schema.prisma`, `prisma/migrations/20261011142112_pipeline_metrics_push` ·
 `src/lib/jobs/{queue,handlers,tick}.ts`, `src/worker/run.ts` · `src/lib/sources/{marktplaats-search,types}.ts`, `src/lib/pipeline/{ingest,analyze,context}.ts` ·

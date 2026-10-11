@@ -32,6 +32,10 @@ export interface FetchContext {
   prefilter?: (ad: RawAd) => boolean;
   /** Detailpagina's niet binnen de zoekrun ophalen (gebeurt dan asynchroon via FETCH_DETAIL-jobs) */
   deferDetails?: boolean;
+  /** Snelle modus: minder pagina's en een korte cache zodat de pagina vers is */
+  fast?: { pages: number };
+  /** Maximale leeftijd (sec) van een gecachte zoekpagina voor deze run */
+  cacheSeconds?: number;
   /** Wordt door de bron ingevuld: aantal opgehaalde pagina's en cache-treffers */
   stats?: { pages: number; cacheHits: number };
   /** Alleen voor tests */

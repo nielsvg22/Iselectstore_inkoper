@@ -144,6 +144,16 @@ export const configSchema = z.object({
       concurrency: z.number().int().min(1).max(8).default(3),
       /** Gedeelde cache van zoekpagina's zodat profielen met dezelfde zoekterm niet dubbel ophalen */
       pageCacheSeconds: z.number().int().min(0).max(900).default(120),
+      /** Snelle modus: per profiel elke ±minuut kijken, direct voorlopige push. Staat standaard UIT (bewuste keuze). */
+      fast: z
+        .object({
+          enabled: z.boolean().default(false),
+          intervalSeconds: z.number().int().min(30).max(600).default(60),
+          pages: z.number().int().min(1).max(3).default(2),
+          /** Bovengrens voor het totaal aantal pagina-requests per minuut over alle snelle profielen */
+          maxRequestsPerMinute: z.number().int().min(1).max(30).default(6),
+        })
+        .default({}),
     })
     .default({}),
 

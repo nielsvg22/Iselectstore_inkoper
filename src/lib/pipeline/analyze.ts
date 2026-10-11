@@ -18,11 +18,11 @@ import type { Recognition, RiskFlag, Signal } from "../types";
 import { loadTree } from "./tree";
 import { getPrefs, passesPrefs, quietEndsAt, type NotifyPrefs } from "../notify/prefs";
 
-async function createNotification(o: { adId: string; profileId: string; userId: string; channel: "TELEGRAM" | "DISCORD" | "WEBPUSH"; dedupeKey: string; runAt?: Date }) {
+async function createNotification(o: { adId: string; profileId: string; userId: string; channel: "TELEGRAM" | "DISCORD" | "WEBPUSH"; dedupeKey: string; runAt?: Date; priority?: number }) {
   if (await prisma.notification.findUnique({ where: { dedupeKey: o.dedupeKey } })) return;
   try {
     const n = await prisma.notification.create({ data: { adId: o.adId, profileId: o.profileId, userId: o.userId, channel: o.channel, dedupeKey: o.dedupeKey } });
-    await enqueue({ type: "NOTIFY", payload: { notificationId: n.id }, priority: 30, runAt: o.runAt, uniqueKey: `notify:${n.id}`, maxAttempts: 6 });
+    await enqueue({ type: "NOTIFY", payload: { notificationId: n.id }, priority: o.priority ?? 30, runAt: o.runAt, uniqueKey: `notify:${n.id}`, maxAttempts: 6 });
   } catch (e) {
     // gelijktijdige analyse maakte dezelfde melding al aan (unieke dedupeKey): niets te doen
     if ((e as { code?: string }).code !== "P2002") throw e;
@@ -281,7 +281,11 @@ export async function matchProfiles(
       await prisma.searchProfile.update({ where: { id: p.id }, data: { discoveredCount: discovered, interestingCount: interesting } });
 
       // Meldingen: pas na volledige beoordeling (detailpagina) en nooit voor geblokkeerde/genegeerde/demo-advertenties
-      const eligible = matched && p.notifyEnabled && cfg.notifications.enabled && !meta.blocked && !meta.userIgnored && !meta.isDemo && meta.score >= p.notifyMinScore && (meta.complete || !cfg.notifications.requireFullAnalysis);
+      const base = matched && p.notifyEnabled && cfg.notifications.enabled && !meta.blocked && !meta.userIgnored && !meta.isDemo && meta.score >= p.notifyMinScore;
+      // Snelle modus: direct een voorlopige push op basis van de lijstgegevens; de definitieve volgt na de detailpagina
+      const fastProfile = cfg.scheduler.fast.enabled && (p.sourceConfig as { fastMode?: boolean } | null)?.fastMode === true;
+      const complete = meta.complete || !cfg.notifications.requireFullAnalysis;
+      const eligible = base && (complete || fastProfile);
       if (eligible) {
         let prefs = prefsCache.get(p.userId);
         if (!prefs) {
@@ -292,13 +296,13 @@ export async function matchProfiles(
         const floor = BAND_RANK[cfg.notifications.minBand];
         // Telegram/Discord: zoals per zoekprofiel ingesteld, tenzij de gebruiker Telegram uit zet of alleen als alternatief wil
         const skipChat = prefs.prefs.telegram === "off" || (prefs.prefs.telegram === "fallback" && prefs.push);
-        if (!skipChat && BAND_RANK[meta.band] >= floor) {
+        if (complete && !skipChat && BAND_RANK[meta.band] >= floor) {
           const channels = (p.notifyChannels as string[]).filter((c) => (cfg.notifications.channels as string[]).includes(c));
           for (const ch of channels) await createNotification({ adId, profileId: p.id, userId: p.userId, channel: ch as "TELEGRAM" | "DISCORD", dedupeKey: `${ch}:${adId}:${p.id}`, runAt });
         }
         // Web Push: één melding per gebruiker per advertentie (ook als meerdere profielen matchen)
         if (prefs.push && prefs.prefs.push && passesPrefs(prefs.prefs, { score: meta.score, band: meta.band, netProfitCents: meta.netProfitCents, profileId: p.id }).ok) {
-          await createNotification({ adId, profileId: p.id, userId: p.userId, channel: "WEBPUSH", dedupeKey: `WEBPUSH:${adId}:${p.userId}`, runAt });
+          await createNotification({ adId, profileId: p.id, userId: p.userId, channel: "WEBPUSH", dedupeKey: complete ? `WEBPUSH:${adId}:${p.userId}` : `WEBPUSH:${adId}:${p.userId}:p`, runAt: complete ? runAt : runAt, priority: complete ? 30 : 40 });
         }
       }
     } catch (e) {

@@ -9,6 +9,7 @@ export interface ProfileFormValue {
   category: string;
   maxPages: number;
   fetchDetails: boolean;
+  fastMode: boolean;
   urls: string;
   feedUrl: string;
   intervalMinutes: number;
@@ -20,4 +21,4 @@ export interface ProfileFormValue {
   tree: Group;
 }
 
-export const defaultProfile = (): ProfileFormValue => ({ name: "", active: true, sourceKind: "SEARCH", queries: [], category: "", maxPages: 3, fetchDetails: true, urls: "", feedUrl: "", intervalMinutes: 60, notifyEnabled: true, notifyMinScore: 75, notifyChannels: ["TELEGRAM"], prioritizeNew: true, query: "", tree: { op: "AND", children: [] } });
+export const defaultProfile = (): ProfileFormValue => ({ name: "", active: true, sourceKind: "SEARCH", queries: [], category: "", maxPages: 3, fetchDetails: true, fastMode: false, urls: "", feedUrl: "", intervalMinutes: 60, notifyEnabled: true, notifyMinScore: 75, notifyChannels: ["TELEGRAM"], prioritizeNew: true, query: "", tree: { op: "AND", children: [] } });

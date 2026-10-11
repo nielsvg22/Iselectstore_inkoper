@@ -37,6 +37,10 @@ export default async function PerformancePage() {
         <p className="mt-1 max-w-3xl text-muted">Gemeten snelheid van de detectieketen. Tijden beginnen bij de <strong>eerste detectie door onze scraper</strong>; de publicatietijd van Marktplaats is te grof (alleen dag) om als meting te gebruiken.</p>
       </div>
 
+      {d.cooldown && (
+        <div role="alert" className="rounded-2xl bg-danger-soft px-5 py-4 text-sm"><strong>Gepauzeerd door Marktplaats-blokkade tot {new Date(d.cooldown.until).toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" })}.</strong> {d.cooldown.reason} De app probeert het daarna rustig opnieuw en omzeilt de blokkade niet.</div>
+      )}
+      {d.fast.enabled && <p className="text-sm text-muted">Snelle modus aan: {d.fast.profiles} profiel{d.fast.profiles === 1 ? "" : "en"} elke ±{d.fast.intervalSeconds} s.</p>}
       <section className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4" aria-label="Kerncijfers">
         <Tile label="Laatste succesvolle controle" value={ago(d.lastSuccessSeconds)} sub={`${d.activeProfiles} actieve zoekprofielen`} />
         <Tile label="Nieuwe advertenties (24 uur)" value={String(d.newAds24h)} sub="eerste keer gezien" />
@@ -73,7 +77,7 @@ export default async function PerformancePage() {
             </tbody>
           </table>
           <div className="mt-5 rounded-2xl bg-muted-bg p-4 text-sm text-muted">
-            <p><strong className="text-foreground">Geschatte maximale detectievertraging: {d.estimatedMaxDetectionDelayMinutes == null ? "—" : `≈ ${d.estimatedMaxDetectionDelayMinutes.toFixed(0)} min`}</strong> <span className="rounded-full bg-card px-2 py-0.5 text-[11px] font-medium">schatting</span></p>
+            <p><strong className="text-foreground">Geschatte maximale detectievertraging: {d.estimatedMaxDetectionDelayMinutes == null ? "—" : d.estimatedMaxDetectionDelayMinutes < 3 ? `≈ ${Math.round(d.estimatedMaxDetectionDelayMinutes * 60)} s` : `≈ ${d.estimatedMaxDetectionDelayMinutes.toFixed(0)} min`}</strong> <span className="rounded-full bg-card px-2 py-0.5 text-[11px] font-medium">schatting</span></p>
             <p className="mt-1">Dit is het kortste controle-interval van een actief profiel plus de gemeten verwerkingstijd. We controleren periodiek; dit is dus geen realtime-garantie. Een advertentie die buiten de opgehaalde zoekpagina’s valt, wordt pas later gezien.</p>
           </div>
         </CardContent>

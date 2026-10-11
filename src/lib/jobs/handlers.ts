@@ -12,6 +12,7 @@ import { buildPrefilter } from "../sources/prefilter";
 import { fetchListingUrl } from "../sources/adapters-shared";
 import { mergeDetail } from "../sources/marktplaats-search";
 import { SourceError, type RawAd } from "../sources/types";
+import { getCooldown, setCooldown } from "./cooldown";
 import { enqueue, PermanentJobError, type Handler, type JobType } from "./queue";
 
 const day = () => new Date().toISOString().slice(0, 10);
@@ -35,12 +36,18 @@ export async function runProfileCheck(profileId: string): Promise<{ fetched: num
     throw new PermanentJobError("Bron uitgeschakeld in instellingen");
   }
   // Bewust géén dagelijkse blokkade: zoeken mag nooit stoppen op een eigen requestlimiet (de pacing per request beschermt de bron al).
+  const sc = (profile.sourceConfig ?? {}) as { fastMode?: boolean; fetchDetails?: boolean };
+  const fast = adapter.origin === "SEARCH" && cfg.scheduler.fast.enabled && sc.fastMode === true;
+  if (adapter.origin === "SEARCH") {
+    const cd = await getCooldown(adapter.id);
+    if (cd) throw new PermanentJobError(`Gepauzeerd tot ${cd.until.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" })}: ${cd.reason}`);
+  }
   const run = await prisma.checkRun.create({ data: { profileId } });
   const t0 = Date.now();
   const stats = { pages: 0, cacheHits: 0 };
   try {
     const prefilter = adapter.origin === "SEARCH" ? buildPrefilter(await loadTree(profileId)) : undefined;
-    const ads = await adapter.fetchProfile({ profileId, query: profile.query, config: (profile.sourceConfig ?? {}) as Record<string, unknown>, maxAds: cfg.limits.maxAdsPerRun, prefilter, deferDetails: adapter.origin === "SEARCH", stats });
+    const ads = await adapter.fetchProfile({ profileId, query: profile.query, config: (profile.sourceConfig ?? {}) as Record<string, unknown>, maxAds: cfg.limits.maxAdsPerRun, prefilter, deferDetails: adapter.origin === "SEARCH", stats, fast: fast ? { pages: cfg.scheduler.fast.pages } : undefined, cacheSeconds: fast ? Math.min(cfg.scheduler.pageCacheSeconds, 15) : Math.min(cfg.scheduler.pageCacheSeconds, Math.max(0, Math.floor((profile.intervalMinutes * 60) / 2))) });
     let created = 0;
     let changed = 0;
     const wantsDetail = adapter.origin === "SEARCH" && ((profile.sourceConfig ?? {}) as { fetchDetails?: boolean }).fetchDetails !== false;
@@ -57,6 +64,8 @@ export async function runProfileCheck(profileId: string): Promise<{ fetched: num
     return { fetched: ads.length, created, changed };
   } catch (e) {
     const msg = errMsg(e);
+    // Blokkade door de bron (403/429): pauzeren met oplopende wachttijd — nooit omzeilen
+    if (adapter.origin === "SEARCH" && /\bHTTP (403|429)\b/.test(msg)) await setCooldown(adapter.id, msg);
     await recordSource(adapter.id, false, msg, 1);
     await prisma.searchProfile.update({ where: { id: profileId }, data: { lastCheckedAt: new Date(), lastError: msg } });
     await prisma.checkRun.update({ where: { id: run.id }, data: { finishedAt: new Date(), durationMs: Date.now() - t0, ok: false, error: msg.slice(0, 300), pages: stats.pages, cacheHits: stats.cacheHits } });
@@ -136,18 +145,30 @@ export const handlers: Partial<Record<JobType, Handler>> = {
   },
 };
 
-/** Zet controle-jobs klaar voor profielen die aan de beurt zijn. */
+/** Zet controle-jobs klaar voor profielen die aan de beurt zijn (snelle profielen op seconden, de rest op minuten). */
 export async function scheduleDueProfiles(now = new Date()): Promise<number> {
   const cfg = await getConfig();
   const profiles = await prisma.searchProfile.findMany({ where: { active: true }, orderBy: [{ prioritizeNew: "desc" }, { lastCheckedAt: "asc" }] });
+  const cooldown = await getCooldown("marktplaats-search", now);
+  // Totaal-rem voor snelle profielen: maximaal N pagina-requests per minuut over alles samen
+  const recentPages = await prisma.checkRun.aggregate({ _sum: { pages: true }, where: { startedAt: { gte: new Date(now.getTime() - 60_000) } } });
+  let budget = cfg.scheduler.fast.maxRequestsPerMinute - (recentPages._sum.pages ?? 0);
   let n = 0;
   for (const p of profiles) {
     const adapter = adapterForOrigin(p.sourceKind);
     if (!adapter || !adapter.automatic) continue;
-    const interval = Math.max(p.intervalMinutes, adapter.origin === "SEARCH" ? Math.max(cfg.scheduler.minIntervalMinutes, adapter.minIntervalMinutes) : adapter.minIntervalMinutes);
-    if (p.lastCheckedAt && now.getTime() - p.lastCheckedAt.getTime() < interval * 60_000) continue;
-    const slot = Math.floor(now.getTime() / (interval * 60_000));
-    const r = await enqueue({ type: "CHECK_PROFILE", payload: { profileId: p.id }, priority: p.prioritizeNew ? 15 : 6, uniqueKey: `check:${p.id}:${slot}`, maxAttempts: 3 });
+    const isSearch = adapter.origin === "SEARCH";
+    if (isSearch && cooldown) continue;
+    const fast = isSearch && cfg.scheduler.fast.enabled && (p.sourceConfig as { fastMode?: boolean } | null)?.fastMode === true;
+    const intervalMs = fast ? cfg.scheduler.fast.intervalSeconds * 1000 : Math.max(p.intervalMinutes, isSearch ? Math.max(cfg.scheduler.minIntervalMinutes, adapter.minIntervalMinutes) : adapter.minIntervalMinutes) * 60_000;
+    if (p.lastCheckedAt && now.getTime() - p.lastCheckedAt.getTime() < intervalMs) continue;
+    if (fast) {
+      const cost = Math.max(1, ((p.sourceConfig as { queries?: string[] } | null)?.queries?.length ?? 1) * cfg.scheduler.fast.pages);
+      if (budget < 1) continue; // wacht op de volgende ronde: eerlijk verdeeld door de sortering op lastCheckedAt
+      budget -= cost;
+    }
+    const slot = Math.floor(now.getTime() / intervalMs);
+    const r = await enqueue({ type: "CHECK_PROFILE", payload: { profileId: p.id }, priority: fast ? 28 : p.prioritizeNew ? 15 : 6, uniqueKey: `check:${p.id}:${slot}`, maxAttempts: 3 });
     if (r.created) n++;
   }
   await enqueue({ type: "CLEANUP", payload: {}, priority: 1, uniqueKey: `cleanup:${now.toISOString().slice(0, 10)}`, maxAttempts: 1 });

@@ -2,7 +2,7 @@ import "./env";
 import { runTick } from "../lib/jobs/tick";
 import { prisma } from "../lib/db/client";
 
-const idleMs = Number(process.env.WORKER_INTERVAL_SECONDS ?? 5) * 1000;
+const idleMs = Number(process.env.WORKER_INTERVAL_SECONDS ?? 3) * 1000;
 let stop = false;
 process.on("SIGTERM", () => (stop = true));
 process.on("SIGINT", () => (stop = true));

@@ -205,9 +205,9 @@ export const searchAdapter: SourceAdapter = {
     const seen = new Map<string, RawAd>();
     let pagesFetched = 0;
     outer: for (const q of sc.queries) {
-      for (let page = 1; page <= sc.maxPages; page++) {
+      for (let page = 1; page <= (ctx.fast ? Math.min(sc.maxPages, ctx.fast.pages) : sc.maxPages); page++) {
         const url = buildSearchUrl(q, sc.category || undefined, page);
-        const res = await cachedPage(url, ctx.fetchImpl ? 0 : cfg.scheduler.pageCacheSeconds * 1000, () => safeFetch(url, { allowlist: cfg.sources.urlAllowlist, respectRobots: true, fetchImpl: ctx.fetchImpl, lookup: ctx.lookup, throttle: th, maxBytes: 4_000_000 }), ctx.stats);
+        const res = await cachedPage(url, ctx.fetchImpl ? 0 : (ctx.cacheSeconds ?? cfg.scheduler.pageCacheSeconds) * 1000, () => safeFetch(url, { allowlist: cfg.sources.urlAllowlist, respectRobots: true, fetchImpl: ctx.fetchImpl, lookup: ctx.lookup, throttle: th, maxBytes: 4_000_000 }), ctx.stats);
         pagesFetched++;
         if (res.status === 404) break;
         if (res.status === 401 || res.status === 403 || res.status === 429) {

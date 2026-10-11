@@ -14,6 +14,8 @@ const profileBase = z.object({
       category: z.string().regex(/^([a-z0-9-]+(\/[a-z0-9-]+)?)?$/, "Ongeldig categoriepad").optional(),
       maxPages: z.number().int().min(1).max(10).optional(),
       fetchDetails: z.boolean().optional(),
+      /** Snelle modus (elke ±minuut kijken, direct voorlopige push) — vereist de globale schakelaar in Instellingen */
+      fastMode: z.boolean().optional(),
       urls: z.array(httpsUrl).max(100).optional(),
       feedUrl: httpsUrl.optional(),
       allowedHosts: z.array(z.string().max(100)).max(10).optional(),
