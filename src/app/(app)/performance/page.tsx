@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getCurrentUser } from "@/lib/auth";
+import { diagnose } from "@/lib/diagnose";
 import { getPerformance, type Dist } from "@/lib/metrics";
 import { timeAgo } from "@/lib/format";
 
@@ -28,7 +30,8 @@ const LAT: Array<[keyof Awaited<ReturnType<typeof getPerformance>>["latency"], s
 ];
 
 export default async function PerformancePage() {
-  const d = await getPerformance(7);
+  const user = await getCurrentUser();
+  const [d, checks] = await Promise.all([getPerformance(7), diagnose(user!.id)]);
   const max = Math.max(1, ...d.adsPerHour.map((h) => h.count));
   return (
     <div className="space-y-8">
@@ -37,6 +40,22 @@ export default async function PerformancePage() {
         <p className="mt-1 max-w-3xl text-muted">Gemeten snelheid van de detectieketen. Tijden beginnen bij de <strong>eerste detectie door onze scraper</strong>; de publicatietijd van Marktplaats is te grof (alleen dag) om als meting te gebruiken.</p>
       </div>
 
+      <section aria-label="Waarom geen melding?" className="rounded-[24px] bg-card p-6 shadow-card sm:p-8">
+        <h2 className="text-[18px] font-semibold tracking-tight">Waarom krijg ik (nog) geen melding?</h2>
+        <p className="mt-1 text-sm text-muted">Loopt de hele keten na: apparaat → voorkeuren → scraper → nulmeting → meldingen.</p>
+        <ul className="mt-5 divide-y divide-card-border">
+          {checks.map((c) => (
+            <li key={c.id} className="flex gap-3 py-3.5">
+              <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${c.status === "ok" ? "bg-success" : c.status === "warn" ? "bg-warning" : "bg-danger"}`} aria-label={c.status === "ok" ? "in orde" : c.status === "warn" ? "let op" : "probleem"} />
+              <div className="min-w-0 text-sm">
+                <p className="font-medium">{c.title}</p>
+                <p className="text-muted">{c.detail}</p>
+                {c.action && <p className="mt-1 font-medium text-foreground/80">→ {c.action}</p>}
+              </div>
+            </li>
+          ))}
+        </ul>
+      </section>
       {d.cooldown && (
         <div role="alert" className="rounded-2xl bg-danger-soft px-5 py-4 text-sm"><strong>Gepauzeerd door Marktplaats-blokkade tot {new Date(d.cooldown.until).toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" })}.</strong> {d.cooldown.reason} De app probeert het daarna rustig opnieuw en omzeilt de blokkade niet.</div>
       )}

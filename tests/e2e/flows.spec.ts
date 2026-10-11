@@ -339,6 +339,8 @@ test("filters testen op bestaande advertenties, met uitleg per advertentie; pres
 
   await page.goto("/performance");
   await expect(page.getByRole("heading", { name: "Prestaties" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Waarom krijg ik (nog) geen melding?" })).toBeVisible();
+  await expect(page.getByText("Pushapparaat", { exact: true })).toBeVisible();
   await expect(page.getByText("Laatste succesvolle controle")).toBeVisible();
   await expect(page.getByText("Geschatte maximale detectievertraging")).toBeVisible();
   await expect(page.getByText("Verwerkingstijden (laatste 7 dagen)")).toBeVisible();
