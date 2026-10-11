@@ -20,6 +20,10 @@ const profileBase = z.object({
       mailOnly: z.boolean().optional(),
       /** Snelle modus: smalle filterpagina's per model/opslag (standaard aan) */
       sliceSearch: z.boolean().optional(),
+      /** Automatisch aangemaakte per-model-profielen: groep (categorie), model en prioriteit */
+      group: z.string().max(60).optional(),
+      auto: z.boolean().optional(),
+      tier: z.enum(["high", "normal"]).optional(),
       /** Te volgen modellen (catalogus-sleutels), opslagformaten en prioriteitsmodellen — los van de filters */
       sliceModels: z.array(z.string().max(60)).max(60).optional(),
       sliceStorages: z.array(z.number().int()).max(10).optional(),

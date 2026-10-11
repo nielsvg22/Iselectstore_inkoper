@@ -187,19 +187,31 @@ export async function scheduleDueProfiles(now = new Date()): Promise<number> {
   const recentPages = await prisma.checkRun.aggregate({ _sum: { pages: true }, where: { startedAt: { gte: new Date(now.getTime() - 60_000) } } });
   let budget = cfg.scheduler.fast.maxRequestsPerMinute - (recentPages._sum.pages ?? 0);
   let n = 0;
-  for (const p of profiles) {
+  // Verwachte paginakosten per profiel = wat de laatste controle kostte (anders een voorzichtige schatting)
+  const lastRuns = await prisma.checkRun.findMany({ where: { ok: true, startedAt: { gte: new Date(now.getTime() - 6 * 3600_000) } }, orderBy: { startedAt: "desc" }, take: 500, select: { profileId: true, pages: true } });
+  const lastPages = new Map<string, number>();
+  for (const r of lastRuns) if (!lastPages.has(r.profileId) && r.pages > 0) lastPages.set(r.profileId, r.pages);
+  const plan = profiles.flatMap((p) => {
     const adapter = adapterForOrigin(p.sourceKind);
-    if (!adapter || !adapter.automatic) continue;
+    if (!adapter || !adapter.automatic) return [];
     const isSearch = adapter.origin === "SEARCH";
-    if (isSearch && (p.sourceConfig as { mailOnly?: boolean } | null)?.mailOnly === true) continue; // alleen via mailbox
-    if (isSearch && cooldown) continue;
-    const fast = isSearch && cfg.scheduler.fast.enabled && (p.sourceConfig as { fastMode?: boolean } | null)?.fastMode === true;
-    const intervalMs = fast ? cfg.scheduler.fast.intervalSeconds * 1000 : Math.max(p.intervalMinutes, isSearch ? Math.max(cfg.scheduler.minIntervalMinutes, adapter.minIntervalMinutes) : adapter.minIntervalMinutes) * 60_000;
-    if (p.lastCheckedAt && now.getTime() - p.lastCheckedAt.getTime() < intervalMs) continue;
+    const sc = (p.sourceConfig ?? {}) as { mailOnly?: boolean; fastMode?: boolean; tier?: "high" | "normal" };
+    if (isSearch && sc.mailOnly === true) return []; // alleen via mailbox
+    if (isSearch && cooldown) return [];
+    const fast = isSearch && cfg.scheduler.fast.enabled && sc.fastMode === true;
+    // Per model ingedeelde profielen: prioriteitsmodellen vaker dan de rest; overige snelle profielen op het snelle interval
+    const fastMs = (sc.tier === "high" ? cfg.scheduler.fast.priorityEveryMinutes * 60_000 : sc.tier === "normal" ? cfg.scheduler.fast.normalEveryMinutes * 60_000 : cfg.scheduler.fast.intervalSeconds * 1000);
+    const intervalMs = fast ? Math.max(fastMs, cfg.scheduler.fast.intervalSeconds * 1000 * (sc.tier ? 1 : 0)) : Math.max(p.intervalMinutes, isSearch ? Math.max(cfg.scheduler.minIntervalMinutes, adapter.minIntervalMinutes) : adapter.minIntervalMinutes) * 60_000;
+    const age = p.lastCheckedAt ? now.getTime() - p.lastCheckedAt.getTime() : Number.POSITIVE_INFINITY;
+    if (age < intervalMs) return [];
+    return [{ p, fast, intervalMs, ratio: age / intervalMs, high: sc.tier === "high" }];
+  });
+  // Grootste achterstand t.o.v. het doelinterval eerst (nooit gecontroleerd = eerst), prioriteit bij gelijke stand
+  plan.sort((a, b) => (a.ratio === b.ratio ? Number(b.high) - Number(a.high) : b.ratio - a.ratio));
+  for (const { p, fast, intervalMs } of plan) {
     if (fast) {
-      const cost = Math.max(1, ((p.sourceConfig as { queries?: string[] } | null)?.queries?.length ?? 1) * cfg.scheduler.fast.pages);
-      if (budget < 1) continue; // wacht op de volgende ronde: eerlijk verdeeld door de sortering op lastCheckedAt
-      budget -= cost;
+      if (budget < 1) continue; // wacht op de volgende ronde
+      budget -= lastPages.get(p.id) ?? 4;
     }
     const slot = Math.floor(now.getTime() / intervalMs);
     const r = await enqueue({ type: "CHECK_PROFILE", payload: { profileId: p.id }, priority: fast ? 28 : p.prioritizeNew ? 15 : 6, uniqueKey: `check:${p.id}:${slot}`, maxAttempts: 3 });

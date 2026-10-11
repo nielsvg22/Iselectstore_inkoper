@@ -59,7 +59,7 @@ export function ProfileEditor({ initial, savedFilters = [], categories = [] }: {
         sourceKind: v.sourceKind,
         sourceConfig:
           v.sourceKind === "SEARCH"
-            ? { queries: v.queries.length ? v.queries : q.models.map((m) => m.replace(/-/g, " ")), category: v.category, maxPages: v.maxPages, fetchDetails: v.fetchDetails, fastMode: v.fastMode, mailOnly: v.mailOnly, sliceSearch: v.sliceSearch }
+            ? { ...(v.extraConfig ?? {}), queries: v.queries.length ? v.queries : q.models.map((m) => m.replace(/-/g, " ")), category: v.category, maxPages: v.maxPages, fetchDetails: v.fetchDetails, fastMode: v.fastMode, mailOnly: v.mailOnly, sliceSearch: v.sliceSearch }
             : v.sourceKind === "MANUAL_URL"
               ? { urls }
               : v.sourceKind === "FEED"

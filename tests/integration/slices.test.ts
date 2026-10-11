@@ -179,22 +179,24 @@ describe("rondlopende planning (selectie)", () => {
 });
 
 describe("iPhone-melder en rondlopend crawlen", () => {
-  it("preset maakt één profiel dat alle iPhones volgt, zet de snelle modus aan, is idempotent en alleen voor beheerders", async () => {
+  it("preset maakt per iPhone-model een eigen profiel (categorie iPhone) plus een restprofiel, zet de snelle modus aan, is idempotent en alleen voor beheerders", async () => {
     const { user, cookie } = await makeUser();
     const r1 = await melderPost(req("/api/profiles/iphone-melder", { method: "POST", cookie, body: {} }));
     expect(r1.status).toBe(200);
-    expect(((await r1.json()) as { created: boolean }).created).toBe(true);
+    const j1 = (await r1.json()) as { created: boolean; models: number; createdModels: number };
+    expect(j1).toMatchObject({ created: true });
+    expect(j1.models).toBeGreaterThan(20);
     const r2 = await melderPost(req("/api/profiles/iphone-melder", { method: "POST", cookie, body: {} }));
-    expect(((await r2.json()) as { created: boolean }).created).toBe(false);
+    expect(((await r2.json()) as { createdModels: number }).createdModels).toBe(0);
     const ps = await prisma.searchProfile.findMany({ where: { userId: user.id } });
-    expect(ps).toHaveLength(1);
-    const sc = ps[0].sourceConfig as { fastMode: boolean; sliceModels: string[]; sliceStorages: number[]; priorityModels: string[]; queries: string[] };
-    expect(sc.fastMode).toBe(true);
-    expect(sc.sliceModels.length).toBeGreaterThan(20);
-    expect(sc.priorityModels).toContain("iphone-15-pro");
-    expect(sc.priorityModels).not.toContain("iphone-11");
-    expect(sc.sliceStorages).toEqual([64, 128, 256, 512, 1024]);
-    expect(ps[0]).toMatchObject({ notifyEnabled: true, notifyMinScore: 0 });
+    expect(ps).toHaveLength(j1.models + 1);
+    type Sc = { fastMode: boolean; sliceModels?: string[]; sliceStorages?: number[]; tier: string; group: string; auto: boolean };
+    const pro = ps.find((p) => p.name === "iPhone 15 Pro")!;
+    expect(pro.sourceConfig as Sc).toMatchObject({ fastMode: true, sliceModels: ["iphone-15-pro"], sliceStorages: [64, 128, 256, 512, 1024], tier: "high", group: "iPhone", auto: true });
+    expect((ps.find((p) => p.name === "iPhone 11")!.sourceConfig as Sc).tier).toBe("normal");
+    expect(ps.every((p) => (p.sourceConfig as Sc).group === "iPhone" && p.notifyEnabled && p.notifyMinScore === 0)).toBe(true);
+    const rest = ps.find((p) => p.name === "iPhone – overige modellen")!;
+    expect((rest.sourceConfig as Sc).sliceModels).toBeUndefined();
     expect((await getConfig(true)).scheduler.fast.enabled).toBe(true);
     const other = await makeUser("USER", "gewoon@example.com");
     expect((await melderPost(req("/api/profiles/iphone-melder", { method: "POST", cookie: other.cookie, body: {} }))).status).toBe(403);
@@ -234,7 +236,7 @@ describe("iPhone-melder en rondlopend crawlen", () => {
   });
 });
 
-import { ensureDefaultProfiles, IPHONE_MELDER_NAME } from "@/lib/provision";
+import { ensureDefaultProfiles } from "@/lib/provision";
 
 describe("automatisch op de server aanmaken (geen handwerk)", () => {
   it("wacht tot er een beheerder is, maakt dan één keer de iPhone-melder en zet de snelle modus aan; verwijderen wordt gerespecteerd", async () => {
@@ -243,10 +245,9 @@ describe("automatisch op de server aanmaken (geen handwerk)", () => {
     const { user } = await makeUser("ADMIN", "eerste@example.com");
     expect(await ensureDefaultProfiles()).toBe("gedaan");
     const ps = await prisma.searchProfile.findMany({ where: { userId: user.id } });
-    expect(ps.map((p) => p.name)).toEqual([IPHONE_MELDER_NAME]);
-    const sc = ps[0].sourceConfig as { sliceModels: string[]; fastMode: boolean };
-    expect(sc.fastMode).toBe(true);
-    expect(sc.sliceModels).toContain("iphone-16-pro-max");
+    expect(ps.map((p) => p.name)).toContain("iPhone 16 Pro Max");
+    expect(ps.length).toBeGreaterThan(20);
+    expect((ps.find((p) => p.name === "iPhone 16 Pro Max")!.sourceConfig as { fastMode: boolean; sliceModels: string[] })).toMatchObject({ fastMode: true, sliceModels: ["iphone-16-pro-max"] });
     const cfg = await getConfig(true);
     expect(cfg.scheduler.fast).toMatchObject({ enabled: true, maxRequestsPerMinute: 12 });
     expect(await ensureDefaultProfiles()).toBe("al-gedaan");

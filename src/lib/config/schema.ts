@@ -164,7 +164,7 @@ export const configSchema = z.object({
           enabled: z.boolean().default(false),
           intervalSeconds: z.number().int().min(30).max(600).default(60),
           /** Maximaal aantal pagina's per zoekterm; de controle stopt eerder zodra alle resultaten zijn gezien */
-          pages: z.number().int().min(1).max(15).default(8),
+          pages: z.number().int().min(1).max(40).default(20),
           /** Bovengrens voor het totaal aantal pagina-requests per minuut over alle snelle profielen */
           maxRequestsPerMinute: z.number().int().min(1).max(30).default(6),
           /** Vangnet: zo vaak (min.) wordt in plaats van de smalle filterpagina's de volledige zoekterm doorlopen, voor advertenties zonder model-/opslagkenmerk */

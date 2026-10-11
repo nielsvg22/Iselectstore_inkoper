@@ -12,6 +12,8 @@ export interface ProfileFormValue {
   fastMode: boolean;
   mailOnly: boolean;
   sliceSearch: boolean;
+  /** Overige instellingen in sourceConfig die dit formulier niet toont (bijv. sliceModels, tier, group, baselineAt): blijven bij opslaan behouden */
+  extraConfig?: Record<string, unknown>;
   urls: string;
   feedUrl: string;
   intervalMinutes: number;

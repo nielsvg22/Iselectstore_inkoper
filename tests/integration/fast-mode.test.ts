@@ -264,3 +264,31 @@ describe("dekking: snelle modus bekijkt álle resultaten van een smalle zoekopdr
     expect(perf.profiles.find((p) => p.id === slow.id)?.coverage).toEqual({ total: TOTAL, covered: 90, pct: 88 });
   });
 });
+
+describe("profielen per model: eigen interval en eerlijke verdeling binnen het paginabudget", () => {
+  it("prioriteitsmodel elke 3 min, overig model elke 20 min; grootste achterstand eerst; rem begrenst het aantal controles per ronde", async () => {
+    const { user } = await makeUser();
+    await saveConfig({ scheduler: { fast: { enabled: true, maxRequestsPerMinute: 8, intervalSeconds: 60, priorityEveryMinutes: 3, normalEveryMinutes: 20 } } });
+    const mk = (name: string, tier: "high" | "normal") => prisma.searchProfile.create({ data: { userId: user.id, name, sourceKind: "SEARCH", notifyChannels: [], sourceConfig: { queries: [name], fastMode: true, tier, auto: true, group: "iPhone" } } });
+    const hi = await mk("iPhone 15 Pro", "high");
+    const lo = await mk("iPhone 11", "normal");
+    const ago = (m: number) => new Date(Date.now() - m * 60_000);
+    await prisma.searchProfile.update({ where: { id: hi.id }, data: { lastCheckedAt: ago(2) } });
+    await prisma.searchProfile.update({ where: { id: lo.id }, data: { lastCheckedAt: ago(10) } });
+    expect(await scheduleDueProfiles()).toBe(0); // 2 min < 3 en 10 min < 20
+
+    await prisma.searchProfile.update({ where: { id: hi.id }, data: { lastCheckedAt: ago(4) } });
+    expect(await scheduleDueProfiles()).toBe(1);
+    expect((await jobsFor(hi.id)).length).toBe(1);
+    expect((await jobsFor(lo.id)).length).toBe(0);
+
+    await prisma.backgroundJob.deleteMany();
+    await prisma.searchProfile.update({ where: { id: hi.id }, data: { lastCheckedAt: ago(4) } }); // ratio 1,33
+    await prisma.searchProfile.update({ where: { id: lo.id }, data: { lastCheckedAt: ago(60) } }); // ratio 3,0 → eerst
+    await prisma.checkRun.create({ data: { profileId: lo.id, ok: true, pages: 8, finishedAt: new Date(), startedAt: new Date(Date.now() - 10 * 60_000) } });
+    await prisma.checkRun.create({ data: { profileId: hi.id, ok: true, pages: 8, finishedAt: new Date(), startedAt: new Date(Date.now() - 10 * 60_000) } });
+    expect(await scheduleDueProfiles()).toBe(1); // budget 8 pagina's: alleen de eerste past, de ander wacht
+    expect((await jobsFor(lo.id)).length).toBe(1);
+    expect((await jobsFor(hi.id)).length).toBe(0);
+  });
+});

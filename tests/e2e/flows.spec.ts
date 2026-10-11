@@ -345,6 +345,30 @@ test("filters testen op bestaande advertenties, met uitleg per advertentie; pres
   await page.screenshot({ path: "tests/e2e/shots/13-prestaties.png", fullPage: true });
 });
 
+test("iPhone-melder: per model ingedeeld, bulk pauzeren, bewerken behoudt de model-instellingen", async ({ page }) => {
+  await login(page);
+  await page.goto("/profiles");
+  await page.getByRole("button", { name: "Aanzetten" }).click();
+  await expect(page.getByText(/iPhone-melder aangemaakt/)).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("region", { name: "Categorie iPhone" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /iPhone 15 Pro\b.*Vaak/ }).first()).toBeVisible();
+  await expect(page.getByText(/profielen \(per model\)/)).toBeVisible();
+  // bewerken en opslaan mag de modelinstellingen niet wegnemen
+  const before = (await (await page.request.get("/api/profiles")).json()) as { profiles: Array<{ id: string; name: string; sourceConfig: Record<string, unknown> }> };
+  const pro = before.profiles.find((p) => p.name === "iPhone 15 Pro")!;
+  expect(pro.sourceConfig.sliceModels).toEqual(["iphone-15-pro"]);
+  await page.goto(`/profiles/${pro.id}`);
+  await page.getByRole("button", { name: "Wijzigingen opslaan" }).click();
+  await expect(page).toHaveURL(/\/profiles$/, { timeout: 20_000 });
+  const after = (await (await page.request.get("/api/profiles")).json()) as { profiles: Array<{ name: string; sourceConfig: Record<string, unknown> }> };
+  const pro2 = after.profiles.find((p) => p.name === "iPhone 15 Pro")!;
+  expect(pro2.sourceConfig).toMatchObject({ sliceModels: ["iphone-15-pro"], tier: "high", group: "iPhone", auto: true });
+  await page.getByRole("button", { name: "Alles pauzeren" }).click();
+  await expect(page.getByText(/profielen gepauzeerd/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Alles aanzetten" })).toBeVisible();
+  await page.screenshot({ path: "tests/e2e/shots/14-profielen-per-model.png", fullPage: true });
+});
+
 test("mobiel: geen horizontale scroll en bottom-navigatie zichtbaar", async ({ browser }) => {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
   const page = await ctx.newPage();

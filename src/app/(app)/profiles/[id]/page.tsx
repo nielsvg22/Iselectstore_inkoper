@@ -29,6 +29,7 @@ export default async function EditProfilePage({ params }: { params: Promise<{ id
     fastMode: cfg.fastMode ?? false,
     mailOnly: cfg.mailOnly ?? false,
     sliceSearch: cfg.sliceSearch ?? true,
+    extraConfig: Object.fromEntries(Object.entries(p.sourceConfig as Record<string, unknown>).filter(([k]) => !["urls", "feedUrl", "queries", "category", "maxPages", "fetchDetails", "fastMode", "mailOnly", "sliceSearch"].includes(k))),
     urls: (cfg.urls ?? []).join("\n"),
     feedUrl: cfg.feedUrl ?? "",
     intervalMinutes: p.intervalMinutes,

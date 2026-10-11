@@ -28,8 +28,8 @@ export function IphoneMelder({ exists, isAdmin }: { exists: boolean; isAdmin: bo
       <div className="flex items-start gap-4">
         <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/10"><Smartphone className="h-6 w-6 text-accent" /></span>
         <div>
-          <h2 className="text-[18px] font-semibold">Elke nieuwe iPhone melden</h2>
-          <p className="mt-1 max-w-xl text-sm text-white/75">Eén tik: de app volgt alle iPhone-modellen en opslagformaten via de smalle Marktplaats-lijsten en stuurt bij elke nieuwe advertentie direct een push. iPhone 13 en nieuwer worden het vaakst bekeken. Hoe vaak precies zie je op <a href="/performance" className="font-medium underline">Prestaties</a>.</p>
+          <h2 className="text-[18px] font-semibold">Elke nieuwe iPhone melden, per model</h2>
+          <p className="mt-1 max-w-xl text-sm text-white/75">Eén tik: de app maakt voor elk iPhone-model een eigen zoekprofiel (ingedeeld onder “iPhone”), controleert elk model apart via de smalle Marktplaats-lijsten per opslag en stuurt bij elke nieuwe advertentie direct een push. iPhone 13 en nieuwer worden het vaakst bekeken. Hoe vaak precies zie je op <a href="/performance" className="font-medium underline">Prestaties</a>.</p>
         </div>
       </div>
       <Button size="lg" onClick={go} loading={busy} disabled={!isAdmin} className="shrink-0">{exists ? "Bijwerken" : "Aanzetten"}</Button>
