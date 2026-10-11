@@ -59,7 +59,7 @@ export function ProfileEditor({ initial, savedFilters = [], categories = [] }: {
         sourceKind: v.sourceKind,
         sourceConfig:
           v.sourceKind === "SEARCH"
-            ? { queries: v.queries.length ? v.queries : q.models.map((m) => m.replace(/-/g, " ")), category: v.category, maxPages: v.maxPages, fetchDetails: v.fetchDetails, fastMode: v.fastMode, mailOnly: v.mailOnly }
+            ? { queries: v.queries.length ? v.queries : q.models.map((m) => m.replace(/-/g, " ")), category: v.category, maxPages: v.maxPages, fetchDetails: v.fetchDetails, fastMode: v.fastMode, mailOnly: v.mailOnly, sliceSearch: v.sliceSearch }
             : v.sourceKind === "MANUAL_URL"
               ? { urls }
               : v.sourceKind === "FEED"
@@ -130,6 +130,12 @@ export function ProfileEditor({ initial, savedFilters = [], categories = [] }: {
               </div>
               <div className="rounded-2xl border border-border bg-card p-4">
                 <Switch checked={v.fastMode} onChange={(x) => setV({ ...v, fastMode: x })} label="Snelle modus: elke ±minuut kijken en direct een voorlopige push sturen" />
+                {v.fastMode && (
+                  <div className="mt-3 border-t border-card-border pt-3">
+                    <Switch checked={v.sliceSearch} onChange={(x) => setV({ ...v, sliceSearch: x })} label="Slim zoeken op model en opslag (aanbevolen)" />
+                    <p className="mt-2 text-xs text-muted">Kies bij Filters de modellen (en eventueel opslag) die je wilt volgen. We bekijken dan per model en opslag de volledige, smalle resultatenlijst van Marktplaats (bijv. iPhone 15 Pro 256GB: ±220 resultaten in plaats van ±2.200), zodat nieuwe advertenties niet buiten beeld vallen. Om advertenties zonder model-/opslagkenmerk niet te missen, doorlopen we regelmatig ook de gewone zoekterm.</p>
+                  </div>
+                )}
                 <p className="mt-2 text-xs text-muted">Gebruik dit voor smalle zoektermen (bijv. ‘iphone 16 pro’). We kijken dan alleen naar de eerste pagina’s en sturen meteen een voorlopige melding; enkele seconden later volgt de definitieve. Werkt alleen als Snelle modus ook is ingeschakeld bij <a href="/settings#snelheid" className="font-medium text-accent-strong underline">Instellingen → Snelheid</a>. Geen realtime-garantie; bij een blokkade door Marktplaats pauzeert de app automatisch.</p>
               </div>
               <p className="text-xs text-muted">Prijs-, afstands-, model- en winstfilters hieronder worden door Deal Hunter zelf toegepast op alle gevonden advertenties. Er wordt rustig gezocht (min. 3 s tussen requests) en robots.txt wordt gerespecteerd.</p>

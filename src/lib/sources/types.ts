@@ -32,6 +32,10 @@ export interface FetchContext {
   prefilter?: (ad: RawAd) => boolean;
   /** Detailpagina's niet binnen de zoekrun ophalen (gebeurt dan asynchroon via FETCH_DETAIL-jobs) */
   deferDetails?: boolean;
+  /** Smalle resultaatlijsten (model × opslag via Marktplaats-filterpagina's); vervangt de zoektermen voor deze run */
+  slices?: Array<{ url: string; label: string }>;
+  /** Zoektermen voor modellen zonder filterpagina; lopen naast de slices mee */
+  extraQueries?: string[];
   /** Snelle modus: minder pagina's en een korte cache zodat de pagina vers is */
   fast?: { pages: number };
   /** Maximale leeftijd (sec) van een gecachte zoekpagina voor deze run */

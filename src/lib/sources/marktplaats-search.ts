@@ -204,10 +204,15 @@ export const searchAdapter: SourceAdapter = {
     const th = gap === 3000 ? throttle : new Throttle(gap);
     const seen = new Map<string, RawAd>();
     let pagesFetched = 0;
-    outer: for (const q of sc.queries) {
+    // Eenheden: smalle filterpagina's (indien meegegeven) of de zoektermen
+    const queryUnit = (q: string, category?: string) => ({ urlFor: (page: number) => buildSearchUrl(q, category, page) });
+    const units: Array<{ urlFor: (page: number) => string }> = ctx.slices?.length
+      ? [...ctx.slices.map((sl) => ({ urlFor: (page: number) => (page > 1 ? `${sl.url}p/${page}/` : sl.url) })), ...(ctx.extraQueries ?? []).map((q) => queryUnit(q, sc.category || undefined))]
+      : sc.queries.map((q) => queryUnit(q, sc.category || undefined));
+    outer: for (const unit of units) {
       // Snelle modus: zoveel pagina's als nodig om álle resultaten van de (smalle) zoekopdracht te zien, tot de ingestelde bovengrens
       for (let page = 1; page <= (ctx.fast ? ctx.fast.pages : sc.maxPages); page++) {
-        const url = buildSearchUrl(q, sc.category || undefined, page);
+        const url = unit.urlFor(page);
         const res = await cachedPage(url, ctx.fetchImpl ? 0 : (ctx.cacheSeconds ?? cfg.scheduler.pageCacheSeconds) * 1000, () => safeFetch(url, { allowlist: cfg.sources.urlAllowlist, respectRobots: true, fetchImpl: ctx.fetchImpl, lookup: ctx.lookup, throttle: th, maxBytes: 4_000_000 }), ctx.stats);
         pagesFetched++;
         if (res.status === 404) break;

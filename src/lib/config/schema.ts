@@ -167,6 +167,8 @@ export const configSchema = z.object({
           pages: z.number().int().min(1).max(15).default(8),
           /** Bovengrens voor het totaal aantal pagina-requests per minuut over alle snelle profielen */
           maxRequestsPerMinute: z.number().int().min(1).max(30).default(6),
+          /** Vangnet: zo vaak (min.) wordt in plaats van de smalle filterpagina's de volledige zoekterm doorlopen, voor advertenties zonder model-/opslagkenmerk */
+          fullSearchEveryMinutes: z.number().int().min(1).max(240).default(10),
         })
         .default({}),
     })

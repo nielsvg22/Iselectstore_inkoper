@@ -18,6 +18,8 @@ const profileBase = z.object({
       fastMode: z.boolean().optional(),
       /** Alleen filteren en melden voor advertenties die via de gekoppelde mailbox binnenkomen; niet zelf zoeken */
       mailOnly: z.boolean().optional(),
+      /** Snelle modus: smalle filterpagina's per model/opslag (standaard aan) */
+      sliceSearch: z.boolean().optional(),
       urls: z.array(httpsUrl).max(100).optional(),
       feedUrl: httpsUrl.optional(),
       allowedHosts: z.array(z.string().max(100)).max(10).optional(),

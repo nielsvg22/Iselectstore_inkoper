@@ -13,6 +13,8 @@ import { fetchListingUrl } from "../sources/adapters-shared";
 import { mergeDetail } from "../sources/marktplaats-search";
 import { SourceError, type RawAd } from "../sources/types";
 import { getCooldown, setCooldown } from "./cooldown";
+import { modelByKey } from "../catalog/apple";
+import { buildSlices, getFacets, getLastFullSearch, setLastFullSearch, sliceSpecsFromTree, type FacetMap, type Slice } from "../sources/facets";
 import { enqueue, PermanentJobError, type Handler, type JobType } from "./queue";
 
 const day = () => new Date().toISOString().slice(0, 10);
@@ -46,8 +48,30 @@ export async function runProfileCheck(profileId: string): Promise<{ fetched: num
   const t0 = Date.now();
   const stats: { pages: number; cacheHits: number; total?: number; covered?: number } = { pages: 0, cacheHits: 0 };
   try {
-    const prefilter = adapter.origin === "SEARCH" ? buildPrefilter(await loadTree(profileId)) : undefined;
-    const ads = await adapter.fetchProfile({ profileId, query: profile.query, config: (profile.sourceConfig ?? {}) as Record<string, unknown>, maxAds: fast ? Math.max(cfg.limits.maxAdsPerRun, cfg.scheduler.fast.pages * 30 * 4) : cfg.limits.maxAdsPerRun, prefilter, deferDetails: adapter.origin === "SEARCH", stats, fast: fast ? { pages: cfg.scheduler.fast.pages } : undefined, cacheSeconds: fast ? Math.min(cfg.scheduler.pageCacheSeconds, 15) : Math.min(cfg.scheduler.pageCacheSeconds, Math.max(0, Math.floor((profile.intervalMinutes * 60) / 2))) });
+    const tree = adapter.origin === "SEARCH" ? await loadTree(profileId) : null;
+    const prefilter = tree ? buildPrefilter(tree) : undefined;
+    // Slim zoeken (snelle modus): smalle filterpagina's per model/opslag; af en toe de volledige zoekterm als vangnet
+    let slices: Slice[] | undefined;
+    let fullSearch = false;
+    let extraQueries: string[] | undefined;
+    if (fast && tree && (profile.sourceConfig as { sliceSearch?: boolean } | null)?.sliceSearch !== false) {
+      const specs = sliceSpecsFromTree(tree);
+      if (specs.length) {
+        const last = await getLastFullSearch(profileId);
+        fullSearch = !last || Date.now() - last.getTime() > cfg.scheduler.fast.fullSearchEveryMinutes * 60_000;
+        if (!fullSearch) {
+          const facets = new Map<string, FacetMap>();
+          for (const cat of new Set(specs.map((x) => x.model.category))) facets.set(cat, await getFacets(cat));
+          const built = buildSlices(specs, facets);
+          if (built.slices.length) {
+            slices = built.slices;
+            extraQueries = built.missing.map((m) => modelByKey(m.key)?.term).filter((t): t is string => !!t);
+          } else fullSearch = true; // geen enkel model heeft een filterpagina: veilig terugvallen op de zoekterm
+        }
+      }
+    }
+    if (fullSearch) await setLastFullSearch(profileId);
+    const ads = await adapter.fetchProfile({ profileId, slices, query: profile.query, config: (profile.sourceConfig ?? {}) as Record<string, unknown>, maxAds: fast ? Math.max(cfg.limits.maxAdsPerRun, cfg.scheduler.fast.pages * 30 * 4) : cfg.limits.maxAdsPerRun, prefilter, deferDetails: adapter.origin === "SEARCH", stats, extraQueries, fast: fast ? { pages: cfg.scheduler.fast.pages } : undefined, cacheSeconds: fast ? Math.min(cfg.scheduler.pageCacheSeconds, 15) : Math.min(cfg.scheduler.pageCacheSeconds, Math.max(0, Math.floor((profile.intervalMinutes * 60) / 2))) });
     let created = 0;
     let changed = 0;
     const wantsDetail = adapter.origin === "SEARCH" && ((profile.sourceConfig ?? {}) as { fetchDetails?: boolean }).fetchDetails !== false;
