@@ -90,7 +90,7 @@ export function StatTile({ title, value, sub, delta, deltaLabel, icon: Icon, ser
     <div className="relative min-h-[132px] overflow-hidden rounded-[22px] bg-card p-6 shadow-card">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[17px] font-semibold text-foreground/90">{title}</p>
+          <p className="text-[16px] font-semibold leading-tight text-foreground/90">{title}</p>
           <p className="tabular mt-2 text-[38px] font-bold leading-none tracking-tight">{value}</p>
         </div>
         <span className="relative z-10 flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent"><Icon className="h-[28px] w-[28px]" strokeWidth={2.2} /></span>

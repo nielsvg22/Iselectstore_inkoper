@@ -77,7 +77,7 @@ export function SettingsForm({ initial, secrets, isAdmin }: { initial: AppConfig
   return (
     <div className="space-y-6">
       {!isAdmin && <Notice tone="warning">Alleen beheerders kunnen instellingen wijzigen.</Notice>}
-      <fieldset disabled={!isAdmin} className="space-y-6">
+      <fieldset disabled={!isAdmin} className="min-w-0 space-y-6">
         <Card>
           <CardHeader><div><CardTitle>Winstdoelen &amp; zoekinstellingen</CardTitle><CardDescription>Standaardwaarden voor analyse, scoring en filters.</CardDescription></div></CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
