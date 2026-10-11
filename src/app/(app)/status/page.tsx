@@ -37,7 +37,7 @@ export default async function StatusPage() {
       {pending > 0 && !s.lastJobFinishedAt && <p className="text-sm text-muted">Er staan jobs in de wachtrij. Draait de worker (<code>npm run worker</code>) of is de cron-aanroep ingesteld? Gebruik anders ‘Nu verwerken’.</p>}
 
       <Card>
-        <CardHeader><div><CardTitle>Databronnen</CardTitle><CardDescription>Of de bron bereikbaar is, en hoeveel requests er vandaag zijn gebruikt.</CardDescription></div></CardHeader>
+        <CardHeader><div><CardTitle>Databronnen</CardTitle><CardDescription>Of de bron bereikbaar is, en hoeveel requests er vandaag zijn gedaan (geen limiet).</CardDescription></div></CardHeader>
         <CardContent className="space-y-3">
           {s.sources.map((src) => (
             <div key={src.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-muted-bg px-4 py-3 text-sm">
@@ -45,7 +45,7 @@ export default async function StatusPage() {
                 {!src.enabled ? <CircleDashed className="h-5 w-5 text-muted" /> : src.ok === false ? <CircleAlert className="h-5 w-5 text-danger" /> : src.ok ? <CheckCircle2 className="h-5 w-5 text-success" /> : <CircleDashed className="h-5 w-5 text-muted" />}
                 <div className="min-w-0"><p className="font-medium">{src.label}</p><p className="truncate text-xs text-muted">{!src.enabled ? "Uitgeschakeld in instellingen" : src.ok === false ? `Fout: ${src.lastError}` : src.ok ? `Laatst gelukt ${timeAgo(src.lastOkAt)}` : "Nog niet gebruikt"} · min. interval {src.minIntervalMinutes} min</p></div>
               </div>
-              <span className="tabular text-xs text-muted">{src.requestsToday}/{src.dailyLimit} requests vandaag</span>
+              <span className="tabular text-xs text-muted">{src.requestsToday} requests vandaag</span>
             </div>
           ))}
         </CardContent>
