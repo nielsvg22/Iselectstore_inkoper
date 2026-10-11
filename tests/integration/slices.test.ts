@@ -233,3 +233,33 @@ describe("iPhone-melder en rondlopend crawlen", () => {
     expect(three).toEqual([`/l/${CAT}/f/256-gb+iphone-15-pro/12825+14053/`, `/l/${CAT}/f/512-gb+iphone-15-pro/12826+14053/`]); // alleen de prioriteitsslices zijn al weer aan de beurt
   });
 });
+
+import { ensureDefaultProfiles, IPHONE_MELDER_NAME } from "@/lib/provision";
+
+describe("automatisch op de server aanmaken (geen handwerk)", () => {
+  it("wacht tot er een beheerder is, maakt dan één keer de iPhone-melder en zet de snelle modus aan; verwijderen wordt gerespecteerd", async () => {
+    expect(await ensureDefaultProfiles()).toBe("wacht-op-beheerder");
+    expect(await prisma.searchProfile.count()).toBe(0);
+    const { user } = await makeUser("ADMIN", "eerste@example.com");
+    expect(await ensureDefaultProfiles()).toBe("gedaan");
+    const ps = await prisma.searchProfile.findMany({ where: { userId: user.id } });
+    expect(ps.map((p) => p.name)).toEqual([IPHONE_MELDER_NAME]);
+    const sc = ps[0].sourceConfig as { sliceModels: string[]; fastMode: boolean };
+    expect(sc.fastMode).toBe(true);
+    expect(sc.sliceModels).toContain("iphone-16-pro-max");
+    const cfg = await getConfig(true);
+    expect(cfg.scheduler.fast).toMatchObject({ enabled: true, maxRequestsPerMinute: 12 });
+    expect(await ensureDefaultProfiles()).toBe("al-gedaan");
+    // gebruiker verwijdert het profiel: niet opnieuw automatisch aanmaken
+    await prisma.searchProfile.deleteMany();
+    expect(await ensureDefaultProfiles()).toBe("al-gedaan");
+    expect(await prisma.searchProfile.count()).toBe(0);
+  });
+
+  it("past een bewust ingestelde paginarem niet aan", async () => {
+    await makeUser("ADMIN", "tweede@example.com");
+    await saveConfig({ scheduler: { fast: { maxRequestsPerMinute: 4 } } });
+    await ensureDefaultProfiles();
+    expect((await getConfig(true)).scheduler.fast.maxRequestsPerMinute).toBe(4);
+  });
+});

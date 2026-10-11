@@ -2,6 +2,7 @@ import "./env";
 import { runTick } from "../lib/jobs/tick";
 import { prisma } from "../lib/db/client";
 import { pollMailbox } from "../lib/mail/poll";
+import { ensureDefaultProfiles } from "../lib/provision";
 import { getConfig } from "../lib/settings/store";
 
 const idleMs = Number(process.env.WORKER_INTERVAL_SECONDS ?? 3) * 1000;
@@ -38,6 +39,20 @@ async function mailLoop() {
 async function main() {
   console.log(`[worker] gestart, wachttijd bij leegloop ${idleMs / 1000}s`);
   void mailLoop();
+  // Standaardprofielen (iPhone-melder) automatisch aanmaken zodra er een beheerder is; controleert periodiek tot dat gelukt is
+  const provision = async () => {
+    try {
+      const r = await ensureDefaultProfiles();
+      if (r === "gedaan") console.log("[worker] iPhone-melder automatisch aangemaakt en snelle modus aangezet");
+      return r;
+    } catch (e) {
+      console.error("[worker] provisioning mislukt:", (e as Error).message);
+      return "fout" as const;
+    }
+  };
+  void (async () => {
+    while (!stop && (await provision()) !== "al-gedaan" ) await new Promise((r) => setTimeout(r, 30_000));
+  })();
   while (!stop) {
     try {
       const r = await runTick({ deadlineMs: 30_000 });
