@@ -16,12 +16,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const cfg = await getConfig();
   const hasNew = (await prisma.notification.count({ where: { status: "SENT", sentAt: { gte: new Date(Date.now() - 24 * 3600_000) } } })) > 0;
   return (
-    <div className="mx-auto flex min-h-dvh max-w-[1720px] gap-5 p-3 pb-28 lg:p-5 lg:pb-5">
+    <div className="mx-auto flex min-h-dvh max-w-[1720px] gap-8 p-4 pb-28 lg:p-6 lg:pb-6">
       <Sidebar />
       <div className="min-w-0 flex-1">
         <Topbar name={user.name ?? user.email} role={user.role} hasNew={hasNew} />
         {cfg.demoMode && (
-          <div className="mt-5 flex items-center gap-2.5 rounded-2xl bg-warning-soft px-4 py-3 text-sm" role="status">
+          <div className="mt-6 flex items-center gap-2.5 rounded-2xl bg-warning-soft/60 px-4 py-2.5 text-[13px] text-muted" role="status">
             <FlaskConical className="h-4 w-4 shrink-0 text-warning" />
             <p>
               <strong>Demonstratiemodus:</strong> alle getoonde advertenties zijn voorbeeldgegevens en geen echte Marktplaats-advertenties.{" "}
@@ -29,7 +29,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             </p>
           </div>
         )}
-        <main className="fade-up mt-5">{children}</main>
+        <main className="fade-up mt-8">{children}</main>
       </div>
       <BottomNav />
     </div>

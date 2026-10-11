@@ -34,13 +34,13 @@ function SearchForm() {
     >
       <label className="relative min-w-0 flex-1">
         <span className="sr-only">Zoek in advertenties</span>
-        <Search className="pointer-events-none absolute left-5 top-1/2 h-[22px] w-[22px] -translate-y-1/2 text-[#5d6679]" />
+        <Search className="pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-faint" />
         <input
           name="q"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Zoek naar iPhone, MacBook, AirPods, iPad..."
-          className="h-[58px] w-full rounded-[20px] border border-transparent bg-[#e6e7ec] pl-14 pr-5 text-[16px] text-foreground placeholder:text-[#7a8397] shadow-[inset_0_1px_2px_rgba(31,48,73,0.05)] transition focus:border-accent focus:bg-card focus:outline-none focus:ring-4 focus:ring-accent-soft dark:bg-muted-bg"
+          className="h-12 w-full rounded-[16px] border border-card-border bg-card pl-12 pr-5 text-[14px] text-foreground placeholder:text-faint shadow-card transition focus:border-accent focus:bg-card focus:outline-none focus:ring-4 focus:ring-accent-soft dark:bg-muted-bg"
         />
       </label>
       <div className="flex gap-3">
@@ -50,13 +50,13 @@ function SearchForm() {
           <select
             value={dist}
             onChange={(e) => setDist(e.target.value)}
-            className="h-[58px] w-full appearance-none rounded-[20px] border border-card-border bg-card pl-12 pr-10 text-[16px] font-medium text-foreground shadow-card focus:border-accent focus:outline-none focus:ring-4 focus:ring-accent-soft"
+            className="h-12 w-full appearance-none rounded-[16px] border border-card-border bg-card pl-11 pr-9 text-[14px] text-foreground shadow-card focus:border-accent focus:outline-none focus:ring-4 focus:ring-accent-soft"
           >
             {DISTANCES.map(([v, l]) => (<option key={v} value={v}>{l}</option>))}
           </select>
           <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
         </label>
-        <button type="submit" className="h-[58px] shrink-0 rounded-[20px] bg-gradient-to-r from-[#F9858B] to-[#EF6570] px-8 text-[17px] font-semibold text-white shadow-[0_12px_26px_rgba(239,101,112,0.35)] transition hover:brightness-105 active:scale-[0.98] sm:px-12">
+        <button type="submit" className="h-12 shrink-0 rounded-[16px] bg-gradient-to-r from-[#F9858B] to-[#EF6570] px-7 text-[14px] font-semibold text-white transition hover:brightness-105 active:scale-[0.98] sm:px-9">
           Zoeken
         </button>
       </div>
@@ -77,7 +77,7 @@ export function Topbar({ name, role, hasNew }: { name: string; role: string; has
           <UserMenu name={name} role={role} />
         </div>
       </div>
-      <React.Suspense fallback={<div className="h-[58px] flex-1 rounded-[20px] bg-muted-bg" />}>
+      <React.Suspense fallback={<div className="h-12 flex-1 rounded-[16px] bg-muted-bg" />}>
         <SearchForm />
       </React.Suspense>
       <div className="hidden items-center gap-3 lg:flex">

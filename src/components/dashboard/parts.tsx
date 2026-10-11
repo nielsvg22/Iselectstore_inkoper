@@ -39,7 +39,7 @@ const CHIPS: Array<{ id: string; label: string; icon: typeof LayoutGrid }> = [
 
 export function CategoryChips({ active, base = "/", param = "cat" }: { active: string; base?: string; param?: string }) {
   return (
-    <nav aria-label="Categorie" className="-mx-2 -mb-3 flex gap-3 overflow-x-auto px-2 pb-4 pt-1">
+    <nav aria-label="Categorie" className="-mx-1 flex gap-2.5 overflow-x-auto px-1 py-1">
       {CHIPS.map(({ id, label, icon: Icon }) => {
         const on = (active || "") === id;
         return (
@@ -48,11 +48,11 @@ export function CategoryChips({ active, base = "/", param = "cat" }: { active: s
             href={id ? `${base}?${param}=${id}` : base}
             aria-current={on ? "true" : undefined}
             className={cn(
-              "flex h-[54px] shrink-0 items-center gap-3 rounded-full px-6 text-[16px] font-semibold transition",
-              on ? "bg-[#1f3049] text-white shadow-[0_10px_22px_rgba(31,48,73,0.25)]" : "bg-card text-[#3b465c] shadow-card hover:-translate-y-0.5 dark:text-foreground",
+              "flex h-11 shrink-0 items-center gap-2.5 rounded-full px-5 text-[14px] font-medium transition",
+              on ? "bg-navy text-white" : "bg-card text-muted hover:text-foreground",
             )}
           >
-            <Icon className="h-[20px] w-[20px]" strokeWidth={on ? 2.2 : 1.8} />
+            <Icon className="h-[18px] w-[18px]" strokeWidth={1.8} />
             {label}
           </Link>
         );
@@ -87,16 +87,15 @@ function Wave({ values }: { values: number[] }) {
 
 export function StatTile({ title, value, sub, delta, deltaLabel, icon: Icon, series }: { title: string; value: string; sub?: string; delta?: number | null; deltaLabel?: string; icon: typeof TrendingUp; series: number[] }) {
   return (
-    <div className="relative min-h-[132px] overflow-hidden rounded-[22px] bg-card p-6 shadow-card">
+    <div className="relative overflow-hidden rounded-[24px] bg-card p-7 shadow-card">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[16px] font-semibold leading-tight text-foreground/90">{title}</p>
-          <p className="tabular mt-2 text-[38px] font-bold leading-none tracking-tight">{value}</p>
+          <p className="text-[14px] font-medium leading-tight text-muted">{title}</p>
+          <p className="tabular mt-3 text-[32px] font-semibold leading-none tracking-tight">{value}</p>
         </div>
-        <span className="relative z-10 flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent"><Icon className="h-[28px] w-[28px]" strokeWidth={2.2} /></span>
+        <span className="relative z-10 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent"><Icon className="h-5 w-5" strokeWidth={1.8} /></span>
       </div>
-      <Wave values={series} />
-      <p className="relative z-10 mt-3 max-w-[60%] text-[14.5px] text-muted">
+      <p className="relative z-10 mt-5 text-[13px] text-faint">
         {delta != null ? (
           <span className="tabular inline-flex items-center gap-1">
             <span className={cn("inline-flex items-center gap-0.5 font-bold", delta >= 0 ? "text-success" : "text-danger")}>
@@ -118,14 +117,14 @@ export const STAT_ICONS = { newDeals: TrendingUp, margin: BarChart3, profiles: S
 /* ------------------------------ category cards ------------------------------ */
 export function CategoryCard({ id, label, art, count }: { id: string; label: string; art: string | null; count: number }) {
   return (
-    <Link href={`/deals?family=${id}`} className="group flex min-w-0 flex-col items-center gap-2 rounded-[22px] bg-card p-3.5 text-center shadow-card transition hover:-translate-y-1 hover:shadow-pop sm:flex-row sm:text-left">
+    <Link href={`/deals?family=${id}`} className="group flex min-w-0 flex-col items-center gap-2 rounded-[22px] bg-card p-4 text-center shadow-card transition hover:shadow-pop sm:flex-row sm:text-left">
       {art && (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={artSrc(art as ArtKey)} alt="" width={68} height={68} className="product-art h-[68px] w-[68px] shrink-0 transition-transform duration-300 group-hover:scale-105" loading="lazy" />
       )}
       <span className="min-w-0">
-        <span className="block text-[17px] font-bold leading-tight">{label}</span>
-        <span className="tabular mt-0.5 inline-flex items-center gap-1 whitespace-nowrap text-[14px] text-muted">
+        <span className="block text-[15px] font-semibold leading-tight">{label}</span>
+        <span className="tabular mt-0.5 inline-flex items-center gap-1 whitespace-nowrap text-[13px] text-muted">
           {count.toLocaleString("nl-NL")} deals <ArrowRight className="h-3.5 w-3.5 text-accent" />
         </span>
       </span>
@@ -143,7 +142,7 @@ const PILL: Record<DealBadgeInfo["tone"], string> = {
 export function ActionPill({ badge }: { badge: DealBadgeInfo }) {
   const Icon = badge.icon === "thumb" ? ThumbsUp : Flame;
   return (
-    <span className={cn("inline-flex items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-[14px] font-semibold", PILL[badge.tone])}>
+    <span className={cn("inline-flex items-center gap-2 whitespace-nowrap rounded-full px-3.5 py-1.5 text-[13px] font-medium", PILL[badge.tone])}>
       <Icon className="h-[17px] w-[17px]" strokeWidth={2.2} />
       {badge.label}
     </span>
@@ -153,21 +152,16 @@ export function ActionPill({ badge }: { badge: DealBadgeInfo }) {
 /* ----------------------------------- banner ----------------------------------- */
 export function CtaBanner() {
   return (
-    <section className="relative overflow-hidden rounded-[26px] bg-navy-2 px-6 py-5 text-white shadow-pop sm:px-8" aria-label="Nieuwe zoekopdracht">
-      <svg className="pointer-events-none absolute right-0 top-0 h-full w-[55%]" viewBox="0 0 600 120" fill="none" aria-hidden preserveAspectRatio="xMaxYMid slice">
-        <g stroke="#f9858b" strokeOpacity=".22" strokeWidth="1.3" strokeLinejoin="round">
-          <path d="M120 130 L220 -10 L300 70 L360 20" /><path d="M280 130 L340 40 L430 120" /><path d="M450 -10 L520 60 L600 10" />
-        </g>
-      </svg>
+    <section className="relative overflow-hidden rounded-[26px] bg-navy-2 px-7 py-6 text-white sm:px-8" aria-label="Nieuwe zoekopdracht">
       <div className="relative flex flex-col items-start gap-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-5">
-          <LogoMark size={64} tile />
+          <LogoMark size={52} tile />
           <div>
-            <h2 className="text-[22px] font-bold tracking-tight">Laat de tool voor jou werken</h2>
-            <p className="mt-0.5 text-[15px] text-white/80">Stel je zoekopdrachten in en ontvang direct meldingen bij de beste deals.</p>
+            <h2 className="text-[18px] font-semibold tracking-tight">Laat de tool voor jou werken</h2>
+            <p className="mt-0.5 text-[14px] text-white/70">Stel je zoekopdrachten in en ontvang direct meldingen bij de beste deals.</p>
           </div>
         </div>
-        <Link href="/profiles/new" className="inline-flex h-[56px] items-center gap-3 rounded-[18px] bg-gradient-to-r from-[#F9858B] to-[#EF6570] px-8 text-[17px] font-semibold text-white shadow-[0_12px_26px_rgba(239,101,112,0.4)] transition hover:brightness-105 active:scale-[0.98]">
+        <Link href="/profiles/new" className="inline-flex h-12 items-center gap-3 rounded-[16px] bg-gradient-to-r from-[#F9858B] to-[#EF6570] px-7 text-[15px] font-semibold text-white transition hover:brightness-105 active:scale-[0.98]">
           Nieuwe zoekopdracht aanmaken <ArrowRight className="h-5 w-5" />
         </Link>
       </div>
