@@ -13,7 +13,7 @@ export function BottomNav() {
           const on = isActive(path, href);
           return (
             <li key={href} className="flex-1">
-              <Link href={href} aria-current={on ? "page" : undefined} className={cn("flex flex-col items-center gap-0.5 rounded-[20px] py-2 text-[9.5px] font-medium tracking-tight transition", on ? "bg-gradient-to-b from-[#FF7A88] to-[#F9606F] text-white" : "text-white/70")}>
+              <Link href={href} aria-current={on ? "page" : undefined} className={cn("flex flex-col items-center gap-0.5 rounded-[20px] py-2 text-[9.5px] font-medium tracking-tight transition", on ? "bg-gradient-to-b from-[#F9858B] to-[#EF6570] text-white" : "text-white/70")}>
                 <Icon className="h-[19px] w-[19px]" />
                 {label === "Zoekopdrachten" ? "Zoeken" : label}
               </Link>

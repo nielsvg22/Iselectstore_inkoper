@@ -40,7 +40,7 @@ function SearchForm() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Zoek naar iPhone, MacBook, AirPods, iPad..."
-          className="h-[58px] w-full rounded-[20px] border border-transparent bg-[#e6e7ec] pl-14 pr-5 text-[16px] text-foreground placeholder:text-[#7a8397] shadow-[inset_0_1px_2px_rgba(24,36,57,0.05)] transition focus:border-accent focus:bg-card focus:outline-none focus:ring-4 focus:ring-accent-soft dark:bg-muted-bg"
+          className="h-[58px] w-full rounded-[20px] border border-transparent bg-[#e6e7ec] pl-14 pr-5 text-[16px] text-foreground placeholder:text-[#7a8397] shadow-[inset_0_1px_2px_rgba(31,48,73,0.05)] transition focus:border-accent focus:bg-card focus:outline-none focus:ring-4 focus:ring-accent-soft dark:bg-muted-bg"
         />
       </label>
       <div className="flex gap-3">
@@ -56,7 +56,7 @@ function SearchForm() {
           </select>
           <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
         </label>
-        <button type="submit" className="h-[58px] shrink-0 rounded-[20px] bg-gradient-to-r from-[#FF7A88] to-[#F9606F] px-8 text-[17px] font-semibold text-white shadow-[0_12px_26px_rgba(249,96,111,0.35)] transition hover:brightness-105 active:scale-[0.98] sm:px-12">
+        <button type="submit" className="h-[58px] shrink-0 rounded-[20px] bg-gradient-to-r from-[#F9858B] to-[#EF6570] px-8 text-[17px] font-semibold text-white shadow-[0_12px_26px_rgba(239,101,112,0.35)] transition hover:brightness-105 active:scale-[0.98] sm:px-12">
           Zoeken
         </button>
       </div>

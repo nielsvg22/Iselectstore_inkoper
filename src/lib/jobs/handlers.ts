@@ -31,12 +31,7 @@ export async function runProfileCheck(profileId: string): Promise<{ fetched: num
     await prisma.searchProfile.update({ where: { id: profileId }, data: { lastCheckedAt: new Date(), lastError: `Bron ${adapter.label} is uitgeschakeld in de instellingen` } });
     throw new PermanentJobError("Bron uitgeschakeld in instellingen");
   }
-  // Dagelijkse requestlimiet per bron
-  const h = await prisma.sourceHealth.findUnique({ where: { id: adapter.id } });
-  if (h && h.day === day() && h.requestsToday >= cfg.limits.requestsPerDayPerSource) {
-    await prisma.searchProfile.update({ where: { id: profileId }, data: { lastCheckedAt: new Date(), lastError: "Dagelijkse requestlimiet voor deze bron bereikt" } });
-    throw new PermanentJobError("Dagelijkse requestlimiet bereikt");
-  }
+  // Bewust géén dagelijkse blokkade: zoeken mag nooit stoppen op een eigen requestlimiet (de pacing per request beschermt de bron al).
   try {
     const prefilter = adapter.origin === "SEARCH" ? buildPrefilter(await loadTree(profileId)) : undefined;
     const ads = await adapter.fetchProfile({ profileId, query: profile.query, config: (profile.sourceConfig ?? {}) as Record<string, unknown>, maxAds: cfg.limits.maxAdsPerRun, prefilter });

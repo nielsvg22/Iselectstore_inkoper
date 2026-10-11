@@ -49,7 +49,7 @@ export function CategoryChips({ active, base = "/", param = "cat" }: { active: s
             aria-current={on ? "true" : undefined}
             className={cn(
               "flex h-[54px] shrink-0 items-center gap-3 rounded-full px-6 text-[16px] font-semibold transition",
-              on ? "bg-[#1d2a40] text-white shadow-[0_10px_22px_rgba(24,36,57,0.25)]" : "bg-card text-[#3b465c] shadow-card hover:-translate-y-0.5 dark:text-foreground",
+              on ? "bg-[#1f3049] text-white shadow-[0_10px_22px_rgba(31,48,73,0.25)]" : "bg-card text-[#3b465c] shadow-card hover:-translate-y-0.5 dark:text-foreground",
             )}
           >
             <Icon className="h-[20px] w-[20px]" strokeWidth={on ? 2.2 : 1.8} />
@@ -78,9 +78,9 @@ function Wave({ values }: { values: number[] }) {
   }, "");
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="absolute bottom-3 right-4 h-[46px] w-[150px]" aria-hidden fill="none">
-      <defs><linearGradient id="wv" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#ff6f7d" stopOpacity=".18"/><stop offset="1" stopColor="#ff6f7d" stopOpacity="0"/></linearGradient></defs>
+      <defs><linearGradient id="wv" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#f9858b" stopOpacity=".18"/><stop offset="1" stopColor="#f9858b" stopOpacity="0"/></linearGradient></defs>
       <path d={`${d} L${w},${h} L0,${h}Z`} fill="url(#wv)" />
-      <path d={d} stroke="#ff9aa4" strokeWidth="2.2" strokeLinecap="round" />
+      <path d={d} stroke="#f9a3a8" strokeWidth="2.2" strokeLinecap="round" />
     </svg>
   );
 }
@@ -155,7 +155,7 @@ export function CtaBanner() {
   return (
     <section className="relative overflow-hidden rounded-[26px] bg-navy-2 px-6 py-5 text-white shadow-pop sm:px-8" aria-label="Nieuwe zoekopdracht">
       <svg className="pointer-events-none absolute right-0 top-0 h-full w-[55%]" viewBox="0 0 600 120" fill="none" aria-hidden preserveAspectRatio="xMaxYMid slice">
-        <g stroke="#ff6f7d" strokeOpacity=".22" strokeWidth="1.3" strokeLinejoin="round">
+        <g stroke="#f9858b" strokeOpacity=".22" strokeWidth="1.3" strokeLinejoin="round">
           <path d="M120 130 L220 -10 L300 70 L360 20" /><path d="M280 130 L340 40 L430 120" /><path d="M450 -10 L520 60 L600 10" />
         </g>
       </svg>
@@ -167,7 +167,7 @@ export function CtaBanner() {
             <p className="mt-0.5 text-[15px] text-white/80">Stel je zoekopdrachten in en ontvang direct meldingen bij de beste deals.</p>
           </div>
         </div>
-        <Link href="/profiles/new" className="inline-flex h-[56px] items-center gap-3 rounded-[18px] bg-gradient-to-r from-[#FF7A88] to-[#F9606F] px-8 text-[17px] font-semibold text-white shadow-[0_12px_26px_rgba(249,96,111,0.4)] transition hover:brightness-105 active:scale-[0.98]">
+        <Link href="/profiles/new" className="inline-flex h-[56px] items-center gap-3 rounded-[18px] bg-gradient-to-r from-[#F9858B] to-[#EF6570] px-8 text-[17px] font-semibold text-white shadow-[0_12px_26px_rgba(239,101,112,0.4)] transition hover:brightness-105 active:scale-[0.98]">
           Nieuwe zoekopdracht aanmaken <ArrowRight className="h-5 w-5" />
         </Link>
       </div>

@@ -3,20 +3,20 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #f8f4f3;
-  --foreground: #1b2438;
-  --muted: #6b7589;
+  --background: #f7f7f7;
+  --foreground: #25292d;
+  --muted: #6b7280;
   --faint: #979fb3;
-  --muted-bg: #f0eeee;
+  --muted-bg: #eeeff1;
   --card: #ffffff;
-  --card-border: rgba(24, 36, 57, 0.06);
-  --border: rgba(24, 36, 57, 0.11);
-  --accent: #ff6f7d;
-  --accent-strong: #f0525f;
+  --card-border: #eceef0;
+  --border: #e7e9ec;
+  --accent: #f9858b;
+  --accent-strong: #ef6570;
   --accent-fg: #ffffff;
-  --accent-soft: #ffe9ea;
-  --navy: #182439;
-  --navy-2: #1d2e45;
+  --accent-soft: #feeeef;
+  --navy: #1f3049;
+  --navy-2: #283a58;
   --success: #1ea362;
   --success-soft: #e3f8ea;
   --info: #3f63e0;
@@ -28,6 +28,10 @@
   --shadow: 0 1px 2px rgba(24, 36, 57, 0.04), 0 10px 30px rgba(24, 36, 57, 0.06);
   --shadow-lg: 0 2px 6px rgba(24, 36, 57, 0.06), 0 22px 54px rgba(24, 36, 57, 0.14);
   --radius: 20px;
+  --coral: #f9858b;
+  --coral-dark: #ef6570;
+  --ivory: #f7f7f7;
+  --anthracite: #25292d;
 }
 
 .dark {
@@ -79,7 +83,7 @@
   --color-warning-soft: var(--warning-soft);
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
-  --font-sans: var(--font-pjs), -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-sans: var(--font-poppins), -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   --radius-card: var(--radius);
   --shadow-card: var(--shadow);
   --shadow-pop: var(--shadow-lg);

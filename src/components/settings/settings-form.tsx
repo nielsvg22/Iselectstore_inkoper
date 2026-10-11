@@ -197,7 +197,7 @@ export function SettingsForm({ initial, secrets, isAdmin }: { initial: AppConfig
             </Field>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <Field label="Max. advertenties per run" htmlFor="l-ads"><Input id="l-ads" type="number" min="1" value={c.limits.maxAdsPerRun} onChange={(e) => set("limits", { maxAdsPerRun: Number(e.target.value) })} /></Field>
-              <Field label="Requests per dag per bron" htmlFor="l-req"><Input id="l-req" type="number" min="1" value={c.limits.requestsPerDayPerSource} onChange={(e) => set("limits", { requestsPerDayPerSource: Number(e.target.value) })} /></Field>
+              <Field label="Requests per dag per bron (alleen weergave, blokkeert niet)" htmlFor="l-req"><Input id="l-req" type="number" min="1" value={c.limits.requestsPerDayPerSource} onChange={(e) => set("limits", { requestsPerDayPerSource: Number(e.target.value) })} /></Field>
               <Field label="Min. seconden tussen requests" htmlFor="l-gap"><Input id="l-gap" type="number" min="0" value={c.limits.minSecondsBetweenRequests} onChange={(e) => set("limits", { minSecondsBetweenRequests: Number(e.target.value) })} /></Field>
               <Field label="Jobs per verwerkingsronde" htmlFor="l-jobs"><Input id="l-jobs" type="number" min="1" value={c.limits.jobsPerTick} onChange={(e) => set("limits", { jobsPerTick: Number(e.target.value) })} /></Field>
               <Field label="Bewaartermijn advertenties (dagen)" htmlFor="l-ret" hint="Favorieten en inkopen blijven bewaard."><Input id="l-ret" type="number" min="7" value={c.limits.adRetentionDays} onChange={(e) => set("limits", { adRetentionDays: Number(e.target.value) })} /></Field>

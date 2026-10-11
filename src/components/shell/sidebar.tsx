@@ -11,7 +11,7 @@ export function Sidebar() {
     <aside className="relative hidden h-[calc(100dvh-2.5rem)] w-[262px] shrink-0 flex-col overflow-hidden rounded-[30px] bg-navy px-5 pb-6 pt-7 text-white shadow-pop lg:sticky lg:top-5 lg:flex" aria-label="Zijbalk">
       {/* decoratieve lijnen onderaan, zoals in het ontwerp */}
       <svg className="pointer-events-none absolute inset-x-0 bottom-0 h-[46%] w-full" viewBox="0 0 262 360" fill="none" aria-hidden preserveAspectRatio="xMidYMax slice">
-        <defs><linearGradient id="fade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#ff6f7d" stopOpacity="0"/><stop offset="1" stopColor="#ff6f7d" stopOpacity=".55"/></linearGradient></defs>
+        <defs><linearGradient id="fade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#f9858b" stopOpacity="0"/><stop offset="1" stopColor="#f9858b" stopOpacity=".55"/></linearGradient></defs>
         <g stroke="url(#fade)" strokeWidth="1.4" strokeLinejoin="round">
           <path d="M-20 300 L120 120 L205 250 L262 205" />
           <path d="M70 360 L150 190 L262 330" />
@@ -33,7 +33,7 @@ export function Sidebar() {
               aria-current={on ? "page" : undefined}
               className={cn(
                 "flex items-center gap-4 rounded-[18px] px-5 py-3.5 text-[16px] font-medium transition-all",
-                on ? "bg-gradient-to-r from-[#FF7A88] to-[#F9606F] text-white shadow-[0_10px_24px_rgba(249,96,111,0.35)]" : "text-white/85 hover:bg-white/8 hover:text-white",
+                on ? "bg-gradient-to-r from-[#F9858B] to-[#EF6570] text-white shadow-[0_10px_24px_rgba(239,101,112,0.35)]" : "text-white/85 hover:bg-white/8 hover:text-white",
               )}
             >
               <Icon className="h-[22px] w-[22px] shrink-0" strokeWidth={on ? 2.2 : 1.8} />
