@@ -37,6 +37,7 @@ const ENV_FALLBACK: Record<SecretKey, string> = {
   "ai.apiKey": "AI_API_KEY",
   "telegram.botToken": "TELEGRAM_BOT_TOKEN",
   "discord.webhookUrl": "DISCORD_WEBHOOK_URL",
+  "imap.password": "IMAP_PASSWORD",
 };
 
 export async function getSecret(key: SecretKey): Promise<string | null> {

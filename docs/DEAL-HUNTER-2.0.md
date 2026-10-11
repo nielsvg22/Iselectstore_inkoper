@@ -43,6 +43,16 @@ Voor "zo snel mogelijk handelen" — alles in de app, geen externe diensten:
 - **Blokkade-rem:** HTTP 403/429 ⇒ automatische pauze 15 min, verdubbelend tot max. 2 uur; tijdens de pauze geen enkel request; zichtbaar op *Prestaties*. Er wordt niets omzeild.
 - **Verwachte vertraging** (plaatsing → voorlopige push): gemiddeld ±30–40 s, in het slechtste geval ±70 s (60 s interval + ±1–5 s ophalen/verwerken). Gemeten eigen verwerking na ophalen: <1 s (testscenario). **Geen realtime-garantie**: staat een nieuwe advertentie buiten de opgehaalde pagina's of pauzeert de bron, dan komt de melding later. Meer verkeer naar Marktplaats kan in strijd zijn met hun voorwaarden; dat risico is een bewuste keuze van de gebruiker.
 
+### Mailbox-koppeling (Marktplaats-zoekalerts)
+Waarom: via de toegestane zoekpagina's zijn nieuwe advertenties niet betrouwbaar te vinden (gemeten: "Vandaag"-advertenties staan verspreid over pagina 1–20+). De zoekalerts die Marktplaats zelf per mail stuurt wél snel. Alles draait in de app/worker:
+1. **Instellingen → Mailbox:** IMAP-server, poort (TLS, certificaat wordt gecontroleerd), gebruiker, **app-wachtwoord** (versleuteld opgeslagen, nooit zichtbaar), map, afzenderfilter ("marktplaats"), interval (standaard 20 s, min. 10 s). *Test verbinding* toont de laatste Marktplaats-mails en hoeveel advertentielinks eruit gehaald worden.
+2. De worker leest **alleen-lezen** (er wordt niets gemarkeerd, verplaatst of verwijderd). Eerste keer = nulmeting: oude mails worden **nooit** verwerkt (ook niet na een UIDVALIDITY-wijziging).
+3. Per nieuwe alert-mail: advertentielinks herkennen (ook in tracking-links verpakt), de advertentiepagina ophalen (één gewone pagina per nieuwe advertentie, met robots.txt-controle, pacing en SSRF-bescherming), opslaan, analyseren, matchen en pushen. De worker wordt direct wakker gemaakt (geen wachttijd).
+4. Profiel met **"Alleen via mailbox"**: wordt niet zelf gezocht; jouw filters (model, minimale winst, afstand, …) bepalen of een alert-advertentie een push geeft. Advertenties uit het zoeken laten zo'n profiel niet pushen.
+5. Dedupe: dezelfde advertentie via mail én zoeken geeft één melding (zelfde `externalId` en `dedupeKey`).
+- **Getest** tegen een echte (lokale) IMAP-server met TLS (Dovecot): nulmeting, nieuwe mail in ±30 ms gezien, verkeerd wachtwoord/map/onbetrouwbaar certificaat geven een begrijpelijke melding, en het proces blijft draaien (`scripts/imap-smoke.ts`). **Niet getest** tegen Gmail/Outlook/iCloud en niet met een echte Marktplaats-alertmail (het exacte mailformaat kon ik niet inzien); de link-herkenning is daarom ruim opgezet en *Test verbinding* laat zien wat er herkend wordt.
+- **Snelheid:** wachttijd = tijd tot Marktplaats de mail verstuurt (buiten onze controle) + ≤ interval (gem. 10 s) + ±1–3 s ophalen/analyseren/pushen.
+
 ## 2. Gewijzigde/nieuwe bestanden (hoofdlijnen)
 `prisma/schema.prisma`, `prisma/migrations/20261011142112_pipeline_metrics_push` ·
 `src/lib/jobs/{queue,handlers,tick}.ts`, `src/worker/run.ts` · `src/lib/sources/{marktplaats-search,types}.ts`, `src/lib/pipeline/{ingest,analyze,context}.ts` ·

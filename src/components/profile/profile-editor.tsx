@@ -59,7 +59,7 @@ export function ProfileEditor({ initial, savedFilters = [], categories = [] }: {
         sourceKind: v.sourceKind,
         sourceConfig:
           v.sourceKind === "SEARCH"
-            ? { queries: v.queries.length ? v.queries : q.models.map((m) => m.replace(/-/g, " ")), category: v.category, maxPages: v.maxPages, fetchDetails: v.fetchDetails, fastMode: v.fastMode }
+            ? { queries: v.queries.length ? v.queries : q.models.map((m) => m.replace(/-/g, " ")), category: v.category, maxPages: v.maxPages, fetchDetails: v.fetchDetails, fastMode: v.fastMode, mailOnly: v.mailOnly }
             : v.sourceKind === "MANUAL_URL"
               ? { urls }
               : v.sourceKind === "FEED"
@@ -123,6 +123,10 @@ export function ProfileEditor({ initial, savedFilters = [], categories = [] }: {
                   </Select>
                 </Field>
                 <div className="flex items-end pb-1"><Switch checked={v.fetchDetails} onChange={(x) => setV({ ...v, fetchDetails: x })} label="Volledige tekst ophalen (nieuwe advertenties)" /></div>
+              </div>
+              <div className="rounded-2xl border border-border bg-card p-4">
+                <Switch checked={v.mailOnly} onChange={(x) => setV({ ...v, mailOnly: x })} label="Alleen via mailbox: niet zelf zoeken, wel filteren en melden voor advertenties uit de gekoppelde Marktplaats-alerts" />
+                <p className="mt-2 text-xs text-muted">Koppel de mailbox bij <a href="/settings#mailbox" className="font-medium text-accent-strong underline">Instellingen → Mailbox</a>. Je zoektermen hieronder zijn dan alleen een omschrijving; de filters bepalen of je een push krijgt.</p>
               </div>
               <div className="rounded-2xl border border-border bg-card p-4">
                 <Switch checked={v.fastMode} onChange={(x) => setV({ ...v, fastMode: x })} label="Snelle modus: elke ±minuut kijken en direct een voorlopige push sturen" />

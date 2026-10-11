@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Field, Input, Select, Switch } from "@/components/ui/form";
 import { Notice } from "@/components/ui/states";
 import { api } from "@/lib/client-api";
+import { timeAgo } from "@/lib/format";
 import type { AppConfig } from "@/lib/config/schema";
 
 type Secrets = Record<string, boolean>;
@@ -65,6 +66,22 @@ export function SettingsForm({ initial, secrets, isAdmin }: { initial: AppConfig
     try {
       await api("/api/settings/test-notification", { body: { channel } });
       toast("Testmelding verzonden");
+    } catch (e) {
+      toast((e as Error).message, "err");
+    } finally {
+      setBusy(null);
+    }
+  };
+  const [mailTest, setMailTest] = React.useState<{ folderMails: number; matching: Array<{ subject: string; date: string | null; links: number; otherLinks: number }> } | null>(null);
+  const [mailState, setMailState] = React.useState<{ lastPollAt?: string; lastOkAt?: string; lastError?: string | null; mailsMatched: number; adsIngested: number; lastMail?: { subject: string; delaySec: number | null; links: number } } | null>(null);
+  React.useEffect(() => {
+    api<{ state: NonNullable<typeof mailState> }>("/api/mail/status").then((r) => setMailState(r.state)).catch(() => undefined);
+  }, []);
+  const testMail = async () => {
+    setBusy("mail");
+    setMailTest(null);
+    try {
+      setMailTest(await api("/api/mail/test", { body: {} }));
     } catch (e) {
       toast((e as Error).message, "err");
     } finally {
@@ -181,6 +198,55 @@ export function SettingsForm({ initial, secrets, isAdmin }: { initial: AppConfig
               <Field label="Prijs uitvoer (€ per 1M tokens)" htmlFor="a-po"><Input id="a-po" type="number" min="0" step="0.1" value={c.ai.outputPricePerMTokEur} onChange={(e) => set("ai", { outputPricePerMTokEur: Number(e.target.value) })} /></Field>
             </div>
             <Switch checked={c.ai.analyzeImages} onChange={(v) => set("ai", { analyzeImages: v })} label="Foto’s meesturen voor schadeherkenning (hogere kosten)" />
+          </CardContent>
+        </Card>
+
+        <Card id="mailbox">
+          <CardHeader>
+            <div>
+              <CardTitle>Mailbox koppelen (Marktplaats-zoekalerts)</CardTitle>
+              <CardDescription>Marktplaats mailt je zelf zodra er een nieuwe advertentie bij je opgeslagen zoekopdracht staat. De app leest die mails (alleen-lezen), haalt de advertentie op, beoordeelt hem en stuurt direct een push. Zo zien we nieuwe advertenties die via gewone zoekpagina’s niet te vinden zijn.</CardDescription>
+            </div>
+            <Badge tone={c.mail.enabled ? "success" : "neutral"}>{c.mail.enabled ? "Aan" : "Uit"}</Badge>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <ol className="list-decimal space-y-1 pl-5 text-sm text-muted">
+              <li>Sla in Marktplaats je zoekopdracht op (bijv. “iPhone”) en zet <strong>directe e-mailmeldingen</strong> aan voor die opgeslagen zoekopdracht.</li>
+              <li>Gmail/Outlook/iCloud: zet IMAP aan en maak een <strong>app-wachtwoord</strong> aan (je gewone wachtwoord werkt vaak niet). Gebruik bij voorkeur een eigen mailadres alleen voor deze alerts.</li>
+              <li>Vul hieronder de gegevens in, sla de instellingen op en druk op <em>Test verbinding</em>.</li>
+              <li>Maak een zoekprofiel met <em>Alleen via mailbox</em> en jouw filters (minimale winst, model, …). Dat bepaalt welke mails een push geven.</li>
+            </ol>
+            <Switch checked={c.mail.enabled} onChange={(v) => set("mail", { enabled: v })} label="Mailbox lezen en alerts verwerken" />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="IMAP-server" htmlFor="m-host" hint="Bijv. imap.gmail.com, outlook.office365.com, imap.mail.me.com"><Input id="m-host" value={c.mail.host} placeholder="imap.gmail.com" onChange={(e) => set("mail", { host: e.target.value })} /></Field>
+              <Field label="Poort (TLS)" htmlFor="m-port"><Input id="m-port" type="number" value={c.mail.port} onChange={(e) => set("mail", { port: Number(e.target.value) })} /></Field>
+              <Field label="Gebruiker (mailadres)" htmlFor="m-user"><Input id="m-user" autoComplete="off" value={c.mail.user} onChange={(e) => set("mail", { user: e.target.value })} /></Field>
+              <SecretField k="imap.password" label="Wachtwoord / app-wachtwoord" placeholder="app-wachtwoord" />
+              <Field label="Map" htmlFor="m-folder" hint="Meestal INBOX"><Input id="m-folder" value={c.mail.folder} onChange={(e) => set("mail", { folder: e.target.value })} /></Field>
+              <Field label="Afzender bevat" htmlFor="m-from" hint="Alleen mails van deze afzender worden verwerkt."><Input id="m-from" value={c.mail.fromContains} onChange={(e) => set("mail", { fromContains: e.target.value })} /></Field>
+              <Field label="Controleer elke (sec)" htmlFor="m-poll" hint="Minimaal 10."><Input id="m-poll" type="number" min="10" max="300" value={c.mail.pollSeconds} onChange={(e) => set("mail", { pollSeconds: Number(e.target.value) })} /></Field>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button type="button" variant="outline" onClick={testMail} loading={busy === "mail"}>Test verbinding</Button>
+              <span className="text-xs text-muted">Test gebruikt de <strong>opgeslagen</strong> instellingen. De mailbox wordt alleen gelezen; er wordt niets gewijzigd of verwijderd.</span>
+            </div>
+            {mailTest && (
+              <div className="rounded-2xl bg-muted-bg p-4 text-sm" role="status">
+                <p className="font-medium">Verbinding gelukt — {mailTest.folderMails} recente berichten gelezen.</p>
+                {mailTest.matching.length === 0 ? (
+                  <p className="mt-1 text-muted">Geen berichten van “{c.mail.fromContains}” gevonden. Zet eerst een zoekalert aan bij Marktplaats en wacht op de eerste mail.</p>
+                ) : (
+                  <ul className="mt-2 space-y-1 text-muted">{mailTest.matching.map((m, i) => <li key={i}>• “{m.subject}” — {m.links} advertentielink{m.links === 1 ? "" : "s"} herkend{m.links === 0 && m.otherLinks > 0 ? ` (${m.otherLinks} andere Marktplaats-links, niet herkend)` : ""}</li>)}</ul>
+                )}
+              </div>
+            )}
+            {mailState && (
+              <p className="text-xs text-muted" aria-live="polite">
+                Laatste controle: {mailState.lastPollAt ? timeAgo(mailState.lastPollAt) : "nog niet"} · {mailState.mailsMatched} alert-mails verwerkt · {mailState.adsIngested} advertenties opgehaald
+                {mailState.lastMail?.delaySec != null && <> · laatste mail was {mailState.lastMail.delaySec < 90 ? `${mailState.lastMail.delaySec} s` : `${Math.round(mailState.lastMail.delaySec / 60)} min`} oud bij verwerking</>}
+                {mailState.lastError && <span className="text-danger"> · fout: {mailState.lastError}</span>}
+              </p>
+            )}
           </CardContent>
         </Card>
 

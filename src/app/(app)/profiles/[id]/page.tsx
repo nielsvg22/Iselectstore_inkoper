@@ -16,7 +16,7 @@ export default async function EditProfilePage({ params }: { params: Promise<{ id
   const user = await getCurrentUser();
   const [p, saved, cats] = await Promise.all([prisma.searchProfile.findUnique({ where: { id } }), prisma.savedFilter.findMany({ where: { userId: user!.id }, orderBy: { name: "asc" } }), getAppleCategories()]);
   if (!p || p.userId !== user!.id) notFound();
-  const cfg = (p.sourceConfig ?? {}) as { urls?: string[]; feedUrl?: string; queries?: string[]; category?: string; maxPages?: number; fetchDetails?: boolean; fastMode?: boolean };
+  const cfg = (p.sourceConfig ?? {}) as { urls?: string[]; feedUrl?: string; queries?: string[]; category?: string; maxPages?: number; fetchDetails?: boolean; fastMode?: boolean; mailOnly?: boolean };
   const value: ProfileFormValue = {
     id: p.id,
     name: p.name,
@@ -27,6 +27,7 @@ export default async function EditProfilePage({ params }: { params: Promise<{ id
     maxPages: cfg.maxPages ?? 3,
     fetchDetails: cfg.fetchDetails ?? true,
     fastMode: cfg.fastMode ?? false,
+    mailOnly: cfg.mailOnly ?? false,
     urls: (cfg.urls ?? []).join("\n"),
     feedUrl: cfg.feedUrl ?? "",
     intervalMinutes: p.intervalMinutes,

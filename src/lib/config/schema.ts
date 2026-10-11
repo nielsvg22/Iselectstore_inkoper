@@ -136,6 +136,20 @@ export const configSchema = z.object({
     })
     .default({}),
 
+  /** Mailbox-koppeling: leest Marktplaats-zoekalerts (opgeslagen zoekopdrachten) uit je eigen mailbox */
+  mail: z
+    .object({
+      enabled: z.boolean().default(false),
+      host: z.string().trim().max(200).default(""),
+      port: z.number().int().min(1).max(65535).default(993),
+      user: z.string().trim().max(200).default(""),
+      folder: z.string().trim().max(200).default("INBOX"),
+      /** Alleen berichten waarvan de afzender dit bevat worden verwerkt */
+      fromContains: z.string().trim().max(100).default("marktplaats"),
+      pollSeconds: z.number().int().min(10).max(300).default(20),
+    })
+    .default({}),
+
   scheduler: z
     .object({
       /** Kortste interval tussen controles van één zoekprofiel (harde ondergrens 5 min, geen realtime) */
@@ -179,5 +193,5 @@ export const configSchema = z.object({
 export type AppConfig = z.infer<typeof configSchema>;
 export const defaultConfig: AppConfig = configSchema.parse({});
 
-export const SECRET_KEYS = ["ai.apiKey", "telegram.botToken", "discord.webhookUrl"] as const;
+export const SECRET_KEYS = ["ai.apiKey", "telegram.botToken", "discord.webhookUrl", "imap.password"] as const;
 export type SecretKey = (typeof SECRET_KEYS)[number];

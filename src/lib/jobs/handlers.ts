@@ -160,6 +160,7 @@ export async function scheduleDueProfiles(now = new Date()): Promise<number> {
     const adapter = adapterForOrigin(p.sourceKind);
     if (!adapter || !adapter.automatic) continue;
     const isSearch = adapter.origin === "SEARCH";
+    if (isSearch && (p.sourceConfig as { mailOnly?: boolean } | null)?.mailOnly === true) continue; // alleen via mailbox
     if (isSearch && cooldown) continue;
     const fast = isSearch && cfg.scheduler.fast.enabled && (p.sourceConfig as { fastMode?: boolean } | null)?.fastMode === true;
     const intervalMs = fast ? cfg.scheduler.fast.intervalSeconds * 1000 : Math.max(p.intervalMinutes, isSearch ? Math.max(cfg.scheduler.minIntervalMinutes, adapter.minIntervalMinutes) : adapter.minIntervalMinutes) * 60_000;

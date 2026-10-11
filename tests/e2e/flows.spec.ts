@@ -307,6 +307,11 @@ test("PWA: manifest, service worker en offline-pagina zijn openbaar; installatie
   await page.goto("/settings");
   await expect(page.getByRole("heading", { name: "Pushmeldingen" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Pushmeldingen inschakelen" })).toBeVisible();
+  // mailbox-koppeling zichtbaar; wachtwoord is een geheim veld
+  await expect(page.getByRole("heading", { name: "Mailbox koppelen (Marktplaats-zoekalerts)" })).toBeVisible();
+  await expect(page.getByLabel("IMAP-server")).toBeVisible();
+  await expect(page.getByLabel("Wachtwoord / app-wachtwoord")).toHaveAttribute("type", "password");
+  await expect(page.getByRole("button", { name: "Test verbinding" })).toBeVisible();
   await page.getByLabel("Welke deals").selectOption("top");
   await page.getByLabel("Alleen melden vanaf winst (€)").fill("120");
   await page.getByRole("button", { name: "Voorkeuren opslaan" }).click();
