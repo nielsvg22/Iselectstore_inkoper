@@ -22,6 +22,7 @@ const profileBase = z.object({
       sliceSearch: z.boolean().optional(),
       /** Automatisch aangemaakte per-model-profielen: groep (categorie), model en prioriteit */
       group: z.string().max(60).optional(),
+      subgroup: z.string().max(60).optional(),
       auto: z.boolean().optional(),
       tier: z.enum(["high", "normal"]).optional(),
       /** Te volgen modellen (catalogus-sleutels), opslagformaten en prioriteitsmodellen — los van de filters */

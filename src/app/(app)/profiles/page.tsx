@@ -18,6 +18,17 @@ export const metadata: Metadata = { title: "Zoekprofielen" };
 
 const SOURCE = { SEARCH: "Marktplaats-zoekopdracht", MANUAL_URL: "Advertentie-URL's", FEED: "Feed", DEMO: "Demodata", IMPORT: "Import", PARTNER_API: "Partner-API" } as const;
 
+/** Verdeelt een categorie in onderdelen (bijv. "iPhone 17", "iPhone 16", …, "iPhone SE", "Overige"), nieuwste eerst; binnen een onderdeel de modellen op naam. */
+function subgroups<T extends { name: string; sourceConfig: unknown }>(list: T[]) {
+  const subOf = (p: T) => (p.sourceConfig as { subgroup?: string } | null)?.subgroup ?? /^(iPhone \d+)/.exec(p.name)?.[1] ?? "Overige";
+  const map = new Map<string, T[]>();
+  for (const p of list) map.set(subOf(p), [...(map.get(subOf(p)) ?? []), p]);
+  const rank = (n: string) => (/^iPhone (\d+)$/.test(n) ? 1000 - Number(/(\d+)/.exec(n)![1]) : n === "iPhone SE" ? 2000 : 3000);
+  return [...map.entries()]
+    .map(([k, v]) => [k, v.sort((a, b) => a.name.localeCompare(b.name, "nl", { numeric: true }))] as const)
+    .sort((a, b) => rank(a[0]) - rank(b[0]) || a[0].localeCompare(b[0]));
+}
+
 export default async function ProfilesPage() {
   const user = await getCurrentUser();
   const all = await prisma.searchProfile.findMany({ where: { userId: user!.id }, orderBy: { createdAt: "desc" } });
@@ -39,7 +50,6 @@ export default async function ProfilesPage() {
       </div>
       <IphoneMelder exists={groups.has("iPhone")} isAdmin={user!.role === "ADMIN"} />
       {[...groups.entries()].map(([g, list]) => {
-        const sorted = [...list].sort((a, b) => Number((b.sourceConfig as { tier?: string }).tier === "high") - Number((a.sourceConfig as { tier?: string }).tier === "high") || Number(a.name.includes("overige")) - Number(b.name.includes("overige")) || a.name.localeCompare(b.name, "nl", { numeric: true }));
         const active = list.filter((p) => p.active).length;
         return (
           <section key={g} className="rounded-[24px] bg-card p-6 shadow-card sm:p-8" aria-label={`Categorie ${g}`}>
@@ -50,24 +60,32 @@ export default async function ProfilesPage() {
               </div>
               {user!.role === "ADMIN" && <GroupActions group={g} anyActive={active > 0} />}
             </div>
-            <ul className="mt-5 divide-y divide-card-border">
-              {sorted.map((p) => {
-                const tier = (p.sourceConfig as { tier?: string }).tier;
-                return (
-                  <li key={p.id}>
-                    <Link href={`/profiles/${p.id}`} className="flex items-center gap-3 py-3 transition hover:bg-muted-bg/50">
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[15px] font-medium">{p.name}</span>
-                        <span className="block truncate text-xs text-muted">{p.lastError ? <span className="text-danger">Fout: {p.lastError}</span> : p.lastSuccessAt ? `Laatst gecontroleerd ${timeAgo(p.lastSuccessAt)}` : "Nog niet gecontroleerd"}</span>
-                      </span>
-                      <span className="tabular hidden text-sm text-muted sm:block">{p.discoveredCount} ontdekt</span>
-                      <Badge tone={tier === "high" ? "accent" : "neutral"}>{tier === "high" ? "Vaak" : "Normaal"}</Badge>
-                      <Badge tone={p.active ? "success" : "neutral"}>{p.active ? "Actief" : "Pauze"}</Badge>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
+            {subgroups(list).map(([sg, items]) => (
+              <div key={sg} className="mt-6" role="group" aria-label={sg}>
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-card-border pb-2">
+                  <h3 className="text-[15px] font-semibold">{sg}<span className="ml-2 text-xs font-normal text-muted">{items.length} {items.length === 1 ? "model" : "modellen"} · {items.filter((p) => p.active).length} actief</span></h3>
+                  {user!.role === "ADMIN" && <GroupActions group={g} subgroup={sg} anyActive={items.some((p) => p.active)} compact />}
+                </div>
+                <ul className="divide-y divide-card-border">
+                  {items.map((p) => {
+                    const tier = (p.sourceConfig as { tier?: string }).tier;
+                    return (
+                      <li key={p.id}>
+                        <Link href={`/profiles/${p.id}`} className="flex items-center gap-3 py-3 transition hover:bg-muted-bg/50">
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-[15px] font-medium">{p.name}</span>
+                            <span className="block truncate text-xs text-muted">{p.lastError ? <span className="text-danger">Fout: {p.lastError}</span> : p.lastSuccessAt ? `Laatst gecontroleerd ${timeAgo(p.lastSuccessAt)}` : "Nog niet gecontroleerd"}</span>
+                          </span>
+                          <span className="tabular hidden text-sm text-muted sm:block">{p.discoveredCount} ontdekt</span>
+                          <Badge tone={tier === "high" ? "accent" : "neutral"}>{tier === "high" ? "Vaak" : "Normaal"}</Badge>
+                          <Badge tone={p.active ? "success" : "neutral"}>{p.active ? "Actief" : "Pauze"}</Badge>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
           </section>
         );
       })}

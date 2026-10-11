@@ -6,14 +6,14 @@ import { useToast } from "@/components/toast";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/client-api";
 
-export function GroupActions({ group, anyActive }: { group: string; anyActive: boolean }) {
+export function GroupActions({ group, subgroup, anyActive, compact }: { group: string; subgroup?: string; anyActive: boolean; compact?: boolean }) {
   const toast = useToast();
   const router = useRouter();
   const [busy, setBusy] = React.useState(false);
   const run = async (active: boolean) => {
     setBusy(true);
     try {
-      const r = await api<{ updated: number }>("/api/profiles/group", { body: { group, active } });
+      const r = await api<{ updated: number }>("/api/profiles/group", { body: { group, subgroup, active } });
       toast(`${r.updated} profielen ${active ? "aangezet" : "gepauzeerd"}`);
       router.refresh();
     } catch (e) {
@@ -23,8 +23,8 @@ export function GroupActions({ group, anyActive }: { group: string; anyActive: b
     }
   };
   return anyActive ? (
-    <Button variant="outline" size="sm" loading={busy} onClick={() => run(false)}><Pause className="h-3.5 w-3.5" />Alles pauzeren</Button>
+    <Button variant="outline" size="sm" loading={busy} onClick={() => run(false)} aria-label={subgroup ? `${subgroup} pauzeren` : "Alles pauzeren"}><Pause className="h-3.5 w-3.5" />{compact ? "Pauzeren" : "Alles pauzeren"}</Button>
   ) : (
-    <Button variant="outline" size="sm" loading={busy} onClick={() => run(true)}><Play className="h-3.5 w-3.5" />Alles aanzetten</Button>
+    <Button variant="outline" size="sm" loading={busy} onClick={() => run(true)} aria-label={subgroup ? `${subgroup} aanzetten` : "Alles aanzetten"}><Play className="h-3.5 w-3.5" />{compact ? "Aanzetten" : "Alles aanzetten"}</Button>
   );
 }

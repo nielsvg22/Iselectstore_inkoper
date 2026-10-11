@@ -32,6 +32,7 @@ export async function provisionIphoneMelder(userId: string): Promise<{ id: strin
       sliceModels: [m.key],
       sliceStorages: OPSLAGEN,
       group: IPHONE_GROUP,
+      subgroup: m.group, // bijv. "iPhone 15" (met Plus, Pro, Pro Max)
       auto: true,
       tier: high.has(m.key) ? ("high" as const) : ("normal" as const),
     };
@@ -45,7 +46,7 @@ export async function provisionIphoneMelder(userId: string): Promise<{ id: strin
   }
   // Advertenties die aan geen enkel model te koppelen zijn (typfouten, onbekende varianten): gewone zoekterm, gewoon interval
   const rest = await prisma.searchProfile.findFirst({ where: { userId, name: IPHONE_REST_NAME } });
-  const restData = { ...common, name: IPHONE_REST_NAME, query: "iPhones zonder herkend model", sourceConfig: { queries: ["iphone"], category: CAT.iphone, maxPages: 3, fetchDetails: true, fastMode: true, sliceSearch: false, group: IPHONE_GROUP, auto: true, tier: "normal" as const } };
+  const restData = { ...common, name: IPHONE_REST_NAME, query: "iPhones zonder herkend model", sourceConfig: { queries: ["iphone"], category: CAT.iphone, maxPages: 3, fetchDetails: true, fastMode: true, sliceSearch: false, group: IPHONE_GROUP, subgroup: "Overige", auto: true, tier: "normal" as const } };
   const rp = rest ? await prisma.searchProfile.update({ where: { id: rest.id }, data: restData }) : await prisma.searchProfile.create({ data: { ...restData, userId } });
   await saveTree(rp.id, { op: "AND", children: [{ field: "family", operator: "in", value: ["iphone"] }, { field: "modelKey", operator: "nin", value: models.map((m) => m.key) }] });
   // Het oude samenvattingsprofiel (alle modellen in één) vervalt

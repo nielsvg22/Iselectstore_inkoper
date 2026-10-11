@@ -353,6 +353,16 @@ test("iPhone-melder: per model ingedeeld, bulk pauzeren, bewerken behoudt de mod
   await expect(page.getByRole("region", { name: "Categorie iPhone" })).toBeVisible();
   await expect(page.getByRole("link", { name: /iPhone 15 Pro\b.*Vaak/ }).first()).toBeVisible();
   await expect(page.getByText(/profielen \(per model\)/)).toBeVisible();
+  // onderverdeeld per generatie: iPhone 17, 16, 15 … met eigen aan/uit
+  const gen15 = page.getByRole("group", { name: "iPhone 15" });
+  await expect(gen15.getByRole("link")).toHaveCount(4); // 15, Plus, Pro, Pro Max
+  await expect(page.getByRole("group", { name: "iPhone SE" })).toBeVisible();
+  await gen15.getByRole("button", { name: "iPhone 15 pauzeren" }).click();
+  await expect(page.getByText("4 profielen gepauzeerd")).toBeVisible();
+  await expect(gen15.getByRole("button", { name: "iPhone 15 aanzetten" })).toBeVisible();
+  await expect(page.getByRole("group", { name: "iPhone 16" }).getByRole("button", { name: "iPhone 16 pauzeren" })).toBeVisible(); // andere generaties blijven actief
+  await gen15.getByRole("button", { name: "iPhone 15 aanzetten" }).click();
+  await expect(page.getByText("4 profielen aangezet")).toBeVisible();
   // bewerken en opslaan mag de modelinstellingen niet wegnemen
   const before = (await (await page.request.get("/api/profiles")).json()) as { profiles: Array<{ id: string; name: string; sourceConfig: Record<string, unknown> }> };
   const pro = before.profiles.find((p) => p.name === "iPhone 15 Pro")!;
