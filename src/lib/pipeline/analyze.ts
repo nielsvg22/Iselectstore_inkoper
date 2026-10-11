@@ -256,7 +256,7 @@ export async function analyzeAd(adId: string, deps: AnalyzeDeps = {}): Promise<{
       batteryKnown: battery != null,
       purchaseProof: rec.signals.some((s) => s.code === "NO_PURCHASE_PROOF") ? "no" : /aankoopbewijs|factuur|bon\b|kassabon|aankoopbon/i.test(`${ad.title} ${ad.description}`) ? "yes" : null,
     };
-    await matchProfiles(adId, ctx, { band: sc.band, score: sc.score, blocked: risk.blocked, isDemo: ad.isDemo, userIgnored: ad.userState === "IGNORED", netProfitCents: pExp.netProfitCents, complete: ad.origin !== "SEARCH" || Boolean(ad.detailFetchedAt) || Boolean((ad.rawPayload as { detailFailed?: boolean } | null)?.detailFailed) }, cfg);
+    await matchProfiles(adId, ctx, { band: sc.band, score: sc.score, blocked: risk.blocked, isDemo: ad.isDemo, userIgnored: ad.userState === "IGNORED", netProfitCents: pExp.netProfitCents, firstSeenAt: ad.firstSeenAt, publishedAt: ad.publishedAt, complete: ad.origin !== "SEARCH" || Boolean(ad.detailFetchedAt) || Boolean((ad.rawPayload as { detailFailed?: boolean } | null)?.detailFailed) }, cfg);
   }
   return { score: sc.score, blocked: sc.blocked };
 }
@@ -264,7 +264,7 @@ export async function analyzeAd(adId: string, deps: AnalyzeDeps = {}): Promise<{
 export async function matchProfiles(
   adId: string,
   ctx: FilterContext,
-  meta: { band: keyof typeof BAND_RANK; score: number; blocked: boolean; isDemo: boolean; userIgnored: boolean; netProfitCents: number; /** volledige advertentie beoordeeld (detailpagina) */ complete: boolean },
+  meta: { band: keyof typeof BAND_RANK; score: number; blocked: boolean; isDemo: boolean; userIgnored: boolean; netProfitCents: number; /** wanneer de advertentie voor het eerst is gezien en (grof) is geplaatst */ firstSeenAt: Date; publishedAt: Date | null; /** volledige advertentie beoordeeld (detailpagina) */ complete: boolean },
   cfg: AppConfig,
 ) {
   const profiles = await prisma.searchProfile.findMany({ where: { active: true } });
@@ -281,7 +281,11 @@ export async function matchProfiles(
       await prisma.searchProfile.update({ where: { id: p.id }, data: { discoveredCount: discovered, interestingCount: interesting } });
 
       // Meldingen: pas na volledige beoordeling (detailpagina) en nooit voor geblokkeerde/genegeerde/demo-advertenties
-      const base = matched && p.notifyEnabled && cfg.notifications.enabled && !meta.blocked && !meta.userIgnored && !meta.isDemo && meta.score >= p.notifyMinScore;
+      // Alleen echt nieuwe advertenties melden: niet wat bij de nulmeting van het profiel al bestond, en geen oude advertentie die we pas nu tegenkomen
+      const baselineAt = (p.sourceConfig as { baselineAt?: string } | null)?.baselineAt;
+      const isNew = p.sourceKind !== "SEARCH" || (baselineAt ? meta.firstSeenAt > new Date(baselineAt) : p.lastSuccessAt != null) ;
+      const fresh = !meta.publishedAt || meta.publishedAt.getTime() > Date.now() - 30 * 3600_000;
+      const base = isNew && fresh && matched && p.notifyEnabled && cfg.notifications.enabled && !meta.blocked && !meta.userIgnored && !meta.isDemo && meta.score >= p.notifyMinScore;
       // Snelle modus: direct een voorlopige push op basis van de lijstgegevens; de definitieve volgt na de detailpagina
       const fastProfile = cfg.scheduler.fast.enabled && (p.sourceConfig as { fastMode?: boolean } | null)?.fastMode === true;
       const complete = meta.complete || !cfg.notifications.requireFullAnalysis;

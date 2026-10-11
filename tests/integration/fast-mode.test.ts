@@ -21,7 +21,7 @@ const raw = (o: Partial<RawAd> = {}): RawAd => ({
 });
 
 async function profile(userId: string, fastMode: boolean, extra: Record<string, unknown> = {}) {
-  const p = await prisma.searchProfile.create({ data: { userId, name: fastMode ? "Snel" : "Normaal", sourceKind: "SEARCH", notifyMinScore: 0, notifyChannels: [], intervalMinutes: 10, sourceConfig: { queries: ["iphone 15 pro"], fastMode, maxPages: 3, ...extra } } });
+  const p = await prisma.searchProfile.create({ data: { userId, name: fastMode ? "Snel" : "Normaal", sourceKind: "SEARCH", notifyMinScore: 0, notifyChannels: [], intervalMinutes: 10, sourceConfig: { queries: ["iphone 15 pro"], fastMode, maxPages: 3, baselineAt: new Date(Date.now() - 3600_000).toISOString(), ...extra } } });
   await saveTree(p.id, { op: "AND", children: [] });
   return p;
 }
@@ -181,5 +181,39 @@ describe("snelle modus: hele keten na ophalen (nagebootste bron en pushdienst)",
     expect(sent[0]).toBeLessThan(3000); // detectie → eerste push (ons deel van de keten)
     // detailpagina's staan klaar maar blokkeren de detectie niet
     expect(await prisma.backgroundJob.count({ where: { type: "FETCH_DETAIL" } })).toBeGreaterThan(0);
+  });
+});
+
+describe("alleen echt nieuwe advertenties worden gemeld", () => {
+  async function prep(baselineOffsetMs: number | null) {
+    const { user } = await makeUser();
+    await saveConfig({ scheduler: { fast: { enabled: true } }, notifications: { enabled: true } });
+    await profile(user.id, true, baselineOffsetMs == null ? { baselineAt: undefined } : { baselineAt: new Date(Date.now() + baselineOffsetMs).toISOString() });
+    await prisma.pushSubscription.create({ data: { userId: user.id, endpoint: "https://push.example/a", p256dh: "p".repeat(30), auth: "a".repeat(12) } });
+    await comps();
+  }
+  const analyze = () => processJobs(handlers, { maxJobs: 50, types: ["ANALYZE_AD"], concurrency: 2 });
+
+  it("nulmeting: advertenties die bij de eerste controle al bestonden geven nooit een melding", async () => {
+    await prep(+60_000); // baseline ligt ná de eerste zichtbaarheid van de advertentie
+    const a = await ingestAd(raw(), { origin: "SEARCH", partial: true });
+    await analyze();
+    expect(await prisma.notification.count({ where: { adId: a.adId } })).toBe(0);
+  });
+
+  it("eerste controle loopt nog (nog geen nulmeting): geen meldingen", async () => {
+    await prep(null);
+    const a = await ingestAd(raw(), { origin: "SEARCH", partial: true });
+    await analyze();
+    expect(await prisma.notification.count({ where: { adId: a.adId } })).toBe(0);
+  });
+
+  it("oude advertentie die we pas nu tegenkomen (geplaatst >30 uur geleden) geeft geen melding; een verse wel", async () => {
+    await prep(-3600_000);
+    const old = await ingestAd(raw({ externalId: "m3000010", url: "https://www.marktplaats.nl/v/x/m3000010-a", title: "iPhone 15 Pro 256GB oud", location: "Zwolle", imageUrls: ["https://img.example/o1.jpg", "https://img.example/o2.jpg", "https://img.example/o3.jpg"], publishedAt: new Date(Date.now() - 72 * 3600_000) }), { origin: "SEARCH", partial: true });
+    const fresh = await ingestAd(raw({ externalId: "m3000011", url: "https://www.marktplaats.nl/v/x/m3000011-a", title: "iPhone 15 Pro 256GB vers", location: "Breda", imageUrls: ["https://img.example/v1.jpg", "https://img.example/v2.jpg", "https://img.example/v3.jpg"], publishedAt: new Date() }), { origin: "SEARCH", partial: true });
+    await analyze();
+    expect(await prisma.notification.count({ where: { adId: old.adId } })).toBe(0);
+    expect(await prisma.notification.count({ where: { adId: fresh.adId, channel: "WEBPUSH" } })).toBe(1);
   });
 });

@@ -45,7 +45,7 @@ async function setup(opts: { push?: boolean; profiles?: number } = {}) {
   await saveConfig({ limits: { minSecondsBetweenRequests: 0 }, notifications: { enabled: true } });
   const profiles = [];
   for (let i = 0; i < (opts.profiles ?? 1); i++) {
-    const p = await prisma.searchProfile.create({ data: { userId: user.id, name: `P${i}`, sourceKind: "SEARCH", notifyMinScore: 0, notifyChannels: ["TELEGRAM"], sourceConfig: { queries: ["iphone"] } } });
+    const p = await prisma.searchProfile.create({ data: { userId: user.id, name: `P${i}`, sourceKind: "SEARCH", notifyMinScore: 0, notifyChannels: ["TELEGRAM"], sourceConfig: { queries: ["iphone"], baselineAt: new Date(Date.now() - 3600_000).toISOString() } } });
     await saveTree(p.id, { op: "AND", children: [] });
     profiles.push(p);
   }

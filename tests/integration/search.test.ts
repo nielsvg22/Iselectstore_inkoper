@@ -103,6 +103,16 @@ describe("automatisch zoeken op Marktplaats", () => {
     expect(run).toMatchObject({ ok: true, pages: 1, cacheHits: 1, fetched: 3, created: 3 });
   });
 
+  it("eerste geslaagde controle legt de nulmeting vast; die blijft daarna ongewijzigd", async () => {
+    stubFetch();
+    const p = await searchProfile({ op: "AND", children: [] }, { fetchDetails: false });
+    await runProfileCheck(p.id);
+    const first = ((await prisma.searchProfile.findUniqueOrThrow({ where: { id: p.id } })).sourceConfig as { baselineAt?: string }).baselineAt;
+    expect(first).toBeTruthy();
+    await runProfileCheck(p.id);
+    expect(((await prisma.searchProfile.findUniqueOrThrow({ where: { id: p.id } })).sourceConfig as { baselineAt?: string }).baselineAt).toBe(first);
+  });
+
   it("tweede run vindt dezelfde advertenties terug zonder dubbelen of nieuwe analyse", async () => {
     stubFetch();
     const p = await searchProfile({ op: "AND", children: [] }, { fetchDetails: false });

@@ -59,7 +59,9 @@ export async function runProfileCheck(profileId: string): Promise<{ fetched: num
     }
     await recordSource(adapter.id, true, undefined, Math.max(1, stats.pages));
     const now = new Date();
-    await prisma.searchProfile.update({ where: { id: profileId }, data: { lastCheckedAt: now, lastSuccessAt: now, lastError: null } });
+    // Eerste geslaagde controle van een zoekprofiel = "nulmeting": wat er al stond wordt nooit als nieuwe deal gemeld
+    const baseline = adapter.origin === "SEARCH" && !((profile.sourceConfig ?? {}) as { baselineAt?: string }).baselineAt ? { sourceConfig: { ...((profile.sourceConfig ?? {}) as object), baselineAt: now.toISOString() } } : {};
+    await prisma.searchProfile.update({ where: { id: profileId }, data: { lastCheckedAt: now, lastSuccessAt: now, lastError: null, ...baseline } });
     await prisma.checkRun.update({ where: { id: run.id }, data: { finishedAt: now, durationMs: Date.now() - t0, ok: true, fetched: ads.length, created, pages: stats.pages, cacheHits: stats.cacheHits } });
     return { fetched: ads.length, created, changed };
   } catch (e) {
