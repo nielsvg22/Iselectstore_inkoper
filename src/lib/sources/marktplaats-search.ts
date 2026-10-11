@@ -205,7 +205,8 @@ export const searchAdapter: SourceAdapter = {
     const seen = new Map<string, RawAd>();
     let pagesFetched = 0;
     outer: for (const q of sc.queries) {
-      for (let page = 1; page <= (ctx.fast ? Math.min(sc.maxPages, ctx.fast.pages) : sc.maxPages); page++) {
+      // Snelle modus: zoveel pagina's als nodig om álle resultaten van de (smalle) zoekopdracht te zien, tot de ingestelde bovengrens
+      for (let page = 1; page <= (ctx.fast ? ctx.fast.pages : sc.maxPages); page++) {
         const url = buildSearchUrl(q, sc.category || undefined, page);
         const res = await cachedPage(url, ctx.fetchImpl ? 0 : (ctx.cacheSeconds ?? cfg.scheduler.pageCacheSeconds) * 1000, () => safeFetch(url, { allowlist: cfg.sources.urlAllowlist, respectRobots: true, fetchImpl: ctx.fetchImpl, lookup: ctx.lookup, throttle: th, maxBytes: 4_000_000 }), ctx.stats);
         pagesFetched++;
@@ -215,6 +216,10 @@ export const searchAdapter: SourceAdapter = {
         }
         if (res.status >= 400) throw new SourceError(`Marktplaats gaf HTTP ${res.status}`);
         const p = parseSearchPage(res.text);
+        if (ctx.stats) {
+          if (page === 1 && p.total != null) ctx.stats.total = (ctx.stats.total ?? 0) + p.total;
+          ctx.stats.covered = (ctx.stats.covered ?? 0) + p.rawCount;
+        }
         for (const ad of p.ads) {
           if (ctx.prefilter && !ctx.prefilter(ad)) continue;
           if (!seen.has(ad.externalId)) seen.set(ad.externalId, ad);

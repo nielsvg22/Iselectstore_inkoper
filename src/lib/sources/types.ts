@@ -37,7 +37,7 @@ export interface FetchContext {
   /** Maximale leeftijd (sec) van een gecachte zoekpagina voor deze run */
   cacheSeconds?: number;
   /** Wordt door de bron ingevuld: aantal opgehaalde pagina's en cache-treffers */
-  stats?: { pages: number; cacheHits: number };
+  stats?: { pages: number; cacheHits: number; /** totaal aantal resultaten volgens de bron (som over zoektermen) */ total?: number; /** aantal resultaten dat we daadwerkelijk hebben gezien */ covered?: number };
   /** Alleen voor tests */
   fetchImpl?: typeof fetch;
   lookup?: (host: string) => Promise<string[]>;

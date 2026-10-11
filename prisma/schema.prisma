@@ -553,6 +553,9 @@ model CheckRun {
   created     Int      @default(0)
   pages       Int      @default(0)
   cacheHits   Int      @default(0)
+  // Dekking: totaal aantal resultaten volgens de bron en hoeveel we er hebben gezien
+  totalResults Int?
+  covered      Int?
 
   @@index([profileId, startedAt])
   @@index([startedAt])

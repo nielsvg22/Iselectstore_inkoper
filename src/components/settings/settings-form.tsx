@@ -262,7 +262,7 @@ export function SettingsForm({ initial, secrets, isAdmin }: { initial: AppConfig
               {c.scheduler.fast.enabled && (
                 <div className="grid gap-4 sm:grid-cols-3">
                   <Field label="Interval snelle profielen (sec)" htmlFor="sf-int" hint="Minimaal 30."><Input id="sf-int" type="number" min="30" max="600" value={c.scheduler.fast.intervalSeconds} onChange={(e) => set("scheduler", { fast: { ...c.scheduler.fast, intervalSeconds: Number(e.target.value) } })} /></Field>
-                  <Field label="Pagina’s per zoekterm" htmlFor="sf-pages"><Input id="sf-pages" type="number" min="1" max="3" value={c.scheduler.fast.pages} onChange={(e) => set("scheduler", { fast: { ...c.scheduler.fast, pages: Number(e.target.value) } })} /></Field>
+                  <Field label="Max. pagina’s per zoekterm" htmlFor="sf-pages" hint="We bekijken alle resultaten tot dit aantal (30 per pagina)."><Input id="sf-pages" type="number" min="1" max="15" value={c.scheduler.fast.pages} onChange={(e) => set("scheduler", { fast: { ...c.scheduler.fast, pages: Number(e.target.value) } })} /></Field>
                   <Field label="Max. pagina-requests per minuut (totaal)" htmlFor="sf-max" hint="Rem over alle snelle profielen samen."><Input id="sf-max" type="number" min="1" max="30" value={c.scheduler.fast.maxRequestsPerMinute} onChange={(e) => set("scheduler", { fast: { ...c.scheduler.fast, maxRequestsPerMinute: Number(e.target.value) } })} /></Field>
                 </div>
               )}

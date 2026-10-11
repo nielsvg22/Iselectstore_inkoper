@@ -29,7 +29,7 @@ const sec = (a: Date, b: Date) => (b.getTime() - a.getTime()) / 1000;
 
 export interface PerformanceData {
   generatedAt: string;
-  profiles: Array<{ id: string; name: string; active: boolean; intervalMinutes: number; lastSuccessAt: string | null; lastError: string | null; secondsSinceSuccess: number | null; overdue: boolean }>;
+  profiles: Array<{ id: string; name: string; active: boolean; intervalMinutes: number; lastSuccessAt: string | null; lastError: string | null; secondsSinceSuccess: number | null; overdue: boolean; coverage: { total: number; covered: number; pct: number } | null }>;
   activeProfiles: number;
   lastSuccessSeconds: number | null;
   checks24h: { total: number; failed: number; missed: number; avgDurationMs: number | null; cacheHitPct: number | null };
@@ -48,6 +48,9 @@ export async function getPerformance(days = 7): Promise<PerformanceData> {
   const now = new Date();
   const since = new Date(now.getTime() - days * 86400_000);
   const since24 = new Date(now.getTime() - 86400_000);
+  const lastRuns = await prisma.checkRun.findMany({ where: { ok: true, totalResults: { not: null } }, orderBy: { startedAt: "desc" }, take: 300, select: { profileId: true, totalResults: true, covered: true } });
+  const cov = new Map<string, { total: number; covered: number; pct: number }>();
+  for (const r of lastRuns) if (!cov.has(r.profileId) && r.totalResults) cov.set(r.profileId, { total: r.totalResults, covered: r.covered ?? 0, pct: Math.min(100, Math.round(((r.covered ?? 0) / r.totalResults) * 100)) });
   const [profiles, runs, ads, notifs, jobs] = await Promise.all([
     prisma.searchProfile.findMany({ select: { id: true, name: true, active: true, intervalMinutes: true, lastSuccessAt: true, lastError: true, sourceKind: true, sourceConfig: true } }),
     prisma.checkRun.findMany({ where: { startedAt: { gte: since24 } }, select: { ok: true, durationMs: true, pages: true, cacheHits: true } }),
@@ -59,7 +62,7 @@ export async function getPerformance(days = 7): Promise<PerformanceData> {
   const prof = profiles.map((p) => {
     const since = p.lastSuccessAt ? sec(p.lastSuccessAt, now) : null;
     const interval = minInterval(p);
-    return { id: p.id, name: p.name, active: p.active, intervalMinutes: interval, lastSuccessAt: p.lastSuccessAt?.toISOString() ?? null, lastError: p.lastError, secondsSinceSuccess: since, overdue: p.active && (since == null || since > interval * 60 * 2 + 120) };
+    return { id: p.id, name: p.name, active: p.active, intervalMinutes: interval, lastSuccessAt: p.lastSuccessAt?.toISOString() ?? null, lastError: p.lastError, secondsSinceSuccess: since, overdue: p.active && (since == null || since > interval * 60 * 2 + 120), coverage: cov.get(p.id) ?? null };
   });
   const active = prof.filter((p) => p.active);
   const lastOk = active.map((p) => p.secondsSinceSuccess).filter((x): x is number => x != null);

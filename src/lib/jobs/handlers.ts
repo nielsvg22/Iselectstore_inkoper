@@ -44,10 +44,10 @@ export async function runProfileCheck(profileId: string): Promise<{ fetched: num
   }
   const run = await prisma.checkRun.create({ data: { profileId } });
   const t0 = Date.now();
-  const stats = { pages: 0, cacheHits: 0 };
+  const stats: { pages: number; cacheHits: number; total?: number; covered?: number } = { pages: 0, cacheHits: 0 };
   try {
     const prefilter = adapter.origin === "SEARCH" ? buildPrefilter(await loadTree(profileId)) : undefined;
-    const ads = await adapter.fetchProfile({ profileId, query: profile.query, config: (profile.sourceConfig ?? {}) as Record<string, unknown>, maxAds: cfg.limits.maxAdsPerRun, prefilter, deferDetails: adapter.origin === "SEARCH", stats, fast: fast ? { pages: cfg.scheduler.fast.pages } : undefined, cacheSeconds: fast ? Math.min(cfg.scheduler.pageCacheSeconds, 15) : Math.min(cfg.scheduler.pageCacheSeconds, Math.max(0, Math.floor((profile.intervalMinutes * 60) / 2))) });
+    const ads = await adapter.fetchProfile({ profileId, query: profile.query, config: (profile.sourceConfig ?? {}) as Record<string, unknown>, maxAds: fast ? Math.max(cfg.limits.maxAdsPerRun, cfg.scheduler.fast.pages * 30 * 4) : cfg.limits.maxAdsPerRun, prefilter, deferDetails: adapter.origin === "SEARCH", stats, fast: fast ? { pages: cfg.scheduler.fast.pages } : undefined, cacheSeconds: fast ? Math.min(cfg.scheduler.pageCacheSeconds, 15) : Math.min(cfg.scheduler.pageCacheSeconds, Math.max(0, Math.floor((profile.intervalMinutes * 60) / 2))) });
     let created = 0;
     let changed = 0;
     const wantsDetail = adapter.origin === "SEARCH" && ((profile.sourceConfig ?? {}) as { fetchDetails?: boolean }).fetchDetails !== false;
@@ -62,7 +62,7 @@ export async function runProfileCheck(profileId: string): Promise<{ fetched: num
     // Eerste geslaagde controle van een zoekprofiel = "nulmeting": wat er al stond wordt nooit als nieuwe deal gemeld
     const baseline = adapter.origin === "SEARCH" && !((profile.sourceConfig ?? {}) as { baselineAt?: string }).baselineAt ? { sourceConfig: { ...((profile.sourceConfig ?? {}) as object), baselineAt: now.toISOString() } } : {};
     await prisma.searchProfile.update({ where: { id: profileId }, data: { lastCheckedAt: now, lastSuccessAt: now, lastError: null, ...baseline } });
-    await prisma.checkRun.update({ where: { id: run.id }, data: { finishedAt: now, durationMs: Date.now() - t0, ok: true, fetched: ads.length, created, pages: stats.pages, cacheHits: stats.cacheHits } });
+    await prisma.checkRun.update({ where: { id: run.id }, data: { finishedAt: now, durationMs: Date.now() - t0, ok: true, fetched: ads.length, created, pages: stats.pages, cacheHits: stats.cacheHits, totalResults: stats.total ?? null, covered: stats.covered ?? null } });
     return { fetched: ads.length, created, changed };
   } catch (e) {
     const msg = errMsg(e);

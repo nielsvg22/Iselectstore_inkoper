@@ -163,7 +163,8 @@ export const configSchema = z.object({
         .object({
           enabled: z.boolean().default(false),
           intervalSeconds: z.number().int().min(30).max(600).default(60),
-          pages: z.number().int().min(1).max(3).default(2),
+          /** Maximaal aantal pagina's per zoekterm; de controle stopt eerder zodra alle resultaten zijn gezien */
+          pages: z.number().int().min(1).max(15).default(8),
           /** Bovengrens voor het totaal aantal pagina-requests per minuut over alle snelle profielen */
           maxRequestsPerMinute: z.number().int().min(1).max(30).default(6),
         })

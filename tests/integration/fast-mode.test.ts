@@ -11,6 +11,7 @@ import { saveConfig } from "@/lib/settings/store";
 import { clearPageCache } from "@/lib/sources/marktplaats-search";
 import type { PushSender } from "@/lib/notify/push";
 import type { RawAd } from "@/lib/sources/types";
+import { getPerformance } from "@/lib/metrics";
 import { makeUser, resetDb } from "../helpers";
 
 vi.mock("node:dns/promises", () => ({ default: { lookup: async () => [{ address: "93.184.216.34", family: 4 }] }, lookup: async () => [{ address: "93.184.216.34", family: 4 }] }));
@@ -215,5 +216,51 @@ describe("alleen echt nieuwe advertenties worden gemeld", () => {
     await analyze();
     expect(await prisma.notification.count({ where: { adId: old.adId } })).toBe(0);
     expect(await prisma.notification.count({ where: { adId: fresh.adId, channel: "WEBPUSH" } })).toBe(1);
+  });
+});
+
+describe("dekking: snelle modus bekijkt álle resultaten van een smalle zoekopdracht", () => {
+  const base = JSON.parse(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/.exec(readFileSync("tests/fixtures/mp-search.html", "utf8"))![1]);
+  const proto = base.props.pageProps.searchRequestAndResponse.listings[1];
+  const TOTAL = 102;
+  const page = (n: number) => {
+    const from = (n - 1) * 30;
+    const listings = Array.from({ length: Math.max(0, Math.min(30, TOTAL - from)) }, (_, i) => ({ ...proto, itemId: `m47${String(from + i).padStart(8, "0")}`, title: `iPhone 15 Pro 128GB nr ${from + i}`, vipUrl: `/v/telecommunicatie/mobiele-telefoons-apple-iphone/m47${String(from + i).padStart(8, "0")}-iphone-15-pro-nr-${from + i}` }));
+    const data = JSON.parse(JSON.stringify(base));
+    Object.assign(data.props.pageProps.searchRequestAndResponse, { listings, totalResultCount: TOTAL, maxAllowedPageNumber: 4 });
+    return `<html><script id="__NEXT_DATA__" type="application/json">${JSON.stringify(data)}</script></html>`;
+  };
+  let pages: number[] = [];
+  const stub = () => {
+    pages = [];
+    vi.stubGlobal("fetch", async (u: string) => {
+      const url = new URL(u);
+      if (url.pathname === "/robots.txt") return new Response("User-agent: *\nDisallow: /lrp/api/search*");
+      const m = /\/p\/(\d+)\//.exec(url.pathname);
+      pages.push(m ? Number(m[1]) : 1);
+      return new Response(page(m ? Number(m[1]) : 1), { headers: { "content-type": "text/html" } });
+    });
+  };
+
+  it("snelle modus: alle 4 pagina's (102 resultaten) in één controle, dekking 100%; gewoon profiel met 3 pagina's: 88% en een waarschuwing-waarde in Prestaties", async () => {
+    const { user } = await makeUser();
+    await saveConfig({ scheduler: { fast: { enabled: true, pages: 8 } }, limits: { maxAdsPerRun: 30 } });
+    const fast = await profile(user.id, true, { fetchDetails: false });
+    stub();
+    await runProfileCheck(fast.id);
+    expect(pages).toEqual([1, 2, 3, 4]); // stopt na de laatste pagina, ondanks bovengrens 8 en maxAdsPerRun 30
+    expect(await prisma.advertisement.count()).toBe(TOTAL);
+    const run = await prisma.checkRun.findFirstOrThrow({ where: { profileId: fast.id } });
+    expect(run).toMatchObject({ totalResults: TOTAL, covered: TOTAL, pages: 4 });
+
+    clearPageCache();
+    await saveConfig({ limits: { maxAdsPerRun: 120 } });
+    const slow = await profile(user.id, false, { fetchDetails: false, maxPages: 3, queries: ["iphone 15 pro nr"] });
+    stub();
+    await runProfileCheck(slow.id);
+    expect(pages).toEqual([1, 2, 3]);
+    const perf = await getPerformance(1);
+    expect(perf.profiles.find((p) => p.id === fast.id)?.coverage).toEqual({ total: TOTAL, covered: TOTAL, pct: 100 });
+    expect(perf.profiles.find((p) => p.id === slow.id)?.coverage).toEqual({ total: TOTAL, covered: 90, pct: 88 });
   });
 });

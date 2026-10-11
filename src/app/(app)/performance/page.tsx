@@ -90,7 +90,7 @@ export default async function PerformancePage() {
             {d.profiles.length === 0 && <p className="text-sm text-muted">Nog geen zoekprofielen.</p>}
             {d.profiles.map((p) => (
               <div key={p.id} className="flex items-center justify-between gap-3 rounded-2xl bg-muted-bg px-4 py-3 text-sm">
-                <div className="min-w-0"><p className="truncate font-medium">{p.name}{!p.active && <span className="ml-2 text-xs text-muted">(gepauzeerd)</span>}</p><p className="truncate text-xs text-muted">{p.lastError ? `Fout: ${p.lastError}` : `elke ${p.intervalMinutes} min`}</p></div>
+                <div className="min-w-0"><p className="truncate font-medium">{p.name}{!p.active && <span className="ml-2 text-xs text-muted">(gepauzeerd)</span>}</p><p className="truncate text-xs text-muted">{p.lastError ? `Fout: ${p.lastError}` : `elke ${p.intervalMinutes} min`}</p>{p.coverage && <p className={`text-xs ${p.coverage.pct < 70 ? "font-medium text-danger" : "text-muted"}`}>Dekking: {p.coverage.covered} van {p.coverage.total} resultaten gezien ({p.coverage.pct}%){p.coverage.pct < 70 ? " — maak de zoekopdracht specifieker (categorie, model, opslag) of verhoog het aantal pagina’s; nieuwe advertenties kunnen anders gemist worden" : ""}</p>}</div>
                 <span className={`shrink-0 text-xs ${p.overdue ? "font-semibold text-danger" : "text-muted"}`}>{p.lastSuccessAt ? timeAgo(p.lastSuccessAt) : "nooit"}{p.overdue ? " · achterstallig" : ""}</span>
               </div>
             ))}
