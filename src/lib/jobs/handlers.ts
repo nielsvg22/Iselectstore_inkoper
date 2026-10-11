@@ -14,6 +14,7 @@ import { mergeDetail } from "../sources/marktplaats-search";
 import { SourceError, type RawAd } from "../sources/types";
 import { getCooldown, setCooldown } from "./cooldown";
 import { modelByKey } from "../catalog/apple";
+import { getSliceState, selectSlices, setSliceState, specsFromConfig } from "../sources/slice-plan";
 import { buildSlices, getFacets, getLastFullSearch, setLastFullSearch, sliceSpecsFromTree, type FacetMap, type Slice } from "../sources/facets";
 import { enqueue, PermanentJobError, type Handler, type JobType } from "./queue";
 
@@ -54,8 +55,11 @@ export async function runProfileCheck(profileId: string): Promise<{ fetched: num
     let slices: Slice[] | undefined;
     let fullSearch = false;
     let extraQueries: string[] | undefined;
+    let sliceStateBefore: Record<string, { at: string; pages: number; total: number | null }> | null = null;
+    const unitResults: Record<string, { at: string; pages: number; total: number | null }> = {};
     if (fast && tree && (profile.sourceConfig as { sliceSearch?: boolean } | null)?.sliceSearch !== false) {
-      const specs = sliceSpecsFromTree(tree);
+      const scfg = (profile.sourceConfig ?? {}) as { sliceModels?: string[]; sliceStorages?: number[]; priorityModels?: string[] };
+      const specs = scfg.sliceModels?.length ? specsFromConfig(scfg) : sliceSpecsFromTree(tree);
       if (specs.length) {
         const last = await getLastFullSearch(profileId);
         fullSearch = !last || Date.now() - last.getTime() > cfg.scheduler.fast.fullSearchEveryMinutes * 60_000;
@@ -64,14 +68,17 @@ export async function runProfileCheck(profileId: string): Promise<{ fetched: num
           for (const cat of new Set(specs.map((x) => x.model.category))) facets.set(cat, await getFacets(cat));
           const built = buildSlices(specs, facets);
           if (built.slices.length) {
-            slices = built.slices;
-            extraQueries = built.missing.map((m) => modelByKey(m.key)?.term).filter((t): t is string => !!t);
+            // Rondlopend: alleen de slices die nu aan de beurt zijn, binnen het paginabudget per controle
+            sliceStateBefore = await getSliceState(profileId);
+            slices = selectSlices(built.slices, sliceStateBefore, Date.now(), cfg.scheduler.fast.pagesPerRun, { highMs: cfg.scheduler.fast.priorityEveryMinutes * 60_000, normalMs: cfg.scheduler.fast.normalEveryMinutes * 60_000 });
+            // Modellen zonder filterpagina (built.missing) worden gedekt door het vangnet: de volledige zoektermen, elke paar minuten
           } else fullSearch = true; // geen enkel model heeft een filterpagina: veilig terugvallen op de zoekterm
         }
       }
     }
     if (fullSearch) await setLastFullSearch(profileId);
-    const ads = await adapter.fetchProfile({ profileId, slices, query: profile.query, config: (profile.sourceConfig ?? {}) as Record<string, unknown>, maxAds: fast ? Math.max(cfg.limits.maxAdsPerRun, cfg.scheduler.fast.pages * 30 * 4) : cfg.limits.maxAdsPerRun, prefilter, deferDetails: adapter.origin === "SEARCH", stats, extraQueries, fast: fast ? { pages: cfg.scheduler.fast.pages } : undefined, cacheSeconds: fast ? Math.min(cfg.scheduler.pageCacheSeconds, 15) : Math.min(cfg.scheduler.pageCacheSeconds, Math.max(0, Math.floor((profile.intervalMinutes * 60) / 2))) });
+    const ads = await adapter.fetchProfile({ profileId, slices, query: profile.query, config: (profile.sourceConfig ?? {}) as Record<string, unknown>, maxAds: fast ? Math.max(cfg.limits.maxAdsPerRun, cfg.scheduler.fast.pages * 30 * 4) : cfg.limits.maxAdsPerRun, prefilter, deferDetails: adapter.origin === "SEARCH", stats, extraQueries, onUnit: (key, i) => { unitResults[key] = { at: new Date().toISOString(), pages: i.pages, total: i.total }; }, fast: fast ? { pages: cfg.scheduler.fast.pages } : undefined, cacheSeconds: fast ? Math.min(cfg.scheduler.pageCacheSeconds, 15) : Math.min(cfg.scheduler.pageCacheSeconds, Math.max(0, Math.floor((profile.intervalMinutes * 60) / 2))) });
+    if (sliceStateBefore && Object.keys(unitResults).length) await setSliceState(profileId, { ...sliceStateBefore, ...Object.fromEntries(Object.entries(unitResults).filter(([k]) => k.startsWith("http"))) });
     let created = 0;
     let changed = 0;
     const wantsDetail = adapter.origin === "SEARCH" && ((profile.sourceConfig ?? {}) as { fetchDetails?: boolean }).fetchDetails !== false;

@@ -1,6 +1,7 @@
 import { Plus, Search } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { IphoneMelder } from "@/components/profile/iphone-melder";
 import { ProfileActions } from "@/components/profile/profile-actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ export default async function ProfilesPage() {
         </div>
         <Link href="/profiles/new"><Button><Plus className="h-4 w-4" />Nieuw profiel</Button></Link>
       </div>
+      <IphoneMelder exists={profiles.some((p) => p.name === "iPhone-melder (alle iPhones)")} isAdmin={user!.role === "ADMIN"} />
       {profiles.length === 0 ? (
         <EmptyState icon={<Search className="h-6 w-6" />} title="Nog geen zoekprofielen" description="Maak een profiel zoals ‘iPhone 15 Pro inkoop’ met maximale prijs, minimale winst en afstand." action={<Link href="/profiles/new"><Button>Eerste profiel maken</Button></Link>} />
       ) : (

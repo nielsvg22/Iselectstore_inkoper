@@ -77,6 +77,11 @@ export async function getFacets(category: string, deps: { fetchImpl?: typeof fet
   await prisma.appSettings.upsert({ where: { key }, create: { key, value: map as object }, update: { value: map as object } });
   return map;
 }
+/** Alleen uit de cache (geen netwerk): voor weergave in het dashboard. */
+export async function peekFacets(category: string): Promise<FacetMap | null> {
+  const row = await prisma.appSettings.findUnique({ where: { key: `facets:${category}` } });
+  return (row?.value as FacetMap | undefined) ?? null;
+}
 export function clearFacetCache() {
   mem.clear();
 }
@@ -84,10 +89,12 @@ export function clearFacetCache() {
 export interface SliceSpec {
   model: { key: string; label: string; category: string };
   storages: number[]; // leeg = alle opslagformaten
+  priority?: "high" | "normal";
 }
 export interface Slice {
   url: string;
   label: string;
+  priority?: "high" | "normal";
 }
 
 /** Canonieke filter-URL (slugs alfabetisch; ids in dezelfde volgorde) — anders stuurt Marktplaats een redirect. */
@@ -108,17 +115,17 @@ export function buildSlices(specs: SliceSpec[], facets: Map<string, FacetMap>): 
       continue;
     }
     if (!s.storages.length) {
-      slices.push({ url: sliceUrl(s.model.category, [m]), label: s.model.label });
+      slices.push({ url: sliceUrl(s.model.category, [m]), label: s.model.label, priority: s.priority });
       continue;
     }
     for (const gb of s.storages) {
       const st = f.storages[norm(gb >= 1024 ? `${gb / 1024} TB` : `${gb} GB`)];
       if (!st) {
         // geen opslagfilter beschikbaar: het hele model volgen (breder, maar niets gemist)
-        if (!slices.some((x) => x.label === s.model.label)) slices.push({ url: sliceUrl(s.model.category, [m]), label: s.model.label });
+        if (!slices.some((x) => x.label === s.model.label)) slices.push({ url: sliceUrl(s.model.category, [m]), label: s.model.label, priority: s.priority });
         continue;
       }
-      slices.push({ url: sliceUrl(s.model.category, [m, st]), label: `${s.model.label} ${gb >= 1024 ? `${gb / 1024}TB` : `${gb}GB`}` });
+      slices.push({ url: sliceUrl(s.model.category, [m, st]), label: `${s.model.label} ${gb >= 1024 ? `${gb / 1024}TB` : `${gb}GB`}`, priority: s.priority });
     }
   }
   return { slices, missing };

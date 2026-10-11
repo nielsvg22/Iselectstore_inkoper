@@ -205,22 +205,27 @@ export const searchAdapter: SourceAdapter = {
     const seen = new Map<string, RawAd>();
     let pagesFetched = 0;
     // Eenheden: smalle filterpagina's (indien meegegeven) of de zoektermen
-    const queryUnit = (q: string, category?: string) => ({ urlFor: (page: number) => buildSearchUrl(q, category, page) });
-    const units: Array<{ urlFor: (page: number) => string }> = ctx.slices?.length
-      ? [...ctx.slices.map((sl) => ({ urlFor: (page: number) => (page > 1 ? `${sl.url}p/${page}/` : sl.url) })), ...(ctx.extraQueries ?? []).map((q) => queryUnit(q, sc.category || undefined))]
+    const queryUnit = (q: string, category?: string) => ({ key: `q:${q}`, urlFor: (page: number) => buildSearchUrl(q, category, page) });
+    const units: Array<{ key: string; urlFor: (page: number) => string }> = ctx.slices?.length
+      ? [...ctx.slices.map((sl) => ({ key: sl.url, urlFor: (page: number) => (page > 1 ? `${sl.url}p/${page}/` : sl.url) })), ...(ctx.extraQueries ?? []).map((q) => queryUnit(q, sc.category || undefined))]
       : sc.queries.map((q) => queryUnit(q, sc.category || undefined));
     outer: for (const unit of units) {
+      const info = { pages: 0, total: null as number | null, covered: 0 };
+      const done = () => ctx.onUnit?.(unit.key, info);
       // Snelle modus: zoveel pagina's als nodig om álle resultaten van de (smalle) zoekopdracht te zien, tot de ingestelde bovengrens
       for (let page = 1; page <= (ctx.fast ? ctx.fast.pages : sc.maxPages); page++) {
         const url = unit.urlFor(page);
         const res = await cachedPage(url, ctx.fetchImpl ? 0 : (ctx.cacheSeconds ?? cfg.scheduler.pageCacheSeconds) * 1000, () => safeFetch(url, { allowlist: cfg.sources.urlAllowlist, respectRobots: true, fetchImpl: ctx.fetchImpl, lookup: ctx.lookup, throttle: th, maxBytes: 4_000_000 }), ctx.stats);
         pagesFetched++;
+        info.pages++;
         if (res.status === 404) break;
         if (res.status === 401 || res.status === 403 || res.status === 429) {
           throw new SourceError(`Marktplaats weigert toegang (HTTP ${res.status}). Er wordt niet geprobeerd dit te omzeilen; verlaag de frequentie of gebruik een export.`, res.status === 429);
         }
         if (res.status >= 400) throw new SourceError(`Marktplaats gaf HTTP ${res.status}`);
         const p = parseSearchPage(res.text);
+        if (page === 1) info.total = p.total;
+        info.covered += p.rawCount;
         if (ctx.stats) {
           if (page === 1 && p.total != null) ctx.stats.total = (ctx.stats.total ?? 0) + p.total;
           ctx.stats.covered = (ctx.stats.covered ?? 0) + p.rawCount;
@@ -228,10 +233,14 @@ export const searchAdapter: SourceAdapter = {
         for (const ad of p.ads) {
           if (ctx.prefilter && !ctx.prefilter(ad)) continue;
           if (!seen.has(ad.externalId)) seen.set(ad.externalId, ad);
-          if (seen.size >= ctx.maxAds) break outer;
+          if (seen.size >= ctx.maxAds) {
+            done();
+            break outer;
+          }
         }
         if (p.rawCount < PAGE_SIZE || (p.maxPage != null && page >= p.maxPage)) break;
       }
+      done();
     }
     let ads = [...seen.values()];
 

@@ -118,16 +118,18 @@ describe("slim zoeken in de snelle modus", () => {
     expect(paths.some((x) => x.includes("/q/iphone"))).toBe(true);
   });
 
-  it("model zonder filterpagina loopt via de zoekterm naast de smalle lijsten mee; uit te zetten per profiel", async () => {
+  it("model zonder filterpagina wordt door het vangnet (volledige zoekterm) gedekt, niet bij elke smalle ronde; uit te zetten per profiel", async () => {
     const p = await fastProfile({ op: "AND", children: [{ field: "modelKey", operator: "in", value: ["iphone-15-pro", "iphone-17"] }] });
+    await prisma.searchProfile.update({ where: { id: p.id }, data: { sourceConfig: { queries: ["iphone 15 pro", "iphone 17"], category: CAT, fastMode: true, fetchDetails: false } } });
     stub();
-    await runProfileCheck(p.id); // vangnet-run
-    await runProfileCheck(p.id); // slices
+    await runProfileCheck(p.id); // vangnet-run: alle zoektermen
+    expect(paths.some((x) => x.includes("/q/iphone+17"))).toBe(true);
+    await runProfileCheck(p.id); // smalle ronde
     paths.length = 0;
     clearPageCache();
     await runProfileCheck(p.id);
     expect(paths).toContain(`/l/${CAT}/f/iphone-15-pro/14053/`);
-    expect(paths.some((x) => x.includes("/q/iphone+17"))).toBe(true);
+    expect(paths.some((x) => x.includes("/q/"))).toBe(false);
 
     await prisma.searchProfile.update({ where: { id: p.id }, data: { sourceConfig: { queries: ["iphone 15 pro"], category: CAT, fastMode: true, fetchDetails: false, sliceSearch: false } } });
     paths.length = 0;
@@ -142,5 +144,92 @@ describe("slim zoeken in de snelle modus", () => {
     await runProfileCheck(p.id);
     await runProfileCheck(p.id);
     expect(paths.some((x) => x.includes("/f/"))).toBe(false);
+  });
+});
+
+import { estimateRounds, getSliceState, selectSlices, type SliceState } from "@/lib/sources/slice-plan";
+import { POST as melderPost } from "@/app/api/profiles/iphone-melder/route";
+import { getConfig } from "@/lib/settings/store";
+import { ctx, req } from "../helpers";
+
+describe("rondlopende planning (selectie)", () => {
+  const sl = (n: string, priority?: "high" | "normal") => ({ url: `https://x/${n}/`, label: n, priority });
+  const T = { highMs: 3 * 60_000, normalMs: 20 * 60_000 };
+  const now = Date.now();
+  const st = (mins: number, pages = 2): SliceState[string] => ({ at: new Date(now - mins * 60_000).toISOString(), pages, total: pages * 30 });
+
+  it("nooit bekeken eerst; daarna de grootste achterstand t.o.v. het doel; prioriteit wint bij gelijke leeftijd; paginabudget wordt gerespecteerd", () => {
+    const slices = [sl("a", "high"), sl("b", "normal"), sl("c", "normal"), sl("d", "high")];
+    const state: SliceState = { a: st(1), b: st(5), c: st(30), d: st(4) };
+    const norm = Object.fromEntries(Object.entries(state).map(([k, v]) => [`https://x/${k}/`, v]));
+    // d: 4/3=1.33, a: 1/3=0.33, c: 30/20=1.5, b: 5/20=0.25 → c, d, a, b
+    expect(selectSlices(slices, norm, now, 4, T).map((s) => s.label)).toEqual(["c", "d"]); // 2+2 pagina's = budget
+    expect(selectSlices(slices, norm, now, 100, T).map((s) => s.label)).toEqual(["c", "d", "a", "b"]);
+    const fresh = selectSlices(slices, { ...norm, "https://x/b/": undefined as never }, now, 2, T);
+    expect(fresh.map((s) => s.label)).toEqual(["b"]); // nooit bekeken gaat voor
+    expect(selectSlices(slices, {}, now, 1, T)).toHaveLength(1); // altijd minstens één, ook bij klein budget
+  });
+
+  it("rondetijd: pagina's ÷ budget × interval", () => {
+    const slices = [sl("a", "high"), sl("b"), sl("c")];
+    const state: SliceState = Object.fromEntries(slices.map((s) => [s.url, { at: new Date().toISOString(), pages: 4, total: 120 }]));
+    expect(estimateRounds(slices, state, 12, 60)).toMatchObject({ slices: 3, pages: 12, fullRoundMin: 1, highRoundMin: 1 });
+    expect(estimateRounds(slices, state, 4, 60)).toMatchObject({ fullRoundMin: 3, highRoundMin: 1 });
+  });
+});
+
+describe("iPhone-melder en rondlopend crawlen", () => {
+  it("preset maakt één profiel dat alle iPhones volgt, zet de snelle modus aan, is idempotent en alleen voor beheerders", async () => {
+    const { user, cookie } = await makeUser();
+    const r1 = await melderPost(req("/api/profiles/iphone-melder", { method: "POST", cookie, body: {} }));
+    expect(r1.status).toBe(200);
+    expect(((await r1.json()) as { created: boolean }).created).toBe(true);
+    const r2 = await melderPost(req("/api/profiles/iphone-melder", { method: "POST", cookie, body: {} }));
+    expect(((await r2.json()) as { created: boolean }).created).toBe(false);
+    const ps = await prisma.searchProfile.findMany({ where: { userId: user.id } });
+    expect(ps).toHaveLength(1);
+    const sc = ps[0].sourceConfig as { fastMode: boolean; sliceModels: string[]; sliceStorages: number[]; priorityModels: string[]; queries: string[] };
+    expect(sc.fastMode).toBe(true);
+    expect(sc.sliceModels.length).toBeGreaterThan(20);
+    expect(sc.priorityModels).toContain("iphone-15-pro");
+    expect(sc.priorityModels).not.toContain("iphone-11");
+    expect(sc.sliceStorages).toEqual([64, 128, 256, 512, 1024]);
+    expect(ps[0]).toMatchObject({ notifyEnabled: true, notifyMinScore: 0 });
+    expect((await getConfig(true)).scheduler.fast.enabled).toBe(true);
+    const other = await makeUser("USER", "gewoon@example.com");
+    expect((await melderPost(req("/api/profiles/iphone-melder", { method: "POST", cookie: other.cookie, body: {} }))).status).toBe(403);
+    expect(ctx).toBeDefined();
+  });
+
+  it("elke controle pakt binnen het paginabudget de slices die het eerst aan de beurt zijn (prioriteit eerst) en onthoudt wat bekeken is", async () => {
+    const { user } = await makeUser();
+    await saveConfig({ scheduler: { fast: { enabled: true, pagesPerRun: 8, fullSearchEveryMinutes: 60, priorityEveryMinutes: 3, normalEveryMinutes: 20 } } });
+    const p = await prisma.searchProfile.create({
+      data: {
+        userId: user.id, name: "Melder", sourceKind: "SEARCH", notifyMinScore: 0, notifyChannels: [],
+        sourceConfig: { queries: ["iphone"], category: CAT, fastMode: true, fetchDetails: false, baselineAt: new Date(Date.now() - 3600_000).toISOString(), sliceModels: ["iphone-15-pro", "iphone-15-pro-max"], sliceStorages: [256, 512], priorityModels: ["iphone-15-pro"] },
+      },
+    });
+    await saveTree(p.id, { op: "AND", children: [] });
+    stub();
+    await runProfileCheck(p.id); // vangnet (eerste run)
+    const fetched = async () => {
+      paths.length = 0;
+      clearPageCache();
+      await runProfileCheck(p.id);
+      return [...new Set(paths.filter((x) => x.includes("/f/")).map((x) => x.replace(/p\/\d+\//, "")))].sort();
+    };
+    const one = await fetched();
+    expect(one).toEqual([`/l/${CAT}/f/256-gb+iphone-15-pro/12825+14053/`, `/l/${CAT}/f/512-gb+iphone-15-pro/12826+14053/`]); // prioriteitsmodel eerst (2 × onbekend = 4 pagina's) binnen het budget van 8
+    const two = await fetched();
+    expect(two).toEqual([`/l/${CAT}/f/256-gb+iphone-15-pro-max/12825+14054/`, `/l/${CAT}/f/512-gb+iphone-15-pro-max/12826+14054/`]); // nu de overige
+    expect(Object.keys(await getSliceState(p.id))).toHaveLength(4);
+    // 4 minuten later is het prioriteitsmodel weer aan de beurt (doel 3 min), de overige nog niet (doel 20 min)
+    const st = await getSliceState(p.id);
+    const aged = Object.fromEntries(Object.entries(st).map(([k, v]) => [k, { ...v, at: new Date(Date.now() - (k.includes("-max/") ? 4 : 4) * 60_000).toISOString() }]));
+    await prisma.appSettings.update({ where: { key: `slice:state:${p.id}` }, data: { value: aged } });
+    await saveConfig({ scheduler: { fast: { pagesPerRun: 4 } } });
+    const three = await fetched();
+    expect(three).toEqual([`/l/${CAT}/f/256-gb+iphone-15-pro/12825+14053/`, `/l/${CAT}/f/512-gb+iphone-15-pro/12826+14053/`]); // alleen de prioriteitsslices zijn al weer aan de beurt
   });
 });

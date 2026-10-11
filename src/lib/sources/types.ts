@@ -34,6 +34,8 @@ export interface FetchContext {
   deferDetails?: boolean;
   /** Smalle resultaatlijsten (model × opslag via Marktplaats-filterpagina's); vervangt de zoektermen voor deze run */
   slices?: Array<{ url: string; label: string }>;
+  /** Wordt aangeroepen zodra een smalle lijst of zoekterm is doorlopen (voor de rondlopende planning) */
+  onUnit?: (key: string, info: { pages: number; total: number | null; covered: number }) => void;
   /** Zoektermen voor modellen zonder filterpagina; lopen naast de slices mee */
   extraQueries?: string[];
   /** Snelle modus: minder pagina's en een korte cache zodat de pagina vers is */

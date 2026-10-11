@@ -20,6 +20,10 @@ const profileBase = z.object({
       mailOnly: z.boolean().optional(),
       /** Snelle modus: smalle filterpagina's per model/opslag (standaard aan) */
       sliceSearch: z.boolean().optional(),
+      /** Te volgen modellen (catalogus-sleutels), opslagformaten en prioriteitsmodellen — los van de filters */
+      sliceModels: z.array(z.string().max(60)).max(60).optional(),
+      sliceStorages: z.array(z.number().int()).max(10).optional(),
+      priorityModels: z.array(z.string().max(60)).max(60).optional(),
       urls: z.array(httpsUrl).max(100).optional(),
       feedUrl: httpsUrl.optional(),
       allowedHosts: z.array(z.string().max(100)).max(10).optional(),

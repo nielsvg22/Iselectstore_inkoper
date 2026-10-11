@@ -1,5 +1,7 @@
 import { prisma } from "./db/client";
 import { getCooldown } from "./jobs/cooldown";
+import { buildSlices, peekFacets, type FacetMap } from "./sources/facets";
+import { estimateRounds, getSliceState, specsFromConfig, type RoundEstimate } from "./sources/slice-plan";
 import { getConfig } from "./settings/store";
 
 export function percentile(values: number[], p: number): number | null {
@@ -29,7 +31,7 @@ const sec = (a: Date, b: Date) => (b.getTime() - a.getTime()) / 1000;
 
 export interface PerformanceData {
   generatedAt: string;
-  profiles: Array<{ id: string; name: string; active: boolean; intervalMinutes: number; lastSuccessAt: string | null; lastError: string | null; secondsSinceSuccess: number | null; overdue: boolean; coverage: { total: number; covered: number; pct: number } | null }>;
+  profiles: Array<{ id: string; name: string; active: boolean; intervalMinutes: number; lastSuccessAt: string | null; lastError: string | null; secondsSinceSuccess: number | null; overdue: boolean; coverage: { total: number; covered: number; pct: number } | null; rounds: (RoundEstimate & { seen: number }) | null }>;
   activeProfiles: number;
   lastSuccessSeconds: number | null;
   checks24h: { total: number; failed: number; missed: number; avgDurationMs: number | null; cacheHitPct: number | null };
@@ -59,10 +61,25 @@ export async function getPerformance(days = 7): Promise<PerformanceData> {
     prisma.backgroundJob.groupBy({ by: ["status"], _count: { _all: true } }),
   ]);
   const minInterval = (p: { intervalMinutes: number; sourceKind: string }) => (p.sourceKind === "SEARCH" ? Math.max(p.intervalMinutes, cfg.scheduler.minIntervalMinutes) : p.intervalMinutes);
+  const roundsFor = new Map<string, RoundEstimate & { seen: number }>();
+  for (const p of profiles) {
+    const sc = (p.sourceConfig ?? {}) as { sliceModels?: string[]; sliceStorages?: number[]; priorityModels?: string[] };
+    if (!p.active || !cfg.scheduler.fast.enabled || !sc.sliceModels?.length) continue;
+    const specs = specsFromConfig(sc);
+    const facets = new Map<string, FacetMap>();
+    for (const cat of new Set(specs.map((x) => x.model.category))) {
+      const f = await peekFacets(cat);
+      if (f) facets.set(cat, f);
+    }
+    const built = buildSlices(specs, facets);
+    if (!built.slices.length) continue;
+    const st = await getSliceState(p.id);
+    roundsFor.set(p.id, { ...estimateRounds(built.slices, st, cfg.scheduler.fast.pagesPerRun, cfg.scheduler.fast.intervalSeconds), seen: built.slices.filter((s) => st[s.url]).length });
+  }
   const prof = profiles.map((p) => {
     const since = p.lastSuccessAt ? sec(p.lastSuccessAt, now) : null;
     const interval = minInterval(p);
-    return { id: p.id, name: p.name, active: p.active, intervalMinutes: interval, lastSuccessAt: p.lastSuccessAt?.toISOString() ?? null, lastError: p.lastError, secondsSinceSuccess: since, overdue: p.active && (since == null || since > interval * 60 * 2 + 120), coverage: cov.get(p.id) ?? null };
+    return { id: p.id, name: p.name, active: p.active, intervalMinutes: interval, lastSuccessAt: p.lastSuccessAt?.toISOString() ?? null, lastError: p.lastError, secondsSinceSuccess: since, overdue: p.active && (since == null || since > interval * 60 * 2 + 120), coverage: cov.get(p.id) ?? null, rounds: roundsFor.get(p.id) ?? null };
   });
   const active = prof.filter((p) => p.active);
   const lastOk = active.map((p) => p.secondsSinceSuccess).filter((x): x is number => x != null);

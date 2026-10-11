@@ -169,6 +169,11 @@ export const configSchema = z.object({
           maxRequestsPerMinute: z.number().int().min(1).max(30).default(6),
           /** Vangnet: zo vaak (min.) wordt in plaats van de smalle filterpagina's de volledige zoekterm doorlopen, voor advertenties zonder model-/opslagkenmerk */
           fullSearchEveryMinutes: z.number().int().min(1).max(240).default(10),
+          /** Rondlopende planning: maximaal zoveel pagina's per controle (houdt de belasting begrensd bij veel modellen) */
+          pagesPerRun: z.number().int().min(1).max(60).default(12),
+          /** Doelinterval (min) voor prioriteitsmodellen en voor de overige modellen */
+          priorityEveryMinutes: z.number().int().min(1).max(120).default(3),
+          normalEveryMinutes: z.number().int().min(1).max(240).default(20),
         })
         .default({}),
     })
