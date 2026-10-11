@@ -50,7 +50,7 @@ docker compose up --build       # web op :3000, worker en Postgres inbegrepen
 | Zoekprofielen met AND/OR-regelboom (relationeel opgeslagen), snelle filters | ✅ |
 | Telegram (en Discord) meldingen, per profiel, zonder duplicaten | ✅ |
 | E-mail, Web Push | ❌ niet geïmplementeerd |
-| Dashboard (kaarten/tabel, filters, sorteren), detailpagina, light/dark, responsive | ✅ |
+| Dashboard in iSelectStore-stijl (statistiektegels, categorieën, nieuwste deals, realtime meldingen), `/deals` (kaarten/tabel, filters, afstand), `/notifications`, `/stats`, detailpagina, light/dark, responsive | ✅ |
 | Inkoop-/verkoopadministratie + statistieken; verkopen voeden waardering | ✅ |
 | Jobs: wachtrij, retry/backoff, rate limiting, dagelijkse requestlimiet, foutregistratie, statuspagina | ✅ |
 | Beveiliging: login (scrypt + JWT-cookie), server-side autorisatie, CSRF-origincheck, SSRF-bescherming, AES-256-GCM voor geheimen, geheimen nooit terug naar frontend, log-redactie, ad-tekst nooit als instructie | ✅ |

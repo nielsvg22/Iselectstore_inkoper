@@ -30,7 +30,7 @@ export function FiltersBar({ profiles, savedFilters = [] }: { profiles: Array<{ 
     <div className="flex flex-col gap-3">
       <div className="relative">
         <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-        <Input aria-label="Zoek in advertenties" placeholder="Zoek op titel…" className="pl-10" value={q} onChange={(e) => setQ(e.target.value)} />
+        <Input aria-label="Filter op titel" placeholder="Filter op titel…" className="pl-10" value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
         <Select aria-label="Sorteren" value={sp.get("sort") ?? "score"} onChange={(e) => set({ sort: e.target.value === "score" ? null : e.target.value })}>

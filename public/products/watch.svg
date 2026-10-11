@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="84 0 232 400" role="img" aria-label="Apple Watch">
+  <defs>
+    <linearGradient id="band" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#101a30"/><stop offset=".5" stop-color="#27385c"/><stop offset="1" stop-color="#101a30"/></linearGradient>
+    <linearGradient id="case" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d9dce4"/><stop offset=".5" stop-color="#9aa0ae"/><stop offset="1" stop-color="#c9a083"/></linearGradient>
+    <radialGradient id="face" cx=".5" cy=".5" r=".7"><stop offset="0" stop-color="#1a1f2c"/><stop offset="1" stop-color="#05070c"/></radialGradient>
+    <filter id="sh" x="-30%" y="-10%" width="160%" height="130%"><feDropShadow dx="0" dy="14" stdDeviation="12" flood-color="#1a2440" flood-opacity=".3"/></filter>
+  </defs>
+  <g filter="url(#sh)">
+    <path d="M148 8 L252 8 Q262 8 264 18 L272 128 L128 128 L136 18 Q138 8 148 8Z" fill="url(#band)"/>
+    <path d="M128 272 L272 272 L264 382 Q262 392 252 392 L148 392 Q138 392 136 382Z" fill="url(#band)"/>
+    <g stroke="#fff" stroke-opacity=".08"><path d="M144 30 H256 M142 56 H258 M140 82 H260 M140 306 H260 M142 334 H258 M144 360 H256"/></g>
+    <rect x="276" y="168" width="14" height="42" rx="6" fill="#f07a2a"/><rect x="278" y="222" width="8" height="26" rx="4" fill="#b9bfcc"/>
+    <rect x="108" y="112" width="184" height="176" rx="52" fill="url(#case)" stroke="#7d8493" stroke-width="2"/>
+    <rect x="120" y="124" width="160" height="152" rx="42" fill="url(#face)"/>
+    <g stroke="#e9edf7" stroke-opacity=".75" stroke-width="2.5" stroke-linecap="round">
+      <path d="M200 134 v8 M200 258 v8 M130 200 h8 M262 200 h8"/>
+    </g>
+    <g stroke="#f4833a" stroke-width="5" stroke-linecap="round" fill="none"><path d="M200 200 L168 160"/><path d="M200 200 L236 166"/></g>
+    <circle cx="200" cy="200" r="6" fill="#f4833a"/>
+    <path d="M200 200 L200 238" stroke="#f4833a" stroke-width="3" stroke-linecap="round"/>
+    <path d="M120 150 Q124 126 150 124" stroke="#fff" stroke-opacity=".18" stroke-width="3" fill="none" stroke-linecap="round"/>
+  </g>
+</svg>

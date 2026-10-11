@@ -1,0 +1,23 @@
+import { Activity, BarChart3, Bell, Download, LayoutGrid, LineChart, Search, Settings, ShoppingBag, Tag } from "lucide-react";
+
+export const MAIN_NAV = [
+  { href: "/", label: "Dashboard", icon: LayoutGrid },
+  { href: "/profiles", label: "Zoekopdrachten", icon: Search },
+  { href: "/deals", label: "Deals", icon: Tag },
+  { href: "/notifications", label: "Meldingen", icon: Bell },
+  { href: "/stats", label: "Statistieken", icon: BarChart3 },
+  { href: "/settings", label: "Instellingen", icon: Settings },
+] as const;
+
+export const MORE_NAV = [
+  { href: "/purchases", label: "Mijn inkopen", icon: ShoppingBag },
+  { href: "/market", label: "Marktdata", icon: LineChart },
+  { href: "/import", label: "Importeren", icon: Download },
+  { href: "/status", label: "Status", icon: Activity },
+] as const;
+
+export function isActive(path: string, href: string): boolean {
+  if (href === "/") return path === "/";
+  if (href === "/deals") return path.startsWith("/deals") || path.startsWith("/ads");
+  return path === href || path.startsWith(href + "/");
+}

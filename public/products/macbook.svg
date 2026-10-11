@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="16 52 368 248" role="img" aria-label="MacBook">
+  <defs>
+    <linearGradient id="base" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e3e6ed"/><stop offset="1" stop-color="#a9afbd"/></linearGradient>
+    <linearGradient id="w1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff7ac2"/><stop offset=".45" stop-color="#8b4bff"/><stop offset="1" stop-color="#1e3fe0"/></linearGradient>
+    <radialGradient id="g1" cx=".4" cy=".55" r=".5"><stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset=".4" stop-color="#ffc6e6" stop-opacity=".55"/><stop offset="1" stop-color="#ffc6e6" stop-opacity="0"/></radialGradient>
+    <filter id="sh" x="-20%" y="-10%" width="140%" height="150%"><feDropShadow dx="0" dy="14" stdDeviation="11" flood-color="#1a2440" flood-opacity=".3"/></filter>
+    <clipPath id="sc"><rect x="72" y="82" width="256" height="164" rx="6"/></clipPath>
+  </defs>
+  <g filter="url(#sh)">
+    <rect x="62" y="72" width="276" height="184" rx="14" fill="#0a0d15" stroke="#2a3040" stroke-width="2"/>
+    <g clip-path="url(#sc)">
+      <rect x="72" y="82" width="256" height="164" fill="url(#w1)"/>
+      <polygon points="72,246 200,82 328,246" fill="#0a1a6e" opacity=".0"/>
+      <polygon points="328,82 328,246 120,246" fill="#0b1055" opacity=".78"/>
+      <polygon points="328,82 328,170 214,82" fill="#0f7bff" opacity=".8"/>
+      <polygon points="72,82 214,82 72,226" fill="#ff8fd0" opacity=".45"/>
+      <rect x="72" y="82" width="256" height="164" fill="url(#g1)"/>
+    </g>
+    <rect x="182" y="72" width="36" height="9" rx="4.5" fill="#0a0d15"/>
+    <path d="M36 262 L364 262 L352 276 Q350 280 344 280 L56 280 Q50 280 48 276 Z" fill="url(#base)" stroke="#8f96a6" stroke-width="1.5"/>
+    <rect x="160" y="262" width="80" height="6" rx="3" fill="#8f96a6"/>
+    <path d="M48 276 Q50 280 56 280 L344 280 Q350 280 352 276" fill="none" stroke="#fff" stroke-opacity=".55"/>
+  </g>
+</svg>

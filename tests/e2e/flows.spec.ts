@@ -32,7 +32,7 @@ test("toegang: niet-ingelogd wordt doorgestuurd; eerste-account setup werkt eenm
   await page.getByLabel("Wachtwoord").fill(PASSWORD);
   await page.getByRole("button", { name: "Account aanmaken" }).click();
   await expect(page).toHaveURL("/");
-  await expect(page.getByRole("heading", { name: "Beste deals van dit moment" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Populaire categorieën" })).toBeVisible();
   // API zonder sessie => 401
   const r = await request.get("/api/ads");
   expect(r.status()).toBe(401);
@@ -43,6 +43,7 @@ test("toegang: niet-ingelogd wordt doorgestuurd; eerste-account setup werkt eenm
 
 test("lege toestand, daarna demodata laden en gemarkeerd tonen", async ({ page }) => {
   await login(page);
+  await page.goto("/deals");
   await expect(page.getByText("Nog geen advertenties")).toBeVisible();
   await page.screenshot({ path: "tests/e2e/shots/01-leeg.png", fullPage: true });
   await page.getByRole("link", { name: "Importeren" }).first().click();
@@ -50,7 +51,7 @@ test("lege toestand, daarna demodata laden en gemarkeerd tonen", async ({ page }
   await page.getByRole("button", { name: "Voorbeelddata laden" }).click();
   await expect(page.getByText("Voorbeelddata geladen")).toBeVisible({ timeout: 45_000 });
   await page.getByRole("link", { name: "Deals", exact: true }).first().click();
-  await expect(page).toHaveURL("/");
+  await expect(page).toHaveURL("/deals");
   await expect(page.getByText("Demonstratiemodus:")).toBeVisible();
   await expect(page.locator("article").first()).toBeVisible();
   expect(await page.locator("article").count()).toBeGreaterThan(5);
@@ -60,26 +61,31 @@ test("lege toestand, daarna demodata laden en gemarkeerd tonen", async ({ page }
 
 test("dashboard: statistiekkaarten, tabelweergave, sorteren en filteren", async ({ page }) => {
   await login(page);
-  for (const label of ["Nieuw (24 uur)", "Interessante deals", "Potentiële winst", "Gemiddeld rendement", "Controle vereist"]) {
+  for (const label of ["Nieuwe deals", "Gemiddelde marge", "Actieve zoekopdrachten", "Prijsverschil"]) {
     await expect(page.getByText(label, { exact: true })).toBeVisible();
   }
+  await page.setViewportSize({ width: 1672, height: 941 });
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: "tests/e2e/shots/00-dashboard-mockup.png" });
+  await page.goto("/deals");
   await page.getByRole("button", { name: "Tabel" }).click();
   await expect(page).toHaveURL(/view=table/);
   await expect(page.getByRole("columnheader", { name: "Marktwaarde" })).toBeVisible();
   await page.getByLabel("Sorteren").selectOption("profit");
   await expect(page).toHaveURL(/sort=profit/);
   await page.getByRole("button", { name: "Kaarten" }).click();
-  await page.getByLabel("Zoek in advertenties").fill("macbook");
+  await page.getByLabel("Filter op titel").fill("macbook");
   await expect(page).toHaveURL(/q=macbook/);
   const cards = page.locator("article");
   await expect(cards.first()).toBeVisible();
   for (const t of await cards.locator("h3").allTextContents()) expect(t.toLowerCase()).toContain("macbook");
-  await page.getByLabel("Zoek in advertenties").fill("zzzonbestaand");
+  await page.getByLabel("Filter op titel").fill("zzzonbestaand");
   await expect(page.getByText("Geen deals gevonden met deze filters")).toBeVisible();
 });
 
 test("advertentiedetail: analyse, kosten bewerken, correcties, favoriet, gekocht, verkocht", async ({ page }) => {
   await login(page);
+  await page.goto("/deals");
   await page.getByLabel("Sorteren").selectOption("score");
   await page.locator("article a[aria-label^='Analyse van']").first().click();
   await expect(page.getByText("Originele advertentietekst")).toBeVisible();
@@ -135,7 +141,7 @@ test("advertentiedetail: analyse, kosten bewerken, correcties, favoriet, gekocht
 
 test("zoekprofiel aanmaken met filters en AND/OR-groep, bewerken en pauzeren", async ({ page }) => {
   await login(page);
-  await page.getByRole("link", { name: "Zoekprofielen" }).first().click();
+  await page.getByRole("link", { name: "Zoekopdrachten" }).first().click();
   await page.getByRole("link", { name: /Nieuw profiel/ }).click();
   await expect(page.getByLabel("Databron")).toHaveValue("SEARCH");
   await expect(page.getByLabel("Zoektermen")).toBeVisible();
@@ -193,11 +199,11 @@ test("eigen filters: maken in Instellingen met productlijst, toepassen op dashbo
   await expect(page.getByText("2 modellen")).toBeVisible();
   await expect(page.getByText("≤ €900")).toBeVisible();
   // toepassen op het dashboard
-  await page.goto("/");
+  await page.goto("/deals");
   await page.getByLabel("Mijn filters").selectOption({ label: "MacBooks onder €900" });
   await expect(page).toHaveURL(/filter=/);
   await expect(page.getByText(/volgens je filter “MacBooks onder €900”/)).toBeVisible();
-  for (const t of await page.locator("article h3").allTextContents()) expect(t.toLowerCase()).toContain("macbook");
+  await expect.poll(async () => (await page.locator("article h3").allTextContents()).every((t) => t.toLowerCase().includes("macbook"))).toBe(true);
   // laden in een nieuw zoekprofiel
   await page.goto("/profiles/new");
   await page.getByLabel("Laad opgeslagen filter").selectOption({ label: "MacBooks onder €900" });
@@ -258,7 +264,8 @@ test("status, marktdata en thema", async ({ page }) => {
   await expect(page.getByText("Prijs toegevoegd")).toBeVisible();
   // dark mode
   await page.goto("/");
-  await page.getByRole("button", { name: /donkere modus/ }).first().click();
+  await page.getByRole("button", { name: "Accountmenu" }).first().click();
+  await page.getByRole("menuitem", { name: /Donkere modus/ }).click();
   await expect(page.locator("html")).toHaveClass(/dark/);
   await page.screenshot({ path: "tests/e2e/shots/06-dashboard-donker.png" });
   await page.reload();
@@ -270,7 +277,7 @@ test("mobiel: geen horizontale scroll en bottom-navigatie zichtbaar", async ({ b
   const page = await ctx.newPage();
   await login(page);
   await expect(page.getByRole("navigation", { name: "Hoofdnavigatie" }).last()).toBeVisible();
-  for (const path of ["/", "/profiles", "/purchases", "/market", "/import", "/status", "/settings"]) {
+  for (const path of ["/", "/deals", "/notifications", "/stats", "/profiles", "/purchases", "/market", "/import", "/status", "/settings"]) {
     await page.goto(path);
     await page.waitForLoadState("networkidle");
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -287,7 +294,7 @@ test("echte advertentie: knop 'Ga naar advertentie' rechtsboven en scherpe foto'
   const csv = "id;titel;prijs;url;plaats;omschrijving;fotos\nR1;iPhone 14 128GB;450;https://www.marktplaats.nl/v/x/m999-a;Utrecht;Batterij 90% icloud vrij. Ophalen.;https://images.marktplaats.com/api/v1/hz-mp-pro-listing/images/abc?rule=ecg_mp_eps$_82.jpg";
   expect((await page.request.post("/api/import/file", { data: { content: csv } })).status()).toBe(200);
   await page.request.post("/api/jobs/tick", { data: {} });
-  await page.goto("/");
+  await page.goto("/deals");
   await expect(page.locator("article").first()).toBeVisible();
   // kaart gebruikt 726×968 (code 85) i.p.v. de miniatuur (82)
   await expect(page.locator("article img").first()).toHaveAttribute("src", /rule=ecg_mp_eps\$_85\.jpg$/);
@@ -308,7 +315,8 @@ test("echte advertentie: knop 'Ga naar advertentie' rechtsboven en scherpe foto'
 
 test("uitloggen", async ({ page }) => {
   await login(page);
-  await page.getByRole("button", { name: "Uitloggen" }).first().click();
+  await page.getByRole("button", { name: "Accountmenu" }).first().click();
+  await page.getByRole("menuitem", { name: "Uitloggen" }).click();
   await expect(page).toHaveURL(/\/login/);
   await page.goto("/");
   await expect(page).toHaveURL(/\/login/);

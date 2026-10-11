@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="76 10 248 350" role="img" aria-label="iPad">
+  <defs>
+    <linearGradient id="w" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3a2bd0"/><stop offset=".5" stop-color="#b73a9a"/><stop offset="1" stop-color="#ff6a6a"/></linearGradient>
+    <radialGradient id="g" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset=".35" stop-color="#ff9ec7" stop-opacity=".55"/><stop offset="1" stop-color="#ff9ec7" stop-opacity="0"/></radialGradient>
+    <filter id="sh" x="-30%" y="-15%" width="160%" height="140%"><feDropShadow dx="0" dy="14" stdDeviation="12" flood-color="#1a2440" flood-opacity=".3"/></filter>
+    <clipPath id="sc"><rect x="116" y="50" width="168" height="268" rx="12"/></clipPath>
+  </defs>
+  <g filter="url(#sh)">
+    <rect x="100" y="30" width="200" height="308" rx="24" fill="#0b0e16" stroke="#3a4152" stroke-width="2"/>
+    <g clip-path="url(#sc)">
+      <rect x="116" y="50" width="168" height="268" fill="url(#w)"/>
+      <path d="M116 50 C 170 120, 200 180, 150 318 L 116 318Z" fill="#150f4f" opacity=".7"/>
+      <path d="M284 50 L284 318 L 190 318 C 230 230, 240 150, 210 50Z" fill="#0b0b2e" opacity=".7"/>
+      <ellipse cx="200" cy="190" rx="110" ry="46" fill="url(#g)" transform="rotate(-24 200 190)"/>
+    </g>
+    <circle cx="200" cy="40" r="2.6" fill="#2b3142"/>
+    <rect x="100" y="30" width="200" height="308" rx="24" fill="none" stroke="#fff" stroke-opacity=".12"/>
+  </g>
+</svg>

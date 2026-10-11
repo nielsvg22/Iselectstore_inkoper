@@ -3,12 +3,16 @@ import { prisma } from "./db/client";
 import { evaluate, type Group } from "./engines/filters";
 import { contextFromRow } from "./pipeline/context";
 import { getConfig } from "./settings/store";
+import { familiesOf } from "./product-art";
 
 export interface DealFilters {
   q?: string;
   band?: string;
   minScore?: number;
+  /** Categorie-groep (iphone, macbook, …), familie of kommalijst daarvan */
   family?: string;
+  /** Maximale afstand in km (advertenties zonder afstand blijven staan) */
+  maxDistanceKm?: number;
   profileId?: string;
   /** Eigen (opgeslagen) filter: wordt in-memory op de resultaten toegepast */
   savedTree?: Group;
@@ -33,7 +37,8 @@ export async function listDeals(f: DealFilters) {
       userState: f.userState ? (f.userState as never) : { not: "IGNORED" },
       ...(f.q ? { title: { contains: f.q, mode: "insensitive" } } : {}),
       ...(f.review ? { needsManualReview: true } : {}),
-      ...(f.family ? { product: { family: f.family } } : {}),
+      ...(f.family ? { product: { family: { in: f.family.split(",").flatMap((x) => familiesOf(x) ?? [x]) } } } : {}),
+      ...(f.maxDistanceKm ? { OR: [{ distanceKm: null }, { distanceKm: { lte: f.maxDistanceKm } }] } : {}),
       ...(f.profileId ? { matches: { some: { profileId: f.profileId, matched: true } } } : {}),
     },
   };
