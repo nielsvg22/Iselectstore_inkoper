@@ -64,7 +64,7 @@ export async function ingestAd(raw: RawAd, opts: { origin: DataOrigin; isDemo?: 
 
   if (!existing) {
     const ad = await prisma.advertisement.create({
-      data: { ...data, source, externalId: raw.externalId, status: "NEW", prefilteredAt: now, images: { create: imageUrls.slice(0, 12).map((url, position) => ({ url, position })) } },
+      data: { ...data, source, externalId: raw.externalId, status: "NEW", firstSeenAt: now, prefilteredAt: now, images: { create: imageUrls.slice(0, 12).map((url, position) => ({ url, position })) } },
     });
     adId = ad.id;
     created = true;

@@ -144,10 +144,10 @@ export function PushSettings({ initialPrefs, profiles }: { initialPrefs: NotifyP
                 <option value="top">Alleen topdeals</option>
               </Select>
             </Field>
-            <Field label="Minimale winst (€)" htmlFor="np-profit" hint="Leeg = geen ondergrens">
+            <Field label="Alleen melden vanaf winst (€)" htmlFor="np-profit" hint="Leeg = geen ondergrens">
               <Input id="np-profit" type="number" min="0" value={prefs.minProfitEuro ?? ""} onChange={(e) => setPrefs({ ...prefs, minProfitEuro: e.target.value === "" ? null : Number(e.target.value) })} />
             </Field>
-            <Field label="Minimale dealscore" htmlFor="np-score" hint="Leeg = de drempel van het zoekprofiel">
+            <Field label="Alleen melden vanaf dealscore" htmlFor="np-score" hint="Leeg = de drempel van het zoekprofiel">
               <Input id="np-score" type="number" min="0" max="100" value={prefs.minScore ?? ""} onChange={(e) => setPrefs({ ...prefs, minScore: e.target.value === "" ? null : Number(e.target.value) })} />
             </Field>
             <Field label="Telegram" htmlFor="np-tg" hint="Telegram kan ook als alternatief dienen wanneer geen pushapparaat actief is">

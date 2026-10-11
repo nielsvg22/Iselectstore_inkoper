@@ -272,12 +272,80 @@ test("status, marktdata en thema", async ({ page }) => {
   await expect(page.locator("html")).toHaveClass(/dark/);
 });
 
+test("PWA: manifest, service worker en offline-pagina zijn openbaar; installatiehandleiding en pushinstellingen", async ({ page, request }) => {
+  // zonder sessie bereikbaar (vereist voor installeerbaarheid)
+  const m = await request.get("/manifest.webmanifest");
+  expect(m.status()).toBe(200);
+  const manifest = await m.json();
+  expect(manifest).toMatchObject({ display: "standalone", start_url: "/?source=pwa", scope: "/", theme_color: "#1F3049", background_color: "#1F3049" });
+  expect(manifest.icons.map((i: { sizes: string; purpose: string }) => `${i.sizes}:${i.purpose}`)).toEqual(expect.arrayContaining(["192x192:any", "512x512:any", "512x512:maskable"]));
+  for (const i of manifest.icons) expect((await request.get(i.src)).status()).toBe(200);
+  const sw = await request.get("/sw.js");
+  expect(sw.status()).toBe(200);
+  expect(sw.headers()["content-type"]).toContain("javascript");
+  expect(sw.headers()["cache-control"]).toContain("no-cache");
+  const swText = await sw.text();
+  expect(swText).toContain('addEventListener("push"');
+  expect(swText).toContain('addEventListener("notificationclick"');
+  expect(swText).toContain('startsWith("/api/")'); // API-verkeer wordt nooit gecachet
+  expect((await request.get("/offline.html")).status()).toBe(200);
+  expect((await request.get("/icons/apple-touch-icon.png")).status()).toBe(200);
+
+  await login(page);
+  const head = await page.goto("/");
+  expect(head!.status()).toBe(200);
+  await expect(page.locator('link[rel="manifest"]')).toHaveAttribute("href", "/manifest.webmanifest");
+  await expect(page.locator('link[rel="apple-touch-icon"]')).toHaveCount(1);
+  await expect(page.locator('meta[name="apple-mobile-web-app-capable"], meta[name="mobile-web-app-capable"]').first()).toHaveAttribute("content", "yes");
+  // service worker wordt geregistreerd (localhost telt als veilige context)
+  await page.waitForFunction(async () => !!(await navigator.serviceWorker.getRegistration("/")), null, { timeout: 15_000 });
+
+  await page.goto("/install");
+  await expect(page.getByRole("heading", { name: "App installeren" })).toBeVisible();
+  await expect(page.getByText("Zet op beginscherm").first()).toBeVisible();
+
+  await page.goto("/settings");
+  await expect(page.getByRole("heading", { name: "Pushmeldingen" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Pushmeldingen inschakelen" })).toBeVisible();
+  await page.getByLabel("Welke deals").selectOption("top");
+  await page.getByLabel("Alleen melden vanaf winst (€)").fill("120");
+  await page.getByRole("button", { name: "Voorkeuren opslaan" }).click();
+  await expect(page.getByText("Meldingsvoorkeuren opgeslagen")).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel("Welke deals")).toHaveValue("top");
+  await expect(page.getByLabel("Alleen melden vanaf winst (€)")).toHaveValue("120");
+  await page.screenshot({ path: "tests/e2e/shots/11-push-instellingen.png", fullPage: true });
+});
+
+test("filters testen op bestaande advertenties, met uitleg per advertentie; prestatiepagina", async ({ page }) => {
+  await login(page);
+  await page.goto("/profiles/new");
+  await page.getByLabel("Maximale afstand (ophalen)").fill("45");
+  await page.getByLabel("Onbekende afstand").selectOption("exclude");
+  await page.getByRole("switch", { name: /Ver weg toch interessant/ }).click();
+  await page.getByLabel("Minimale winst na verzendkosten").fill("150");
+  await page.getByRole("button", { name: "Test filters" }).click();
+  await expect(page.getByText(/\d+ van \d+ advertenties voldoen aan deze filters/)).toBeVisible({ timeout: 20_000 });
+  const rows = page.locator("ul[class*='divide-y'] button[aria-expanded]");
+  expect(await rows.count()).toBeGreaterThan(0);
+  await rows.last().click();
+  await expect(page.getByText(/nu:/).first()).toBeVisible();
+  await page.screenshot({ path: "tests/e2e/shots/12-filtertest.png", fullPage: true });
+
+  await page.goto("/performance");
+  await expect(page.getByRole("heading", { name: "Prestaties" })).toBeVisible();
+  await expect(page.getByText("Laatste succesvolle controle")).toBeVisible();
+  await expect(page.getByText("Geschatte maximale detectievertraging")).toBeVisible();
+  await expect(page.getByText("Verwerkingstijden (laatste 7 dagen)")).toBeVisible();
+  await page.screenshot({ path: "tests/e2e/shots/13-prestaties.png", fullPage: true });
+});
+
 test("mobiel: geen horizontale scroll en bottom-navigatie zichtbaar", async ({ browser }) => {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
   const page = await ctx.newPage();
   await login(page);
   await expect(page.getByRole("navigation", { name: "Hoofdnavigatie" }).last()).toBeVisible();
-  for (const path of ["/", "/deals", "/notifications", "/stats", "/profiles", "/purchases", "/market", "/import", "/status", "/settings"]) {
+  for (const path of ["/", "/deals", "/notifications", "/stats", "/performance", "/install", "/profiles", "/purchases", "/market", "/import", "/status", "/settings"]) {
     await page.goto(path);
     await page.waitForLoadState("networkidle");
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

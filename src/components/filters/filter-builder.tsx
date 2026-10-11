@@ -104,7 +104,7 @@ export function FilterBuilder({ state, onChange }: { state: FilterState; onChang
               {num("minSellerTrust", "Minimale betrouwbaarheid verkoper", "Onbekend telt nooit als voldoende. Zie uitleg bij de advertentie.", "/100")}
             </div>
             <div className="space-y-3 border-t border-card-border pt-4">
-              <Switch checked={q.farRule.enabled} onChange={(x) => setQuick("farRule", { ...q.farRule, enabled: x })} label="Verder dan de maximale afstand: toch interessant onder voorwaarden (OF-regel)" />
+              <Switch checked={q.farRule.enabled} onChange={(x) => setQuick("farRule", { ...q.farRule, enabled: x })} label="Ver weg toch interessant, mét verzending (OF-regel)" />
               {q.farRule.enabled && (
                 <div className="grid gap-4 sm:grid-cols-2">
                   {q.maxDistance === "" && <p className="text-xs text-warning sm:col-span-2">Vul eerst een maximale afstand in; de OF-regel geldt voor advertenties verder dan die afstand.</p>}
