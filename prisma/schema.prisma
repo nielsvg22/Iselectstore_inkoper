@@ -87,6 +87,7 @@ enum NotificationChannel {
   DISCORD
   EMAIL
   WEBPUSH
+  INAPP
 }
 
 enum NotificationStatus {

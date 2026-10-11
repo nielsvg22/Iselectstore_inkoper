@@ -12,6 +12,8 @@ export const notifyPrefsSchema = z.object({
   profileIds: z.array(z.string()).max(200).default([]),
   quiet: z.object({ enabled: z.boolean().default(false), start: hhmm.default("22:30"), end: hhmm.default("07:00") }).default({}),
   push: z.boolean().default(true),
+  /** Pop-up in de app zodra er een nieuwe advertentie is (als de app open staat) */
+  popup: z.boolean().default(true),
   /** profile = zoals ingesteld per zoekprofiel; fallback = alleen als er geen actief pushapparaat is; off = nooit */
   telegram: z.enum(["profile", "fallback", "off"]).default("profile"),
 });

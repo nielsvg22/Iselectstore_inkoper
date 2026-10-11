@@ -306,6 +306,17 @@ export async function matchProfiles(
           const channels = (p.notifyChannels as string[]).filter((c) => (cfg.notifications.channels as string[]).includes(c));
           for (const ch of channels) await createNotification({ adId, profileId: p.id, userId: p.userId, channel: ch as "TELEGRAM" | "DISCORD", dedupeKey: `${ch}:${adId}:${p.id}`, runAt });
         }
+        // Pop-up in de app: één per gebruiker per advertentie, direct "verzonden" (de geopende app haalt ze op)
+        if (prefs.prefs.popup && passesPrefs(prefs.prefs, { score: meta.score, band: meta.band, netProfitCents: meta.netProfitCents, profileId: p.id }).ok) {
+          const key = `INAPP:${adId}:${p.userId}`;
+          if (!(await prisma.notification.findUnique({ where: { dedupeKey: key } }))) {
+            try {
+              await prisma.notification.create({ data: { adId, profileId: p.id, userId: p.userId, channel: "INAPP", dedupeKey: key, status: "SENT", sentAt: new Date() } });
+            } catch (e) {
+              if ((e as { code?: string }).code !== "P2002") throw e;
+            }
+          }
+        }
         // Web Push: één melding per gebruiker per advertentie (ook als meerdere profielen matchen)
         if (prefs.push && prefs.prefs.push && passesPrefs(prefs.prefs, { score: meta.score, band: meta.band, netProfitCents: meta.netProfitCents, profileId: p.id }).ok) {
           await createNotification({ adId, profileId: p.id, userId: p.userId, channel: "WEBPUSH", dedupeKey: complete ? `WEBPUSH:${adId}:${p.userId}` : `WEBPUSH:${adId}:${p.userId}:p`, runAt: complete ? runAt : runAt, priority: complete ? 30 : 40 });

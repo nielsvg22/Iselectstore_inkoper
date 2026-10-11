@@ -128,3 +128,9 @@ Bij interval 10 min is de **haalbare gemiddelde detectievertraging ≈ 5–6 min
 - Automatisch: `npx vitest run` (379 tests: engines, filters, seller, beleid, prefs, push-API, pipeline, retries, dedupe, Telegram-alternatief, scrape-toegestane paden) en `npx playwright test` (14 scenario's incl. PWA-manifest/SW/offline, filtertest, prestaties, mobiel zonder horizontale scroll).
 - **Door jou op een echte iPhone te doen** (kan ik hier niet): 1) Safari → open portaal (https) → Deel → *Zet op beginscherm*; 2) open via het icoon; 3) Instellingen → Pushmeldingen → inschakelen → *Sta toe*; 4) *Stuur testpush* → melding verschijnt, tik ⇒ app opent `/notifications`; 5) sluit de app volledig, maak een zoekprofiel met lage drempel, wacht op een echte melding ⇒ tik ⇒ opent de deal; 6) test Niet-storen/Focus en stilteperiode; 7) zet Wi-Fi uit ⇒ app toont offline-pagina (geen gegevens gecachet); 8) log uit/in: pushes bij uitgelogde sessie blijven per apparaat bestaan — verwijder het apparaat in Instellingen als je het toestel overdraagt.
 - Controle toegestane bronbeperkingen: `tests/integration/search.test.ts` bewaakt dat alleen robots-toegestane paden worden gebruikt, dat 403/429 niet worden omzeild en dat de pacing blijft gelden.
+
+## In-app pop-up per nieuwe advertentie
+
+Elke nieuwe advertentie die een profiel matcht (na nulmeting, binnen versheidsvenster, voorkeuren van de gebruiker) maakt een `INAPP`-melding.
+De geopende app pollt `/api/notify/feed` elke 5 s en toont een pop-up-kaart (model, prijs, marktwaarde, winst, score, afstand, knoppen naar de deal en Marktplaats).
+Uitzetten kan bij Meldingen → "Pop-up in de app" (`popup`). INAPP-meldingen tellen niet mee in de verzendstatistieken. Werkt alleen terwijl de app open staat; voor gesloten app blijft Web Push nodig.

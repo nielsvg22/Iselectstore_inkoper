@@ -31,7 +31,7 @@ export default async function NotificationsPage() {
                 <Thumb image={n.ad.images[0]?.url ?? null} family={n.ad.product?.family ?? null} size={48} />
                 <span className="min-w-0 flex-1">
                   <span className="line-clamp-1 font-semibold">{n.ad.product?.modelLabel ?? n.ad.title}</span>
-                  <span className="tabular text-sm text-muted">{formatEuro(n.ad.askingPriceCents)} · {n.channel === "TELEGRAM" ? "Telegram" : "Discord"}</span>
+                  <span className="tabular text-sm text-muted">{formatEuro(n.ad.askingPriceCents)} · {({ TELEGRAM: "Telegram", DISCORD: "Discord", WEBPUSH: "Push", INAPP: "Pop-up in de app", EMAIL: "E-mail" } as Record<string, string>)[n.channel] ?? n.channel}</span>
                 </span>
                 <span className="text-right text-sm text-muted">
                   <span className="block font-medium text-foreground">{STATUS[n.status] ?? n.status}</span>

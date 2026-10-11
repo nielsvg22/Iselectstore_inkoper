@@ -1,6 +1,7 @@
 import { FlaskConical } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { LivePopups } from "@/components/notify/live-popups";
 import { BottomNav } from "@/components/shell/bottom-nav";
 import { Sidebar } from "@/components/shell/sidebar";
 import { Topbar } from "@/components/shell/topbar";
@@ -31,6 +32,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         )}
         <main className="fade-up mt-8">{children}</main>
       </div>
+      <LivePopups />
       <BottomNav />
     </div>
   );

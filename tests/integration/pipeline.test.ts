@@ -190,7 +190,7 @@ describe("zoekprofielen, matching en meldingen", () => {
     const prof = await prisma.searchProfile.findUniqueOrThrow({ where: { id: p.id } });
     expect(prof.discoveredCount).toBe(1);
     expect(prof.interestingCount).toBe(1);
-    expect(await prisma.notification.count({ where: { adId } })).toBe(1);
+    expect(await prisma.notification.count({ where: { adId, channel: { not: "INAPP" } } })).toBe(1);
     expect(await prisma.backgroundJob.count({ where: { type: "NOTIFY" } })).toBe(1);
   });
 
@@ -244,7 +244,7 @@ describe("zoekprofielen, matching en meldingen", () => {
     const r = await processJobs(handlers, { maxJobs: 10, types: ["ANALYZE_AD"] });
     expect(r.processed).toBe(1);
     expect(await prisma.dealAnalysis.count()).toBe(1);
-    expect(await prisma.notification.count()).toBe(1);
+    expect(await prisma.notification.count({ where: { channel: { not: "INAPP" } } })).toBe(1);
   });
 });
 

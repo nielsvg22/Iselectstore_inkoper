@@ -176,6 +176,7 @@ export function PushSettings({ initialPrefs, profiles }: { initialPrefs: NotifyP
             <Field label="Tot" htmlFor="np-qe"><Input id="np-qe" type="time" disabled={!prefs.quiet.enabled} value={prefs.quiet.end} onChange={(e) => setPrefs({ ...prefs, quiet: { ...prefs.quiet, end: e.target.value } })} /></Field>
           </div>
           <p className="text-xs text-muted">Meldingen die in de stilteperiode vallen worden niet weggegooid maar verstuurd zodra de stilte eindigt (tijdzone Europe/Amsterdam).</p>
+          <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" className="h-4 w-4 accent-[var(--accent)]" checked={prefs.popup} onChange={(e) => setPrefs({ ...prefs, popup: e.target.checked })} />Pop-up in de app bij elke nieuwe advertentie (zolang de app open staat)</label>
           <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" className="h-4 w-4 accent-[var(--accent)]" checked={prefs.push} onChange={(e) => setPrefs({ ...prefs, push: e.target.checked })} />Pushmeldingen actief voor mijn account (alle apparaten)</label>
           <Button onClick={save} loading={busy === "prefs"}>Voorkeuren opslaan</Button>
         </div>

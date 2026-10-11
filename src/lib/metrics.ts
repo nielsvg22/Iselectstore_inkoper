@@ -57,7 +57,7 @@ export async function getPerformance(days = 7): Promise<PerformanceData> {
     prisma.searchProfile.findMany({ select: { id: true, name: true, active: true, intervalMinutes: true, lastSuccessAt: true, lastError: true, sourceKind: true, sourceConfig: true } }),
     prisma.checkRun.findMany({ where: { startedAt: { gte: since24 } }, select: { ok: true, durationMs: true, pages: true, cacheHits: true } }),
     prisma.advertisement.findMany({ where: { isDemo: false, firstSeenAt: { gte: since } }, select: { firstSeenAt: true, prefilteredAt: true, analyzedAt: true } }),
-    prisma.notification.findMany({ where: { createdAt: { gte: since } }, select: { createdAt: true, sentAt: true, status: true, ad: { select: { firstSeenAt: true, isDemo: true } } } }),
+    prisma.notification.findMany({ where: { createdAt: { gte: since }, channel: { not: "INAPP" } }, select: { createdAt: true, sentAt: true, status: true, ad: { select: { firstSeenAt: true, isDemo: true } } } }),
     prisma.backgroundJob.groupBy({ by: ["status"], _count: { _all: true } }),
   ]);
   const minInterval = (p: { intervalMinutes: number; sourceKind: string }) => (p.sourceKind === "SEARCH" ? Math.max(p.intervalMinutes, cfg.scheduler.minIntervalMinutes) : p.intervalMinutes);
