@@ -185,6 +185,41 @@ export function SettingsForm({ initial, secrets, isAdmin }: { initial: AppConfig
         </Card>
 
         <Card>
+          <CardHeader><div><CardTitle>Snelheid &amp; controle-interval</CardTitle><CardDescription>We controleren Marktplaats periodiek via de toegestane zoekpagina’s — dit is geen realtime. Hoe korter het interval, hoe sneller nieuwe advertenties worden gevonden; houd rekening met de voorwaarden van Marktplaats.</CardDescription></div></CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-3">
+            <Field label="Kortste interval per zoekprofiel (min)" htmlFor="sc-int" hint="Ondergrens 5 minuten."><Input id="sc-int" type="number" min="5" max="1440" value={c.scheduler.minIntervalMinutes} onChange={(e) => set("scheduler", { minIntervalMinutes: Number(e.target.value) })} /></Field>
+            <Field label="Parallelle analyses" htmlFor="sc-con" hint="Alleen analyse/meldingen; ophalen blijft gepaceerd."><Input id="sc-con" type="number" min="1" max="8" value={c.scheduler.concurrency} onChange={(e) => set("scheduler", { concurrency: Number(e.target.value) })} /></Field>
+            <Field label="Gedeelde paginacache (sec)" htmlFor="sc-cache" hint="Profielen met dezelfde zoekterm halen een pagina niet dubbel op."><Input id="sc-cache" type="number" min="0" max="900" value={c.scheduler.pageCacheSeconds} onChange={(e) => set("scheduler", { pageCacheSeconds: Number(e.target.value) })} /></Field>
+            <div className="sm:col-span-3"><Switch checked={c.notifications.requireFullAnalysis} onChange={(v) => set("notifications", { requireFullAnalysis: v })} label="Melding pas versturen na volledige beoordeling (detailpagina opgehaald)" /></div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><div><CardTitle>Afstand &amp; batterij: beleid</CardTitle><CardDescription>Instelbare regels die in de winstberekening en de risico-inschatting worden meegenomen. Per zoekprofiel stel je daarnaast eigen filters in.</CardDescription></div></CardHeader>
+          <CardContent className="space-y-5">
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Field label="Ophalen acceptabel tot (km)" htmlFor="po-km"><Input id="po-km" type="number" min="0" value={c.policies.distance.pickupMaxKm} onChange={(e) => set("policies", { distance: { ...c.policies.distance, pickupMaxKm: Number(e.target.value) } })} /></Field>
+              <Field label="Reiskosten per km, heen en terug (€)" htmlFor="po-km-cost" hint="0 = niet meenemen"><Input id="po-km-cost" type="number" min="0" step="0.01" value={euro(c.policies.distance.transportPerKmCents)} onChange={(e) => set("policies", { distance: { ...c.policies.distance, transportPerKmCents: cents(e.target.value) } })} /></Field>
+              <Field label="Verzendkosten bij verzending (€)" htmlFor="po-ship" hint="Verder dan de grens en verzending mogelijk. 0 = niet meenemen"><Input id="po-ship" type="number" min="0" step="0.01" value={euro(c.policies.distance.shippingCostCents)} onChange={(e) => set("policies", { distance: { ...c.policies.distance, shippingCostCents: cents(e.target.value) } })} /></Field>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Field label="Batterij: uitsluiten onder (%)" htmlFor="po-bex" hint="0 = niet uitsluiten"><Input id="po-bex" type="number" min="0" max="100" value={c.policies.battery.excludeBelowPct} onChange={(e) => set("policies", { battery: { ...c.policies.battery, excludeBelowPct: Number(e.target.value) } })} /></Field>
+              <Field label="Onbekende batterijconditie" htmlFor="po-bun">
+                <Select id="po-bun" value={c.policies.battery.unknown} onChange={(e) => set("policies", { battery: { ...c.policies.battery, unknown: e.target.value as "allow" | "review" | "exclude" } })}>
+                  <option value="allow">Toestaan</option>
+                  <option value="review">Apart beoordelen</option>
+                  <option value="exclude">Uitsluiten</option>
+                </Select>
+              </Field>
+              <Field label="Vervangingskosten batterij (€)" htmlFor="po-brc"><Input id="po-brc" type="number" min="0" step="0.01" value={euro(c.policies.battery.replacementCents)} onChange={(e) => set("policies", { battery: { ...c.policies.battery, replacementCents: cents(e.target.value) } })} /></Field>
+              <Field label="Vervanging relevant onder (%)" htmlFor="po-brb"><Input id="po-brb" type="number" min="0" max="100" value={c.policies.battery.replaceBelowPct} onChange={(e) => set("policies", { battery: { ...c.policies.battery, replaceBelowPct: Number(e.target.value) } })} /></Field>
+              <Field label="Correctie verkoopprijs onder die grens (%)" htmlFor="po-bpc"><Input id="po-bpc" type="number" min="0" max="50" value={c.policies.battery.priceCorrectionPct} onChange={(e) => set("policies", { battery: { ...c.policies.battery, priceCorrectionPct: Number(e.target.value) } })} /></Field>
+              <div className="flex items-end pb-1"><Switch checked={c.policies.battery.deductReplacement} onChange={(v) => set("policies", { battery: { ...c.policies.battery, deductReplacement: v } })} label="Vervangingskosten in winst aftrekken" /></div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
           <CardHeader><div><CardTitle>Toegestane databronnen &amp; verwerkingslimieten</CardTitle></div></CardHeader>
           <CardContent className="space-y-5">
             <div className="grid gap-2.5 sm:grid-cols-2">

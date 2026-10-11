@@ -45,6 +45,7 @@ export async function ingestAd(raw: RawAd, opts: { origin: DataOrigin; isDemo?: 
     distanceKm: raw.distanceKm ?? null,
     category: raw.category ?? null,
     sellerType: raw.sellerType ?? null,
+    ...(raw.seller ? { sellerId: raw.seller.id ?? null, sellerName: raw.seller.name ?? null, sellerVerified: raw.seller.verified ?? null, sellerSignals: { business: raw.seller.business ?? null, anonymous: raw.seller.anonymous ?? null } as Prisma.InputJsonValue } : {}),
     shippingOptions: (raw.shipping ?? []) as Prisma.InputJsonValue,
     conditionText: raw.conditionText ?? null,
     publishedAt: raw.publishedAt ?? null,
@@ -63,7 +64,7 @@ export async function ingestAd(raw: RawAd, opts: { origin: DataOrigin; isDemo?: 
 
   if (!existing) {
     const ad = await prisma.advertisement.create({
-      data: { ...data, source, externalId: raw.externalId, status: "NEW", images: { create: imageUrls.slice(0, 12).map((url, position) => ({ url, position })) } },
+      data: { ...data, source, externalId: raw.externalId, status: "NEW", prefilteredAt: now, images: { create: imageUrls.slice(0, 12).map((url, position) => ({ url, position })) } },
     });
     adId = ad.id;
     created = true;
@@ -101,7 +102,7 @@ export async function ingestAd(raw: RawAd, opts: { origin: DataOrigin; isDemo?: 
 
   if (changed && !duplicateOfId && opts.enqueueAnalysis !== false) {
     await prisma.advertisement.update({ where: { id: adId }, data: { status: "QUEUED" } });
-    await enqueue({ type: "ANALYZE_AD", payload: { adId }, priority: created ? 10 : 5, uniqueKey: `analyze:${adId}:${hash}` });
+    await enqueue({ type: "ANALYZE_AD", payload: { adId }, priority: created ? 20 : 12, uniqueKey: `analyze:${adId}:${hash}` });
   }
   return { adId, created, changed, priceChanged, duplicateOfId };
 }

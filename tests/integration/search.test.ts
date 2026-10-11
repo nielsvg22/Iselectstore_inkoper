@@ -9,6 +9,7 @@ import { saveTree } from "@/lib/pipeline/tree";
 import { processJobs } from "@/lib/jobs/queue";
 import { handlers } from "@/lib/jobs/handlers";
 import { saveConfig } from "@/lib/settings/store";
+import { clearPageCache } from "@/lib/sources/marktplaats-search";
 import { ctx, makeUser, req, resetDb } from "../helpers";
 import { POST as refreshAd } from "@/app/api/ads/[id]/refresh/route";
 
@@ -33,6 +34,11 @@ function stubFetch(over: { searchStatus?: number; page2?: string } = {}) {
   });
 }
 
+/** Verwerkt de asynchrone detail-jobs (nieuwe advertenties worden eerst opgenomen, details volgen). */
+async function drainDetails() {
+  await processJobs(handlers, { maxJobs: 100, types: ["FETCH_DETAIL"], concurrency: 1 });
+}
+
 async function searchProfile(tree: unknown, config: Record<string, unknown> = {}) {
   const { user } = await makeUser();
   const p = await prisma.searchProfile.create({
@@ -45,6 +51,7 @@ async function searchProfile(tree: unknown, config: Record<string, unknown> = {}
 beforeEach(async () => {
   await resetDb();
   vi.unstubAllGlobals();
+  clearPageCache();
   await saveConfig({ limits: { minSecondsBetweenRequests: 0 } });
 });
 
@@ -75,6 +82,7 @@ describe("automatisch zoeken op Marktplaats", () => {
     stubFetch();
     const p = await searchProfile({ op: "AND", children: [] });
     await runProfileCheck(p.id);
+    await drainDetails();
     expect(requested.length).toBeGreaterThan(1);
     for (const path of requested) {
       expect(path).not.toMatch(/\/lrp\/api\/|\/lp\/api\/|^\/search/);
@@ -89,7 +97,10 @@ describe("automatisch zoeken op Marktplaats", () => {
     const r = await runProfileCheck(p.id);
     expect(r.fetched).toBe(3);
     expect(await prisma.advertisement.count()).toBe(3);
-    expect(requested.filter((x) => x.includes("/q/iphone")).length).toBe(2); // één pagina per zoekterm
+    // identieke zoekterm: de tweede keer komt uit de gedeelde paginacache (niet nogmaals bij de bron opgehaald)
+    expect(requested.filter((x) => x.includes("/q/iphone")).length).toBe(1);
+    const run = await prisma.checkRun.findFirstOrThrow({ where: { profileId: p.id } });
+    expect(run).toMatchObject({ ok: true, pages: 1, cacheHits: 1, fetched: 3, created: 3 });
   });
 
   it("tweede run vindt dezelfde advertenties terug zonder dubbelen of nieuwe analyse", async () => {
@@ -107,8 +118,11 @@ describe("automatisch zoeken op Marktplaats", () => {
     stubFetch();
     const p = await searchProfile({ op: "AND", children: [] }, { fetchDetails: true });
     await runProfileCheck(p.id);
-    const firstDetail = requested.filter((x) => x.startsWith("/v/")).length;
-    expect(firstDetail).toBe(3);
+    // de zoekronde zelf haalt géén detailpagina's op: nieuwe advertenties zijn direct opgenomen
+    expect(requested.filter((x) => x.startsWith("/v/")).length).toBe(0);
+    expect(await prisma.backgroundJob.count({ where: { type: "FETCH_DETAIL" } })).toBe(3);
+    await drainDetails();
+    expect(requested.filter((x) => x.startsWith("/v/")).length).toBe(3);
     const ad = await prisma.advertisement.findFirstOrThrow();
     expect(ad.description).toContain("Volledige tekst");
     stubFetch();
@@ -165,6 +179,7 @@ describe("automatisch zoeken op Marktplaats", () => {
     stubFetch();
     const p = await searchProfile({ op: "AND", children: [] }, { fetchDetails: true });
     await runProfileCheck(p.id);
+    await drainDetails();
     const ad = await prisma.advertisement.findFirstOrThrow({ include: { images: { orderBy: { position: "asc" } } } });
     expect(ad.images.length).toBeGreaterThanOrEqual(4);
     expect(ad.detailFetchedAt).toBeTruthy();
@@ -189,17 +204,18 @@ describe("automatisch zoeken op Marktplaats", () => {
     expect(await prisma.backgroundJob.count({ where: { type: "ANALYZE_AD" } })).toBe(jobsBefore);
   });
 
-  it("begrenst het aantal detailpagina's per run en haalt de rest in een volgende run op", async () => {
-    await saveConfig({ limits: { maxDetailsPerRun: 1 } });
+  it("detail-jobs zijn idempotent en een tweede zoekronde zet er geen nieuwe klaar", async () => {
     stubFetch();
     const p = await searchProfile({ op: "AND", children: [] }, { fetchDetails: true });
     await runProfileCheck(p.id);
-    expect(requested.filter((x) => x.startsWith("/v/")).length).toBe(1);
-    expect(await prisma.advertisement.count({ where: { detailFetchedAt: { not: null } } })).toBe(1);
+    await runProfileCheck(p.id); // nog geen details opgehaald: zelfde uniqueKey => geen dubbele jobs
+    expect(await prisma.backgroundJob.count({ where: { type: "FETCH_DETAIL" } })).toBe(3);
+    await drainDetails();
+    expect(await prisma.advertisement.count({ where: { detailFetchedAt: { not: null } } })).toBe(3);
     stubFetch();
     await runProfileCheck(p.id);
-    expect(requested.filter((x) => x.startsWith("/v/")).length).toBe(1);
-    expect(await prisma.advertisement.count({ where: { detailFetchedAt: { not: null } } })).toBe(2);
+    await drainDetails();
+    expect(requested.filter((x) => x.startsWith("/v/")).length).toBe(0);
   });
 
   it("op aanvraag verversen: foto's en tekst van één advertentie worden direct opgehaald", async () => {

@@ -5,7 +5,7 @@ import { resetConfigCache } from "@/lib/settings/store";
 import { resetRateLimits } from "@/lib/security/ratelimit";
 
 export async function resetDb() {
-  await prisma.$executeRawUnsafe(`TRUNCATE "User","SearchProfile","Advertisement","MarketComparable","ValuationHistory","AppSettings","BackgroundJob","SourceHealth","AiUsage","AiCache","AuditLog","Purchase" RESTART IDENTITY CASCADE`);
+  await prisma.$executeRawUnsafe(`TRUNCATE "User","SearchProfile","Advertisement","MarketComparable","ValuationHistory","AppSettings","BackgroundJob","SourceHealth","AiUsage","AiCache","AuditLog","Purchase","CheckRun","PushSubscription" RESTART IDENTITY CASCADE`);
   resetConfigCache();
   resetRateLimits();
 }

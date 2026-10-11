@@ -20,25 +20,45 @@ export interface QuickFilters {
   shipping: "" | "shipping" | "pickup";
   minScore: string;
   maxRisk: "" | "LOW" | "MEDIUM" | "HIGH";
+  /** Onbekende afstand / batterijconditie: doorlaten of uitsluiten */
+  unknownDistance: "allow" | "exclude";
+  unknownBattery: "allow" | "exclude";
+  /** Minimale betrouwbaarheid verkoper (0-100). Onbekend telt nooit als voldoende. */
+  minSellerTrust: string;
+  requireProof: boolean;
+  /** Verder dan de maximale afstand: alleen interessant met verzending, voldoende betrouwbare verkoper en minimale winst (na verzendkosten) */
+  farRule: { enabled: boolean; minProfit: string; minTrust: string };
 }
 
 export const emptyQuick = (): QuickFilters => ({
   models: [], storage: [], maxPrice: "", minProfit: "", minRoi: "", maxDistance: "", minBattery: "", maxAgeHours: "", includeWords: [], excludeWords: [],
   excludeDefects: false, excludeLocked: false, requirePhotos: false, requireInfo: false, newOnly: false, shipping: "", minScore: "", maxRisk: "",
+  unknownDistance: "allow", unknownBattery: "allow", minSellerTrust: "", requireProof: false, farRule: { enabled: false, minProfit: "", minTrust: "" },
 });
 
 const RISK_EXCLUDE: Record<string, string[]> = { LOW: ["MEDIUM", "HIGH", "BLOCKED"], MEDIUM: ["HIGH", "BLOCKED"], HIGH: ["BLOCKED"] };
 const num = (s: string) => Number(s.replace(",", "."));
 
-export function quickToConditions(q: QuickFilters): Condition[] {
-  const c: Condition[] = [];
+export function quickToConditions(q: QuickFilters): Node[] {
+  const c: Node[] = [];
   if (q.models.length) c.push({ field: "modelKey", operator: "in", value: q.models });
   if (q.storage.length) c.push({ field: "storageGb", operator: "in", value: q.storage });
   if (q.maxPrice !== "") c.push({ field: "askingEuro", operator: "lte", value: num(q.maxPrice) });
   if (q.minProfit !== "") c.push({ field: "expectedProfitEuro", operator: "gte", value: num(q.minProfit) });
   if (q.minRoi !== "") c.push({ field: "roiPct", operator: "gte", value: num(q.minRoi) });
-  if (q.maxDistance !== "") c.push({ field: "distanceKm", operator: "lte_if_known", value: num(q.maxDistance) });
-  if (q.minBattery !== "") c.push({ field: "batteryHealth", operator: "gte_if_known", value: num(q.minBattery) });
+  if (q.maxDistance !== "") {
+    const near: Condition = { field: "distanceKm", operator: q.unknownDistance === "exclude" ? "lte" : "lte_if_known", value: num(q.maxDistance) };
+    if (q.farRule.enabled) {
+      // OF-regel: dichtbij, OF verder weg mét verzending, voldoende betrouwbare verkoper en minimale winst
+      const far: Condition[] = [{ field: "distanceKm", operator: "gt", value: num(q.maxDistance) }, { field: "shippingAvailable", operator: "isTrue" }];
+      if (q.farRule.minTrust !== "") far.push({ field: "sellerTrust", operator: "gte", value: num(q.farRule.minTrust) });
+      if (q.farRule.minProfit !== "") far.push({ field: "expectedProfitEuro", operator: "gte", value: num(q.farRule.minProfit) });
+      c.push({ op: "OR", children: [{ op: "AND", children: [near] }, { op: "AND", children: far }] });
+    } else c.push(near);
+  }
+  if (q.minBattery !== "") c.push({ field: "batteryHealth", operator: q.unknownBattery === "exclude" ? "gte" : "gte_if_known", value: num(q.minBattery) });
+  if (q.minSellerTrust !== "") c.push({ field: "sellerTrust", operator: "gte", value: num(q.minSellerTrust) });
+  if (q.requireProof) c.push({ field: "purchaseProof", operator: "eq", value: "yes" });
   if (q.maxAgeHours !== "") c.push({ field: "ageHours", operator: "lte", value: num(q.maxAgeHours) });
   if (q.includeWords.length) c.push({ field: "text", operator: "containsAny", value: q.includeWords });
   if (q.excludeWords.length) c.push({ field: "text", operator: "containsNone", value: q.excludeWords });
@@ -71,6 +91,13 @@ export function treeToQuick(tree: Group): { quick: QuickFilters; groups: Advance
   const loose: Condition[] = [];
   for (const n of tree.children) {
     if (isGroup(n)) {
+      const far = parseFarRule(n);
+      if (far) {
+        quick.maxDistance = far.maxDistance;
+        quick.unknownDistance = far.unknownDistance;
+        quick.farRule = far.rule;
+        continue;
+      }
       groups.push(toGroup(n));
       continue;
     }
@@ -80,8 +107,10 @@ export function treeToQuick(tree: Group): { quick: QuickFilters; groups: Advance
     else if (n.field === "askingEuro" && n.operator === "lte") quick.maxPrice = String(v);
     else if (n.field === "expectedProfitEuro" && n.operator === "gte") quick.minProfit = String(v);
     else if (n.field === "roiPct" && n.operator === "gte") quick.minRoi = String(v);
-    else if (n.field === "distanceKm" && n.operator === "lte_if_known") quick.maxDistance = String(v);
-    else if (n.field === "batteryHealth" && n.operator === "gte_if_known") quick.minBattery = String(v);
+    else if (n.field === "distanceKm" && (n.operator === "lte_if_known" || n.operator === "lte")) { quick.maxDistance = String(v); quick.unknownDistance = n.operator === "lte" ? "exclude" : "allow"; }
+    else if (n.field === "batteryHealth" && (n.operator === "gte_if_known" || n.operator === "gte")) { quick.minBattery = String(v); quick.unknownBattery = n.operator === "gte" ? "exclude" : "allow"; }
+    else if (n.field === "sellerTrust" && n.operator === "gte") quick.minSellerTrust = String(v);
+    else if (n.field === "purchaseProof" && n.operator === "eq" && v === "yes") quick.requireProof = true;
     else if (n.field === "ageHours" && n.operator === "lte") quick.maxAgeHours = String(v);
     else if (n.field === "text" && n.operator === "containsAny") quick.includeWords = (v as string[]) ?? [];
     else if (n.field === "text" && n.operator === "containsNone") quick.excludeWords = (v as string[]) ?? [];
@@ -99,6 +128,24 @@ export function treeToQuick(tree: Group): { quick: QuickFilters; groups: Advance
   }
   if (loose.length) groups.push({ op: "AND", conditions: loose.map((l) => ({ field: l.field, operator: l.operator, value: valueToString(l.value) })) });
   return { quick, groups, rootOp: "AND" };
+}
+
+/** Herkent de door quickToConditions gemaakte "dichtbij OF ver mét verzending"-groep. */
+function parseFarRule(g: Group): { maxDistance: string; unknownDistance: "allow" | "exclude"; rule: QuickFilters["farRule"] } | null {
+  if (g.op !== "OR" || g.children.length !== 2) return null;
+  const [a, b] = g.children;
+  if (!isGroup(a) || !isGroup(b) || a.children.length !== 1 || isGroup(a.children[0])) return null;
+  const near = a.children[0] as Condition;
+  if (near.field !== "distanceKm" || (near.operator !== "lte" && near.operator !== "lte_if_known")) return null;
+  const far = b.children;
+  if (far.some((x) => isGroup(x))) return null;
+  const fc = far as Condition[];
+  const gt = fc.find((x) => x.field === "distanceKm" && x.operator === "gt");
+  if (!gt || gt.value !== near.value || !fc.some((x) => x.field === "shippingAvailable" && x.operator === "isTrue")) return null;
+  const trust = fc.find((x) => x.field === "sellerTrust" && x.operator === "gte");
+  const profit = fc.find((x) => x.field === "expectedProfitEuro" && x.operator === "gte");
+  if (fc.length !== 2 + (trust ? 1 : 0) + (profit ? 1 : 0)) return null;
+  return { maxDistance: String(near.value), unknownDistance: near.operator === "lte" ? "exclude" : "allow", rule: { enabled: true, minProfit: profit ? String(profit.value) : "", minTrust: trust ? String(trust.value) : "" } };
 }
 
 function toGroup(g: Group): AdvancedGroup {
@@ -136,7 +183,9 @@ export function summarizeFilter(q: QuickFilters, groups: AdvancedGroup[]): strin
   if (q.maxPrice) out.push(`≤ €${q.maxPrice}`);
   if (q.minProfit) out.push(`winst ≥ €${q.minProfit}`);
   if (q.minRoi) out.push(`rendement ≥ ${q.minRoi}%`);
-  if (q.maxDistance) out.push(`≤ ${q.maxDistance} km`);
+  if (q.maxDistance) out.push(`≤ ${q.maxDistance} km${q.unknownDistance === "exclude" ? " (afstand verplicht)" : ""}${q.farRule.enabled ? ` of ver mét verzending${q.farRule.minProfit ? ` en winst ≥ €${q.farRule.minProfit}` : ""}` : ""}`);
+  if (q.minSellerTrust) out.push(`verkoper ≥ ${q.minSellerTrust}`);
+  if (q.requireProof) out.push("aankoopbewijs");
   if (q.minBattery) out.push(`batterij ≥ ${q.minBattery}%`);
   if (q.maxAgeHours) out.push(`≤ ${q.maxAgeHours} uur oud`);
   if (q.minScore) out.push(`score ≥ ${q.minScore}`);

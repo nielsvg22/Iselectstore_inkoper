@@ -109,6 +109,13 @@ export function mapSearchListing(o: Obj, now = new Date()): RawAd | null {
     distanceKm: dist,
     category: Array.isArray(o.verticals) ? str((o.verticals as unknown[])[0]) : null,
     sellerType: seller.isVerified ? "verified" : null,
+    seller: {
+      id: seller.sellerId != null ? String(seller.sellerId) : null,
+      name: str(seller.sellerName),
+      verified: typeof seller.isVerified === "boolean" ? seller.isVerified : null,
+      business: Array.isArray(o.traits) ? (o.traits as unknown[]).includes("VERIFIED_SELLER") || (o.traits as unknown[]).includes("SELLER_PROFILE_URL") : null,
+      anonymous: str(seller.sellerName)?.toLowerCase() === "anoniem" || seller.sellerId === 1,
+    },
     shipping,
     conditionText: attrs.condition ?? null,
     publishedAt: parseListingDate(o.date, now),
@@ -151,6 +158,7 @@ export function mergeDetail(list: RawAd, detail: RawAd): RawAd {
     // Detailpagina eerst: die heeft de volledige fotoset; zoekresultaat-foto's vullen alleen aan
     imageUrls: mergeImages(detail.imageUrls.map((u) => hiRes(u, "full")), list.imageUrls).slice(0, 20),
     detailLoaded: true,
+    seller: list.seller ?? detail.seller,
     askingCents: list.askingCents ?? detail.askingCents ?? null,
     location: list.location ?? detail.location ?? null,
   };
@@ -158,11 +166,32 @@ export function mergeDetail(list: RawAd, detail: RawAd): RawAd {
 
 const throttle = new Throttle(3000);
 
+/** Gedeelde paginacache: profielen met dezelfde zoekterm/categorie halen een pagina niet dubbel op. */
+const pageCache = new Map<string, { at: number; status: number; text: string }>();
+export function clearPageCache() {
+  pageCache.clear();
+}
+async function cachedPage(url: string, ttlMs: number, load: () => Promise<{ status: number; text: string }>, stats?: { pages: number; cacheHits: number }) {
+  const hit = ttlMs > 0 ? pageCache.get(url) : undefined;
+  if (hit && Date.now() - hit.at < ttlMs) {
+    if (stats) stats.cacheHits++;
+    return hit;
+  }
+  const r = await load();
+  if (stats) stats.pages++;
+  const entry = { at: Date.now(), status: r.status, text: r.text };
+  if (ttlMs > 0 && r.status < 400) {
+    pageCache.set(url, entry);
+    if (pageCache.size > 200) for (const [k, v] of pageCache) if (Date.now() - v.at > ttlMs) pageCache.delete(k);
+  }
+  return entry;
+}
+
 export const searchAdapter: SourceAdapter = {
   id: "marktplaats-search",
   label: "Zoeken op Marktplaats",
   origin: "SEARCH",
-  minIntervalMinutes: 30,
+  minIntervalMinutes: 5,
   automatic: true,
   description:
     "Zoekt automatisch op door jou ingestelde zoektermen (en categorie) via de publieke zoekpagina's van Marktplaats en haalt alle resultaten op. Respecteert robots.txt (de verboden zoek-API wordt niet gebruikt), wacht minstens 3 seconden tussen requests en omzeilt geen blokkades.",
@@ -178,7 +207,7 @@ export const searchAdapter: SourceAdapter = {
     outer: for (const q of sc.queries) {
       for (let page = 1; page <= sc.maxPages; page++) {
         const url = buildSearchUrl(q, sc.category || undefined, page);
-        const res = await safeFetch(url, { allowlist: cfg.sources.urlAllowlist, respectRobots: true, fetchImpl: ctx.fetchImpl, lookup: ctx.lookup, throttle: th, maxBytes: 4_000_000 });
+        const res = await cachedPage(url, ctx.fetchImpl ? 0 : cfg.scheduler.pageCacheSeconds * 1000, () => safeFetch(url, { allowlist: cfg.sources.urlAllowlist, respectRobots: true, fetchImpl: ctx.fetchImpl, lookup: ctx.lookup, throttle: th, maxBytes: 4_000_000 }), ctx.stats);
         pagesFetched++;
         if (res.status === 404) break;
         if (res.status === 401 || res.status === 403 || res.status === 429) {
@@ -198,7 +227,7 @@ export const searchAdapter: SourceAdapter = {
 
     // Volledige tekst + alle foto's van de detailpagina voor advertenties waarvan we die nog niet hebben
     // (nieuw, of eerder niet aan de beurt gekomen door de limiet). Nieuwste eerst, begrensd per run.
-    if (sc.fetchDetails && ads.length) {
+    if (sc.fetchDetails && !ctx.deferDetails && ads.length) {
       const known = await prisma.advertisement.findMany({ where: { source: "marktplaats", externalId: { in: ads.map((a) => a.externalId) } }, select: { externalId: true, detailFetchedAt: true } });
       const done = new Set(known.filter((k) => k.detailFetchedAt).map((k) => k.externalId));
       const todo = ads.filter((a) => !done.has(a.externalId)).slice(0, cfg.limits.maxDetailsPerRun);

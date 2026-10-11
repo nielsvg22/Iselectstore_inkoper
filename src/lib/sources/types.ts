@@ -11,6 +11,8 @@ export interface RawAd {
   distanceKm?: number | null;
   category?: string | null;
   sellerType?: string | null;
+  /** Alleen wat de bron zelf levert; ontbrekende gegevens blijven null (nooit aannemen) */
+  seller?: { id?: string | null; name?: string | null; verified?: boolean | null; business?: boolean | null; anonymous?: boolean | null };
   shipping?: string[];
   conditionText?: string | null;
   publishedAt?: Date | null;
@@ -28,6 +30,10 @@ export interface FetchContext {
   maxAds: number;
   /** Goedkope voorselectie (op basis van het profiel) zodat niet alles wordt opgeslagen/geanalyseerd */
   prefilter?: (ad: RawAd) => boolean;
+  /** Detailpagina's niet binnen de zoekrun ophalen (gebeurt dan asynchroon via FETCH_DETAIL-jobs) */
+  deferDetails?: boolean;
+  /** Wordt door de bron ingevuld: aantal opgehaalde pagina's en cache-treffers */
+  stats?: { pages: number; cacheHits: number };
   /** Alleen voor tests */
   fetchImpl?: typeof fetch;
   lookup?: (host: string) => Promise<string[]>;

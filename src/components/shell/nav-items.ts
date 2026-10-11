@@ -1,4 +1,4 @@
-import { Activity, BarChart3, Bell, Download, LayoutGrid, LineChart, Search, Settings, ShoppingBag, Tag } from "lucide-react";
+import { Activity, BarChart3, Gauge, Smartphone, Bell, Download, LayoutGrid, LineChart, Search, Settings, ShoppingBag, Tag } from "lucide-react";
 
 export const MAIN_NAV = [
   { href: "/", label: "Dashboard", icon: LayoutGrid },
@@ -13,7 +13,9 @@ export const MORE_NAV = [
   { href: "/purchases", label: "Mijn inkopen", icon: ShoppingBag },
   { href: "/market", label: "Marktdata", icon: LineChart },
   { href: "/import", label: "Importeren", icon: Download },
+  { href: "/performance", label: "Prestaties", icon: Gauge },
   { href: "/status", label: "Status", icon: Activity },
+  { href: "/install", label: "App installeren", icon: Smartphone },
 ] as const;
 
 export function isActive(path: string, href: string): boolean {

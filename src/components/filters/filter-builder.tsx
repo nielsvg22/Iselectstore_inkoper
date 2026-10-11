@@ -8,7 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Field, Input, Select, Switch } from "@/components/ui/form";
 import { cn } from "@/lib/cn";
 import { FIELD_DEFS } from "@/lib/engines/filters";
-import type { AdvancedGroup, QuickFilters } from "@/lib/profile-quick";
+import { FilterTestPanel } from "@/components/filters/filter-test-panel";
+import { buildTree, type AdvancedGroup, type QuickFilters } from "@/lib/profile-quick";
 
 export interface FilterState {
   quick: QuickFilters;
@@ -16,7 +17,7 @@ export interface FilterState {
 }
 
 const OP_LABEL: Record<string, string> = {
-  eq: "is gelijk aan", neq: "is niet gelijk aan", in: "is één van", nin: "is geen van", gte: "≥", lte: "≤", between: "tussen (min, max)", gte_if_known: "≥ (indien bekend)", lte_if_known: "≤ (indien bekend)",
+  eq: "is gelijk aan", neq: "is niet gelijk aan", in: "is één van", nin: "is geen van", gte: "≥", lte: "≤", gt: ">", lt: "<", between: "tussen (min, max)", gte_if_known: "≥ (indien bekend)", lte_if_known: "≤ (indien bekend)",
   containsAny: "bevat één van", containsAll: "bevat alle", containsNone: "bevat geen van", isTrue: "is waar", isFalse: "is onwaar", isKnown: "is bekend",
 };
 
@@ -61,8 +62,8 @@ export function FilterBuilder({ state, onChange }: { state: FilterState; onChang
             {num("maxPrice", "Maximale inkoopprijs", undefined, "€")}
             {num("minProfit", "Minimale verwachte winst", undefined, "€")}
             {num("minRoi", "Minimaal rendement", undefined, "%")}
-            {num("maxDistance", "Maximale afstand", "Advertenties zonder afstand komen door.", "km")}
-            {num("minBattery", "Batterijconditie minimaal", "Alleen getoetst als bekend.", "%")}
+            {num("maxDistance", "Maximale afstand (ophalen)", "Bijv. 45 km. Zie hieronder voor verder weg.", "km")}
+            {num("minBattery", "Batterijconditie minimaal", undefined, "%")}
             {num("maxAgeHours", "Maximale advertentieleeftijd", undefined, "uur")}
             {num("minScore", "Minimale dealscore", undefined, "/100")}
             <Field label="Maximale risico-inschatting" htmlFor="q-risk">
@@ -85,7 +86,40 @@ export function FilterBuilder({ state, onChange }: { state: FilterState; onChang
             <Field label="Inclusiezoekwoorden (minstens één)" htmlFor="q-inc"><Chips id="q-inc" value={q.includeWords} onChange={(w) => setQuick("includeWords", w)} placeholder="bijv. zgan" /></Field>
             <Field label="Uitsluitingszoekwoorden" htmlFor="q-exc"><Chips id="q-exc" value={q.excludeWords} onChange={(w) => setQuick("excludeWords", w)} placeholder="bijv. defect, kapot" /></Field>
           </div>
+          <div className="space-y-4 rounded-2xl border border-border p-4">
+            <p className="text-sm font-semibold">Afstand, batterij &amp; verkoper</p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Onbekende afstand" htmlFor="q-ud">
+                <Select id="q-ud" value={q.unknownDistance} onChange={(e) => setQuick("unknownDistance", e.target.value as QuickFilters["unknownDistance"])}>
+                  <option value="allow">Doorlaten (apart beoordelen)</option>
+                  <option value="exclude">Uitsluiten</option>
+                </Select>
+              </Field>
+              <Field label="Onbekende batterijconditie" htmlFor="q-ub">
+                <Select id="q-ub" value={q.unknownBattery} onChange={(e) => setQuick("unknownBattery", e.target.value as QuickFilters["unknownBattery"])}>
+                  <option value="allow">Doorlaten (apart beoordelen)</option>
+                  <option value="exclude">Uitsluiten</option>
+                </Select>
+              </Field>
+              {num("minSellerTrust", "Minimale betrouwbaarheid verkoper", "Onbekend telt nooit als voldoende. Zie uitleg bij de advertentie.", "/100")}
+            </div>
+            <div className="space-y-3 border-t border-card-border pt-4">
+              <Switch checked={q.farRule.enabled} onChange={(x) => setQuick("farRule", { ...q.farRule, enabled: x })} label="Verder dan de maximale afstand: toch interessant onder voorwaarden (OF-regel)" />
+              {q.farRule.enabled && (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {q.maxDistance === "" && <p className="text-xs text-warning sm:col-span-2">Vul eerst een maximale afstand in; de OF-regel geldt voor advertenties verder dan die afstand.</p>}
+                  <Field label="Minimale winst na verzendkosten" htmlFor="q-far-profit" hint="De verwachte winst houdt al rekening met ingestelde verzend-/transportkosten.">
+                    <Input id="q-far-profit" type="number" min="0" value={q.farRule.minProfit} onChange={(e) => setQuick("farRule", { ...q.farRule, minProfit: e.target.value })} />
+                  </Field>
+                  <Field label="Minimale betrouwbaarheid verkoper" htmlFor="q-far-trust" hint="Verzending moet mogelijk zijn. Leeg = geen eis aan betrouwbaarheid.">
+                    <Input id="q-far-trust" type="number" min="0" max="100" value={q.farRule.minTrust} onChange={(e) => setQuick("farRule", { ...q.farRule, minTrust: e.target.value })} />
+                  </Field>
+                </div>
+              )}
+            </div>
+          </div>
           <div className="grid gap-3 sm:grid-cols-2">
+            {check("requireProof", "Alleen met vermeld aankoopbewijs")}
             {check("excludeDefects", "Defecte producten uitsluiten")}
             {check("excludeLocked", "iCloud-/MDM-vergrendeling uitsluiten")}
             {check("requirePhotos", "Alleen advertenties met foto's")}
@@ -139,6 +173,7 @@ export function FilterBuilder({ state, onChange }: { state: FilterState; onChang
         </CardContent>
       </Card>
 
+          <FilterTestPanel tree={buildTree(state.quick, state.groups, FIELD_DEFS)} />
     </>
   );
 }

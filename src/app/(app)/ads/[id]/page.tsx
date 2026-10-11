@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AdActions } from "@/components/ad/ad-actions";
+import { SellerCard } from "@/components/ad/seller-card";
 import { AutoEnrich } from "@/components/ad/auto-enrich";
 import { CorrectionsForm, CostEditor, NotesEditor } from "@/components/ad/ad-editors";
 import { PriceHistoryChart } from "@/components/ad/charts";
@@ -21,6 +22,7 @@ import { getConfig } from "@/lib/settings/store";
 import type { RiskFlag } from "@/lib/types";
 import type { ProfitBreakdown } from "@/lib/engines/profit";
 import type { ScoreFactor } from "@/lib/engines/scoring";
+import type { SellerAssessment } from "@/lib/engines/seller";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Analyse" };
@@ -59,7 +61,7 @@ export default async function AdDetailPage({ params }: { params: Promise<{ id: s
   if (!d) notFound();
   const cfg = await getConfig();
   const { ad, current: a, valuations, comparables, similar } = d;
-  const costs = a?.costs as unknown as { expected: ProfitBreakdown; conservative: ProfitBreakdown; optimistic: ProfitBreakdown; valuationSteps: string[]; repairCents: number; maxBidConservativeCents: number } | undefined;
+  const costs = a?.costs as unknown as { expected: ProfitBreakdown; conservative: ProfitBreakdown; optimistic: ProfitBreakdown; valuationSteps: string[]; repairCents: number; maxBidConservativeCents: number; seller?: SellerAssessment; distance?: { note: string }; battery?: { notes: string[] } } | undefined;
   const flags = (ad.risk?.flags ?? []) as unknown as RiskFlag[];
   const breakdown = a?.scoreBreakdown as unknown as { factors: ScoreFactor[]; adjustments: Array<{ label: string; delta?: number; cap?: number }> } | undefined;
   const priceKnown = ad.askingPriceCents != null && ad.askingPriceCents > 0;
@@ -81,6 +83,7 @@ export default async function AdDetailPage({ params }: { params: Promise<{ id: s
             {ad.isDemo && <Badge tone="warning">Voorbeelddata</Badge>}
             {ad.duplicateOfId && <Badge tone="neutral">Mogelijk duplicaat</Badge>}
             {ad.needsManualReview && <Badge tone="warning">Handmatige controle vereist</Badge>}
+            {!ad.isDemo && ad.origin === "SEARCH" && !ad.detailFetchedAt && <Badge tone="warning">Voorlopige beoordeling</Badge>}
           </div>
           <h1 className="mt-2 text-[28px] font-semibold leading-tight tracking-tight sm:text-[34px]">{ad.product?.modelLabel ?? ad.title}</h1>
           <p className="mt-1 text-muted">{ad.title}</p>
@@ -255,6 +258,8 @@ export default async function AdDetailPage({ params }: { params: Promise<{ id: s
             <CardHeader><CardTitle>Prijshistorie</CardTitle></CardHeader>
             <CardContent><PriceHistoryChart data={chartData} /></CardContent>
           </Card>
+
+          <SellerCard seller={costs?.seller ?? null} notes={[...(costs?.distance?.note ? [costs.distance.note] : []), ...(costs?.battery?.notes ?? [])]} />
 
           <Card id="kosten">
             <CardHeader><div><CardTitle>Kosten bewerken</CardTitle><CardDescription>Laat leeg om de standaardwaarden uit de instellingen te gebruiken{costs ? `. Automatisch geschatte reparatiekosten: ${formatEuro(costs.repairCents)}` : ""}.</CardDescription></div></CardHeader>

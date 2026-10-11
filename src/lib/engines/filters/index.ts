@@ -26,9 +26,18 @@ export interface FilterContext {
   riskLevel: string | null;
   blocked: boolean;
   location: string | null;
+  /** 0–100; null = onvoldoende gegevens (nooit automatisch "betrouwbaar") */
+  sellerTrust: number | null;
+  sellerTrustLevel: string | null;
+  sellerVerified: boolean | null;
+  shippingAvailable: boolean;
+  pickupAvailable: boolean;
+  batteryKnown: boolean;
+  /** "yes" = aankoopbewijs genoemd, "no" = expliciet niet, null = niet vermeld */
+  purchaseProof: string | null;
 }
 
-export type Operator = "eq" | "neq" | "in" | "nin" | "gte" | "lte" | "between" | "gte_if_known" | "lte_if_known" | "containsAny" | "containsAll" | "containsNone" | "isTrue" | "isFalse" | "isKnown";
+export type Operator = "eq" | "neq" | "in" | "nin" | "gte" | "lte" | "between" | "gte_if_known" | "lte_if_known" | "gt" | "lt" | "containsAny" | "containsAll" | "containsNone" | "isTrue" | "isFalse" | "isKnown";
 
 export interface Condition {
   field: string;
@@ -53,7 +62,7 @@ export interface FieldDef {
   help?: string;
 }
 
-const NUM_OPS: Operator[] = ["gte", "lte", "between", "eq", "gte_if_known", "lte_if_known", "isKnown"];
+const NUM_OPS: Operator[] = ["gte", "lte", "gt", "lt", "between", "eq", "gte_if_known", "lte_if_known", "isKnown"];
 export const FIELD_DEFS: FieldDef[] = [
   { key: "modelKey", label: "Productmodel", type: "string", operators: ["in", "nin", "eq", "neq"], help: "bijv. iphone-15-pro" },
   { key: "family", label: "Productfamilie", type: "string", operators: ["in", "nin", "eq", "neq"] },
@@ -76,6 +85,13 @@ export const FIELD_DEFS: FieldDef[] = [
   { key: "score", label: "Dealscore", type: "number", operators: ["gte", "lte", "between"] },
   { key: "riskScore", label: "Risicoscore (0-100)", type: "number", operators: ["lte", "gte"] },
   { key: "riskLevel", label: "Risiconiveau", type: "string", operators: ["in", "nin", "eq", "neq"], help: "LOW, MEDIUM, HIGH, BLOCKED" },
+  { key: "sellerTrust", label: "Betrouwbaarheid verkoper (0-100)", type: "number", operators: ["gte", "lte", "isKnown"], help: "Onbekend = onvoldoende gegevens; telt nooit als betrouwbaar" },
+  { key: "sellerTrustLevel", label: "Betrouwbaarheidsniveau verkoper", type: "string", operators: ["in", "nin", "eq", "neq"], help: "HIGH, MEDIUM, LOW, UNKNOWN" },
+  { key: "sellerVerified", label: "Verkoper geverifieerd (platform)", type: "boolean", operators: ["isTrue", "isFalse"] },
+  { key: "shippingAvailable", label: "Verzending mogelijk", type: "boolean", operators: ["isTrue", "isFalse"] },
+  { key: "pickupAvailable", label: "Ophalen mogelijk", type: "boolean", operators: ["isTrue", "isFalse"] },
+  { key: "batteryKnown", label: "Batterijconditie bekend", type: "boolean", operators: ["isTrue", "isFalse"] },
+  { key: "purchaseProof", label: "Aankoopbewijs", type: "string", operators: ["eq", "neq", "in", "isKnown"], help: "yes, no (leeg = niet vermeld)" },
   { key: "location", label: "Plaats", type: "string", operators: ["containsAny", "containsNone", "eq", "in"] },
 ];
 
@@ -109,6 +125,10 @@ export function evalCondition(c: Condition, ctx: FilterContext): boolean {
       return typeof raw === "number" && raw >= Number(val);
     case "lte":
       return typeof raw === "number" && raw <= Number(val);
+    case "gt":
+      return typeof raw === "number" && raw > Number(val);
+    case "lt":
+      return typeof raw === "number" && raw < Number(val);
     case "gte_if_known":
       return raw == null || (typeof raw === "number" && raw >= Number(val));
     case "lte_if_known":
@@ -147,7 +167,54 @@ export function evaluate(node: Node, ctx: FilterContext): boolean {
   return node.op === "AND" ? node.children.every((c) => evaluate(c, ctx)) : node.children.some((c) => evaluate(c, ctx));
 }
 
-const operators = ["eq", "neq", "in", "nin", "gte", "lte", "between", "gte_if_known", "lte_if_known", "containsAny", "containsAll", "containsNone", "isTrue", "isFalse", "isKnown"] as const;
+const OP_TEXT: Record<string, string> = {
+  eq: "=", neq: "≠", in: "is één van", nin: "is geen van", gte: "≥", lte: "≤", gt: ">", lt: "<", between: "tussen", gte_if_known: "≥ (indien bekend)", lte_if_known: "≤ (indien bekend)",
+  containsAny: "bevat één van", containsAll: "bevat alle", containsNone: "bevat geen van", isTrue: "is waar", isFalse: "is onwaar", isKnown: "is bekend",
+};
+
+export interface Explained {
+  pass: boolean;
+  kind: "group" | "condition";
+  op?: "AND" | "OR";
+  label: string;
+  /** werkelijke waarde van de advertentie (alleen bij voorwaarden) */
+  actual?: string;
+  children?: Explained[];
+}
+
+function showValue(field: string, v: unknown): string {
+  if (v == null || v === "") return "onbekend";
+  const def = FIELD_DEFS.find((f) => f.key === field);
+  if (Array.isArray(v)) return v.length ? v.join(", ") : "geen";
+  if (typeof v === "number") return `${Math.round(v * 100) / 100}${def?.unit ? ` ${def.unit}` : ""}`;
+  if (typeof v === "boolean") return v ? "ja" : "nee";
+  const t = String(v);
+  return t.length > 60 ? t.slice(0, 57) + "…" : t;
+}
+
+/** Zelfde uitkomst als evaluate(), maar met per voorwaarde de werkelijke waarde (voor "waarom wel/niet?"). */
+export function explain(node: Node, ctx: FilterContext): Explained {
+  if (!isGroup(node)) {
+    const def = FIELD_DEFS.find((f) => f.key === node.field);
+    const exp = node.operator === "isTrue" || node.operator === "isFalse" || node.operator === "isKnown" ? "" : ` ${Array.isArray(node.value) ? node.value.join("/") : String(node.value ?? "")}`;
+    return { kind: "condition", pass: evalCondition(node, ctx), label: `${def?.label ?? node.field} ${OP_TEXT[node.operator] ?? node.operator}${exp}`, actual: node.field === "text" ? undefined : showValue(node.field, fieldValue(ctx, node.field)) };
+  }
+  const children = node.children.map((c) => explain(c, ctx));
+  const pass = !children.length || (node.op === "AND" ? children.every((c) => c.pass) : children.some((c) => c.pass));
+  return { kind: "group", op: node.op, pass, label: node.op === "AND" ? "Alle voorwaarden" : "Minstens één van", children };
+}
+
+/** Vlakke lijst van de voorwaarden die de advertentie doen falen (kort, voor lijstweergave). */
+export function failedReasons(e: Explained): string[] {
+  if (e.pass) return [];
+  if (e.kind === "condition") return [`${e.label} — nu: ${e.actual}`];
+  const kids = e.children ?? [];
+  if (e.op === "AND") return kids.flatMap(failedReasons);
+  // OR: alle takken faalden; toon per tak de belangrijkste reden
+  return kids.length ? [`Geen van de alternatieven voldoet: ${kids.map((k) => (k.kind === "group" ? `(${failedReasons(k).join("; ")})` : `${k.label} — nu: ${k.actual}`)).join(" OF ")}`] : [];
+}
+
+const operators = ["eq", "neq", "in", "nin", "gte", "lte", "gt", "lt", "between", "gte_if_known", "lte_if_known", "containsAny", "containsAll", "containsNone", "isTrue", "isFalse", "isKnown"] as const;
 const validFields = new Set(FIELD_DEFS.map((f) => f.key));
 
 export const conditionSchema = z.object({

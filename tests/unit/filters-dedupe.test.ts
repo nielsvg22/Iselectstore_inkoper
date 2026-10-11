@@ -5,7 +5,8 @@ import { contentHash, findDuplicate, fingerprint, jaccard } from "@/lib/engines/
 const ctx = (o: Partial<FilterContext> = {}): FilterContext => ({
   modelKey: "iphone-15-pro", family: "iphone", modelLabel: "iPhone 15 Pro", storageGb: 256, ramGb: null, batteryHealth: 91, askingCents: 35000, expectedProfitCents: 15000, roiPct: 42.9,
   maxBidCents: 40000, distanceKm: 34, ageHours: 2, text: "iphone 15 pro 256gb icloud vrij", photoCount: 3, descriptionLength: 120, shipping: ["pickup", "shipping"], condition: "A",
-  hasDefect: false, activationLock: "clear", mdm: false, score: 93, riskScore: 10, riskLevel: "LOW", blocked: false, location: "Utrecht", ...o,
+  hasDefect: false, activationLock: "clear", mdm: false, score: 93, riskScore: 10, riskLevel: "LOW", blocked: false, location: "Utrecht",
+  sellerTrust: null, sellerTrustLevel: "UNKNOWN", sellerVerified: null, shippingAvailable: true, pickupAvailable: true, batteryKnown: true, purchaseProof: null, ...o,
 });
 
 const profileTree: Group = {

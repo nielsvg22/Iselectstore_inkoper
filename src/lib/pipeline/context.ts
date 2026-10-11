@@ -7,9 +7,11 @@ interface Row {
   maxBidCents: number;
   score: number;
   blocked: boolean;
+  costs?: unknown;
   ad: {
     title: string;
     description: string;
+    sellerVerified?: boolean | null;
     askingPriceCents: number | null;
     location: string | null;
     distanceKm: number | null;
@@ -27,6 +29,8 @@ const DEFECT_VALUES = ["SCREEN_DAMAGE", "BACK_DAMAGE", "CAMERA_DAMAGE", "SEVERE_
 /** Bouwt de filtercontext uit opgeslagen database-rijen (voor eigen filters op het dashboard). */
 export function contextFromRow(r: Row, now = new Date()): FilterContext {
   const specs = r.ad.product?.specs ?? [];
+  const seller = (r.costs as { seller?: { level?: string; score?: number } } | null | undefined)?.seller;
+  const shipping = (Array.isArray(r.ad.shippingOptions) ? r.ad.shippingOptions : []) as string[];
   const known = (k: string) => specs.find((s) => s.key === k && s.source !== "UNKNOWN");
   const num = (k: string) => {
     const v = known(k);
@@ -51,7 +55,7 @@ export function contextFromRow(r: Row, now = new Date()): FilterContext {
     text: `${r.ad.title} ${r.ad.description}`.toLowerCase(),
     photoCount: r.ad._count.images,
     descriptionLength: r.ad.description.length,
-    shipping: (Array.isArray(r.ad.shippingOptions) ? r.ad.shippingOptions : []) as string[],
+    shipping,
     condition: r.ad.product?.conditionGrade ?? null,
     hasDefect: DEFECT_VALUES.some((d) => damage.includes(d)),
     activationLock: act === "locked" || act === "clear" ? act : null,
@@ -61,5 +65,12 @@ export function contextFromRow(r: Row, now = new Date()): FilterContext {
     riskLevel: r.ad.risk?.level ?? null,
     blocked: r.blocked,
     location: r.ad.location,
+    sellerTrust: seller && seller.level !== "UNKNOWN" && typeof seller.score === "number" ? seller.score : null,
+    sellerTrustLevel: seller?.level ?? null,
+    sellerVerified: r.ad.sellerVerified ?? null,
+    shippingAvailable: shipping.includes("shipping"),
+    pickupAvailable: shipping.includes("pickup") || !shipping.length,
+    batteryKnown: num("batteryHealth") != null,
+    purchaseProof: /aankoopbewijs|factuur|kassabon|aankoopbon/i.test(`${r.ad.title} ${r.ad.description}`) ? "yes" : null,
   };
 }

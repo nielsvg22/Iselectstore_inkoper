@@ -92,7 +92,7 @@ export function ProfileEditor({ initial, savedFilters = [], categories = [] }: {
             <Field label="Naam" htmlFor="p-name"><Input id="p-name" required maxLength={100} placeholder="iPhone 15 Pro inkoop" value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} /></Field>
             <Field label="Controlefrequentie" htmlFor="p-int" hint="De bron kan een minimale interval afdwingen.">
               <Select id="p-int" value={v.intervalMinutes} onChange={(e) => setV({ ...v, intervalMinutes: Number(e.target.value) })}>
-                {[[15, "Elke 15 minuten"], [30, "Elke 30 minuten"], [60, "Elk uur"], [180, "Elke 3 uur"], [360, "Elke 6 uur"], [1440, "Dagelijks"]].map(([m, l]) => (<option key={m} value={m}>{l}</option>))}
+                {[[5, "Elke 5 minuten (snelst)"], [10, "Elke 10 minuten"], [15, "Elke 15 minuten"], [30, "Elke 30 minuten"], [60, "Elk uur"], [180, "Elke 3 uur"], [360, "Elke 6 uur"], [1440, "Dagelijks"]].map(([m, l]) => (<option key={m} value={m}>{l}</option>))}
               </Select>
             </Field>
             <Field label="Databron" htmlFor="p-src">

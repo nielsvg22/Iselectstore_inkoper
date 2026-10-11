@@ -16,7 +16,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const cfg = await getConfig();
   const hasNew = (await prisma.notification.count({ where: { status: "SENT", sentAt: { gte: new Date(Date.now() - 24 * 3600_000) } } })) > 0;
   return (
-    <div className="mx-auto flex min-h-dvh max-w-[1720px] gap-8 p-4 pb-28 lg:p-6 lg:pb-6">
+    <div className="mx-auto flex min-h-dvh max-w-[1720px] gap-8 p-4 pb-28 pt-[max(1rem,env(safe-area-inset-top))] lg:p-6 lg:pb-6">
       <Sidebar />
       <div className="min-w-0 flex-1">
         <Topbar name={user.name ?? user.email} role={user.role} hasNew={hasNew} />

@@ -103,6 +103,47 @@ export const configSchema = z.object({
       enabled: z.boolean().default(true),
       minBand: z.enum(["TOP", "VERY_INTERESTING", "INTERESTING"]).default("VERY_INTERESTING"),
       channels: z.array(z.enum(["TELEGRAM", "DISCORD"])).default(["TELEGRAM"]),
+      /** Geen (definitieve) melding zolang de volledige advertentie (detailpagina) nog niet is beoordeeld */
+      requireFullAnalysis: z.boolean().default(true),
+    })
+    .default({}),
+
+  policies: z
+    .object({
+      distance: z
+        .object({
+          /** Tot hier is ophalen acceptabel (voorbeeld klant: ±45 km) */
+          pickupMaxKm: z.number().min(0).max(1000).default(45),
+          /** Reiskosten per kilometer (heen en terug); 0 = niet meenemen */
+          transportPerKmCents: z.number().int().min(0).max(500).default(0),
+          /** Verzendkosten bij ophalen op afstand niet nodig; 0 = niet automatisch meenemen */
+          shippingCostCents: z.number().int().min(0).default(0),
+        })
+        .default({}),
+      battery: z
+        .object({
+          /** Uitsluiten onder dit percentage (0 = uit) */
+          excludeBelowPct: z.number().min(0).max(100).default(0),
+          unknown: z.enum(["allow", "review", "exclude"]).default("allow"),
+          /** Onder dit percentage geldt batterijvervanging als relevant */
+          replaceBelowPct: z.number().min(0).max(100).default(85),
+          replacementCents: z.number().int().min(0).default(9000),
+          deductReplacement: z.boolean().default(false),
+          /** Correctie op de verwachte verkoopprijs (%) onder de vervangingsgrens; 0 = geen */
+          priceCorrectionPct: z.number().min(0).max(50).default(0),
+        })
+        .default({}),
+    })
+    .default({}),
+
+  scheduler: z
+    .object({
+      /** Kortste interval tussen controles van één zoekprofiel (harde ondergrens 5 min, geen realtime) */
+      minIntervalMinutes: z.number().int().min(5).max(1440).default(10),
+      /** Parallelle analyse-/meldingsjobs (netwerkverkeer naar Marktplaats blijft in één, gepaceerde rij) */
+      concurrency: z.number().int().min(1).max(8).default(3),
+      /** Gedeelde cache van zoekpagina's zodat profielen met dezelfde zoekterm niet dubbel ophalen */
+      pageCacheSeconds: z.number().int().min(0).max(900).default(120),
     })
     .default({}),
 

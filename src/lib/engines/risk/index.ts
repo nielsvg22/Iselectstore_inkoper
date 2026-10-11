@@ -8,6 +8,9 @@ export interface RiskInput {
   /** Verwachte verkoopprijs en betrouwbaarheid (optioneel) voor "te mooi om waar te zijn" */
   expectedCents?: number | null;
   valuationConfidence?: number | null;
+  /** Extra vlaggen uit instelbaar beleid (batterij, afstand …) */
+  policyFlags?: RiskFlag[];
+  policyReviewReasons?: string[];
 }
 
 export interface RiskResult {
@@ -69,6 +72,9 @@ export function assessRisk(input: RiskInput): RiskResult {
     flags.push({ code: "PRICE_TOO_GOOD", label: "Vraagprijs ver onder marktwaarde — controleer op oplichting of verborgen gebreken", severity: "warn", points: 20 });
     reasons.push("Vraagprijs ver onder marktwaarde");
   }
+
+  for (const f of input.policyFlags ?? []) flags.push(f);
+  for (const r of input.policyReviewReasons ?? []) reasons.push(r);
 
   if (rec.confidence < 0.5) reasons.push("Productherkenning onzeker");
 

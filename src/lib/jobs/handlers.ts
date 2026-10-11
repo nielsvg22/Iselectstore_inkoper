@@ -2,13 +2,16 @@ import type { BackgroundJob } from "@prisma/client";
 import { prisma } from "../db/client";
 import { errMsg } from "../log";
 import { deliverNotification } from "../notify/dispatch";
+import { cleanupPushSubscriptions } from "../notify/push";
 import { analyzeAd } from "../pipeline/analyze";
 import { ingestAd } from "../pipeline/ingest";
 import { getConfig } from "../settings/store";
 import { adapterForOrigin } from "../sources/adapters";
 import { loadTree } from "../pipeline/tree";
 import { buildPrefilter } from "../sources/prefilter";
-import { SourceError } from "../sources/types";
+import { fetchListingUrl } from "../sources/adapters-shared";
+import { mergeDetail } from "../sources/marktplaats-search";
+import { SourceError, type RawAd } from "../sources/types";
 import { enqueue, PermanentJobError, type Handler, type JobType } from "./queue";
 
 const day = () => new Date().toISOString().slice(0, 10);
@@ -32,24 +35,66 @@ export async function runProfileCheck(profileId: string): Promise<{ fetched: num
     throw new PermanentJobError("Bron uitgeschakeld in instellingen");
   }
   // Bewust géén dagelijkse blokkade: zoeken mag nooit stoppen op een eigen requestlimiet (de pacing per request beschermt de bron al).
+  const run = await prisma.checkRun.create({ data: { profileId } });
+  const t0 = Date.now();
+  const stats = { pages: 0, cacheHits: 0 };
   try {
     const prefilter = adapter.origin === "SEARCH" ? buildPrefilter(await loadTree(profileId)) : undefined;
-    const ads = await adapter.fetchProfile({ profileId, query: profile.query, config: (profile.sourceConfig ?? {}) as Record<string, unknown>, maxAds: cfg.limits.maxAdsPerRun, prefilter });
+    const ads = await adapter.fetchProfile({ profileId, query: profile.query, config: (profile.sourceConfig ?? {}) as Record<string, unknown>, maxAds: cfg.limits.maxAdsPerRun, prefilter, deferDetails: adapter.origin === "SEARCH", stats });
     let created = 0;
     let changed = 0;
+    const wantsDetail = adapter.origin === "SEARCH" && ((profile.sourceConfig ?? {}) as { fetchDetails?: boolean }).fetchDetails !== false;
     for (const raw of ads) {
       const r = await ingestAd(raw, { origin: adapter.origin, isDemo: adapter.origin === "DEMO", partial: adapter.origin === "SEARCH" });
       if (r.created) created++;
       if (r.changed) changed++;
+      if (wantsDetail && !raw.detailLoaded && (r.created || r.changed)) await enqueueDetail(r.adId, r.created);
     }
-    await recordSource(adapter.id, true, undefined, Math.max(1, ads.length));
-    await prisma.searchProfile.update({ where: { id: profileId }, data: { lastCheckedAt: new Date(), lastSuccessAt: new Date(), lastError: null } });
+    await recordSource(adapter.id, true, undefined, Math.max(1, stats.pages));
+    const now = new Date();
+    await prisma.searchProfile.update({ where: { id: profileId }, data: { lastCheckedAt: now, lastSuccessAt: now, lastError: null } });
+    await prisma.checkRun.update({ where: { id: run.id }, data: { finishedAt: now, durationMs: Date.now() - t0, ok: true, fetched: ads.length, created, pages: stats.pages, cacheHits: stats.cacheHits } });
     return { fetched: ads.length, created, changed };
   } catch (e) {
     const msg = errMsg(e);
     await recordSource(adapter.id, false, msg, 1);
     await prisma.searchProfile.update({ where: { id: profileId }, data: { lastCheckedAt: new Date(), lastError: msg } });
+    await prisma.checkRun.update({ where: { id: run.id }, data: { finishedAt: new Date(), durationMs: Date.now() - t0, ok: false, error: msg.slice(0, 300), pages: stats.pages, cacheHits: stats.cacheHits } });
     if (e instanceof SourceError && !e.retryable) throw new PermanentJobError(msg);
+    throw e;
+  }
+}
+
+/** Zet het ophalen van de volledige advertentie klaar (nieuwe advertenties eerst). */
+export async function enqueueDetail(adId: string, isNew: boolean) {
+  const ad = await prisma.advertisement.findUnique({ where: { id: adId }, select: { detailFetchedAt: true, contentHash: true } });
+  if (!ad || ad.detailFetchedAt) return;
+  await enqueue({ type: "FETCH_DETAIL", payload: { adId }, priority: isNew ? 25 : 14, uniqueKey: `detail:${adId}`, maxAttempts: 3 });
+}
+
+/** Haalt de detailpagina op, vult de advertentie aan en laat die opnieuw beoordelen. */
+export async function runDetailFetch(adId: string, fetchImpl?: typeof fetch): Promise<void> {
+  const ad = await prisma.advertisement.findUnique({ where: { id: adId }, include: { images: { orderBy: { position: "asc" } } } });
+  if (!ad || ad.isDemo || ad.detailFetchedAt) return;
+  const cfg = await getConfig();
+  try {
+    const d = await fetchListingUrl(ad.url, { allowlist: cfg.sources.urlAllowlist, minSecondsBetween: Math.max(cfg.limits.minSecondsBetweenRequests, process.env.NODE_ENV === "test" ? 0 : 3), fetchImpl, throttleId: "search-detail" });
+    const attrs = (ad.rawPayload as { attributes?: Record<string, string | number> } | null)?.attributes;
+    const list: RawAd = {
+      externalId: ad.externalId, url: ad.url, title: ad.title, description: ad.description, askingCents: ad.askingPriceCents, location: ad.location, distanceKm: ad.distanceKm,
+      category: ad.category, sellerType: ad.sellerType, shipping: (ad.shippingOptions as string[]) ?? [], conditionText: ad.conditionText, publishedAt: ad.publishedAt,
+      imageUrls: ad.images.map((i) => i.url), attributes: attrs,
+    };
+    await ingestAd(mergeDetail(list, d), { origin: ad.origin, source: ad.source, partial: true });
+  } catch (e) {
+    // Definitief mislukt (verkocht/verwijderd/geweigerd): markeer, zodat de melding niet eindeloos wacht
+    const permanent = (e instanceof SourceError && !e.retryable);
+    if (permanent || (await prisma.backgroundJob.findFirst({ where: { uniqueKey: `detail:${adId}`, attempts: { gte: 3 } } }))) {
+      const raw = ((ad.rawPayload ?? {}) as Record<string, unknown>) ?? {};
+      await prisma.advertisement.update({ where: { id: adId }, data: { rawPayload: { ...raw, detailFailed: true } as never } });
+      await enqueue({ type: "ANALYZE_AD", payload: { adId }, priority: 20, uniqueKey: `analyze:${adId}:detailfailed` });
+      return;
+    }
     throw e;
   }
 }
@@ -58,10 +103,20 @@ export const handlers: Partial<Record<JobType, Handler>> = {
   async CHECK_PROFILE(job: BackgroundJob) {
     await runProfileCheck((job.payload as { profileId: string }).profileId);
   },
+  async FETCH_DETAIL(job: BackgroundJob) {
+    await runDetailFetch((job.payload as { adId: string }).adId);
+  },
   async ANALYZE_AD(job: BackgroundJob) {
     const adId = (job.payload as { adId: string }).adId;
     try {
-      await analyzeAd(adId);
+      // Per advertentie één analyse tegelijk (lijst- en detailfase kunnen anders gelijktijdig draaien en elkaar tegenwerken)
+      await prisma.$transaction(
+        async (tx) => {
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${adId}))`;
+          await analyzeAd(adId);
+        },
+        { timeout: 180_000, maxWait: 60_000 },
+      );
     } catch (e) {
       await prisma.advertisement.updateMany({ where: { id: adId }, data: { status: "FAILED", statusError: errMsg(e) } });
       throw e;
@@ -75,6 +130,7 @@ export const handlers: Partial<Record<JobType, Handler>> = {
     const cutoff = new Date(Date.now() - cfg.limits.adRetentionDays * 86400000);
     await prisma.advertisement.deleteMany({ where: { lastSeenAt: { lt: cutoff }, userState: { notIn: ["FAVORITE", "INTERESTING"] }, purchase: null } });
     await prisma.backgroundJob.deleteMany({ where: { status: { in: ["DONE", "FAILED", "DEAD"] }, finishedAt: { lt: new Date(Date.now() - 14 * 86400000) } } });
+    await cleanupPushSubscriptions();
     await prisma.aiCache.deleteMany({ where: { createdAt: { lt: new Date(Date.now() - 30 * 86400000) } } });
     await prisma.marketComparable.deleteMany({ where: { kind: { not: "REALIZED" }, observedAt: { lt: new Date(Date.now() - 365 * 86400000) } } });
   },
@@ -82,15 +138,16 @@ export const handlers: Partial<Record<JobType, Handler>> = {
 
 /** Zet controle-jobs klaar voor profielen die aan de beurt zijn. */
 export async function scheduleDueProfiles(now = new Date()): Promise<number> {
-  const profiles = await prisma.searchProfile.findMany({ where: { active: true } });
+  const cfg = await getConfig();
+  const profiles = await prisma.searchProfile.findMany({ where: { active: true }, orderBy: [{ prioritizeNew: "desc" }, { lastCheckedAt: "asc" }] });
   let n = 0;
   for (const p of profiles) {
     const adapter = adapterForOrigin(p.sourceKind);
     if (!adapter || !adapter.automatic) continue;
-    const interval = Math.max(p.intervalMinutes, adapter.minIntervalMinutes);
+    const interval = Math.max(p.intervalMinutes, adapter.origin === "SEARCH" ? Math.max(cfg.scheduler.minIntervalMinutes, adapter.minIntervalMinutes) : adapter.minIntervalMinutes);
     if (p.lastCheckedAt && now.getTime() - p.lastCheckedAt.getTime() < interval * 60_000) continue;
     const slot = Math.floor(now.getTime() / (interval * 60_000));
-    const r = await enqueue({ type: "CHECK_PROFILE", payload: { profileId: p.id }, priority: p.prioritizeNew ? 15 : 8, uniqueKey: `check:${p.id}:${slot}`, maxAttempts: 3 });
+    const r = await enqueue({ type: "CHECK_PROFILE", payload: { profileId: p.id }, priority: p.prioritizeNew ? 15 : 6, uniqueKey: `check:${p.id}:${slot}`, maxAttempts: 3 });
     if (r.created) n++;
   }
   await enqueue({ type: "CLEANUP", payload: {}, priority: 1, uniqueKey: `cleanup:${now.toISOString().slice(0, 10)}`, maxAttempts: 1 });

@@ -8,12 +8,26 @@ import { assessRisk } from "../engines/risk";
 import { bandFor, scoreDeal } from "../engines/scoring";
 import { calcProfit, costsFromConfig, maxBuyPrice, minSalePrice, taxFromConfig } from "../engines/profit";
 import { valuate } from "../engines/valuation";
+import { batteryOutcome, distanceCosts } from "../engines/policy";
+import { assessSeller } from "../engines/seller";
 import { evaluate, type FilterContext } from "../engines/filters";
 import { enqueue } from "../jobs/queue";
 import { errMsg, log } from "../log";
 import { getConfig, getSecret } from "../settings/store";
-import type { Recognition, Signal } from "../types";
+import type { Recognition, RiskFlag, Signal } from "../types";
 import { loadTree } from "./tree";
+import { getPrefs, passesPrefs, quietEndsAt, type NotifyPrefs } from "../notify/prefs";
+
+async function createNotification(o: { adId: string; profileId: string; userId: string; channel: "TELEGRAM" | "DISCORD" | "WEBPUSH"; dedupeKey: string; runAt?: Date }) {
+  if (await prisma.notification.findUnique({ where: { dedupeKey: o.dedupeKey } })) return;
+  try {
+    const n = await prisma.notification.create({ data: { adId: o.adId, profileId: o.profileId, userId: o.userId, channel: o.channel, dedupeKey: o.dedupeKey } });
+    await enqueue({ type: "NOTIFY", payload: { notificationId: n.id }, priority: 30, runAt: o.runAt, uniqueKey: `notify:${n.id}`, maxAttempts: 6 });
+  } catch (e) {
+    // gelijktijdige analyse maakte dezelfde melding al aan (unieke dedupeKey): niets te doen
+    if ((e as { code?: string }).code !== "P2002") throw e;
+  }
+}
 
 export interface AdOverrides {
   recognition?: ManualOverrides;
@@ -102,16 +116,28 @@ export async function analyzeAd(adId: string, deps: AnalyzeDeps = {}): Promise<{
 
   // 4) Waardering
   const comps = await prisma.marketComparable.findMany({ where: { modelKey: rec.modelKey, isDemo: ad.isDemo }, orderBy: { observedAt: "desc" }, take: 500 });
-  const repairCents = overrides.costs?.repairCents ?? repairCostFor(rec.signals, cfg);
-  const val = valuate(
+  const bat = batteryOutcome(rec.family, battery, cfg);
+  const shippingList = (ad.shippingOptions as string[]) ?? [];
+  const dist = distanceCosts(ad.distanceKm, shippingList, cfg);
+  const repairCents = overrides.costs?.repairCents ?? repairCostFor(rec.signals, cfg) + bat.replacementCents;
+  const val0 = valuate(
     { modelKey: rec.modelKey, storageGb, ramGb, batteryHealth: battery, conditionGrade: rec.conditionGrade, willBeRepaired: repairCents > 0 && (overrides.costs?.repairCents ?? 1) > 0, excludeSourceAdId: adId },
     comps.map((c) => ({ modelKey: c.modelKey, priceCents: c.priceCents, kind: c.kind, storageGb: c.storageGb, ramGb: c.ramGb, batteryHealth: c.batteryHealth, observedAt: c.observedAt, sourceAdId: c.sourceAdId })),
     cfg,
   );
+  const val = bat.priceFactor === 1 ? val0 : { ...val0, lowCents: Math.round(val0.lowCents * bat.priceFactor), expectedCents: Math.round(val0.expectedCents * bat.priceFactor), highCents: Math.round(val0.highCents * bat.priceFactor) };
 
   // 5) Risico (definitief) en winst
-  const risk = assessRisk({ recognition: rec, photoCount, descriptionLength: ad.description.length, askingCents: ad.askingPriceCents, expectedCents: val.expectedCents, valuationConfidence: val.confidence });
-  const costs = costsFromConfig(cfg, { repairCents, shippingCents: overrides.costs?.shippingCents, transportCents: overrides.costs?.transportCents, otherCents: overrides.costs?.otherCents });
+  const policyFlags: RiskFlag[] = [];
+  const policyReview: string[] = [];
+  if (bat.exclude) policyFlags.push({ code: "BATTERY_POLICY", label: bat.notes[0] ?? "Batterijbeleid sluit deze advertentie uit", severity: "block", points: 100 });
+  if (bat.review) { policyFlags.push({ code: "BATTERY_UNKNOWN", label: "Batterijconditie onbekend (apart beoordelen)", severity: "warn", points: 8 }); policyReview.push("Batterijconditie onbekend"); }
+  const risk = assessRisk({ recognition: rec, photoCount, descriptionLength: ad.description.length, askingCents: ad.askingPriceCents, expectedCents: val.expectedCents, valuationConfidence: val.confidence, policyFlags, policyReviewReasons: policyReview });
+  const costs = costsFromConfig(cfg, { repairCents, shippingCents: overrides.costs?.shippingCents ?? dist.shippingCents ?? undefined, transportCents: overrides.costs?.transportCents ?? dist.transportCents ?? undefined, otherCents: overrides.costs?.otherCents });
+  const seller = assessSeller({
+    verified: ad.sellerVerified, business: (ad.sellerSignals as { business?: boolean | null })?.business ?? null, anonymous: (ad.sellerSignals as { anonymous?: boolean | null })?.anonymous ?? null,
+    photoCount, descriptionLength: ad.description.length, askingCents: ad.askingPriceCents, expectedCents: val.expectedCents, valuationConfidence: val.confidence, riskFlags: risk.flags, shipping: shippingList,
+  });
   const tax = taxFromConfig(cfg, overrides.costs?.marginSchemeEligible);
   const buy = ad.askingPriceCents ?? 0;
   const priceKnown = ad.askingPriceCents != null && ad.askingPriceCents > 0;
@@ -163,7 +189,7 @@ export async function analyzeAd(adId: string, deps: AnalyzeDeps = {}): Promise<{
         valuationConfidence: val.confidence,
         sampleSize: val.sampleSize,
         uncertain: val.uncertain,
-        costs: { expected: pExp, conservative: pLow, optimistic: pHigh, valuationSteps: val.steps, repairCents, maxBidConservativeCents: maxBidCons } as unknown as Prisma.InputJsonValue,
+        costs: { expected: pExp, conservative: pLow, optimistic: pHigh, valuationSteps: val.steps, repairCents, maxBidConservativeCents: maxBidCons, distance: dist, battery: bat, seller } as unknown as Prisma.InputJsonValue,
         netProfitCents: pExp.netProfitCents,
         conservativeProfitCents: pLow.netProfitCents,
         optimisticProfitCents: pHigh.netProfitCents,
@@ -191,7 +217,7 @@ export async function analyzeAd(adId: string, deps: AnalyzeDeps = {}): Promise<{
         data: { adId, modelKey: rec.modelKey, lowCents: val.lowCents, expectedCents: val.expectedCents, highCents: val.highCents, confidence: val.confidence, sampleSize: val.sampleSize, realizedUsed: val.realizedUsed, uncertain: val.uncertain, methodology: { steps: val.steps, tier: val.tier } as unknown as Prisma.InputJsonValue },
       });
     }
-    await tx.advertisement.update({ where: { id: adId }, data: { status: "ANALYZED", statusError: null, needsManualReview: needsReview, lastCheckedOkAt: new Date() } });
+    await tx.advertisement.update({ where: { id: adId }, data: { status: "ANALYZED", statusError: null, needsManualReview: needsReview, lastCheckedOkAt: new Date(), analyzedAt: new Date() } });
   });
 
   // 7) Zoekprofielen matchen en meldingen klaarzetten
@@ -222,8 +248,15 @@ export async function analyzeAd(adId: string, deps: AnalyzeDeps = {}): Promise<{
       riskLevel: risk.level,
       blocked: risk.blocked,
       location: ad.location,
+      sellerTrust: seller.level === "UNKNOWN" ? null : seller.score,
+      sellerTrustLevel: seller.level,
+      sellerVerified: ad.sellerVerified ?? null,
+      shippingAvailable: shippingList.includes("shipping"),
+      pickupAvailable: shippingList.includes("pickup") || !shippingList.length,
+      batteryKnown: battery != null,
+      purchaseProof: rec.signals.some((s) => s.code === "NO_PURCHASE_PROOF") ? "no" : /aankoopbewijs|factuur|bon\b|kassabon|aankoopbon/i.test(`${ad.title} ${ad.description}`) ? "yes" : null,
     };
-    await matchProfiles(adId, ctx, { band: sc.band, score: sc.score, blocked: risk.blocked, isDemo: ad.isDemo, userIgnored: ad.userState === "IGNORED" }, cfg);
+    await matchProfiles(adId, ctx, { band: sc.band, score: sc.score, blocked: risk.blocked, isDemo: ad.isDemo, userIgnored: ad.userState === "IGNORED", netProfitCents: pExp.netProfitCents, complete: ad.origin !== "SEARCH" || Boolean(ad.detailFetchedAt) || Boolean((ad.rawPayload as { detailFailed?: boolean } | null)?.detailFailed) }, cfg);
   }
   return { score: sc.score, blocked: sc.blocked };
 }
@@ -231,10 +264,11 @@ export async function analyzeAd(adId: string, deps: AnalyzeDeps = {}): Promise<{
 export async function matchProfiles(
   adId: string,
   ctx: FilterContext,
-  meta: { band: keyof typeof BAND_RANK; score: number; blocked: boolean; isDemo: boolean; userIgnored: boolean },
+  meta: { band: keyof typeof BAND_RANK; score: number; blocked: boolean; isDemo: boolean; userIgnored: boolean; netProfitCents: number; /** volledige advertentie beoordeeld (detailpagina) */ complete: boolean },
   cfg: AppConfig,
 ) {
   const profiles = await prisma.searchProfile.findMany({ where: { active: true } });
+  const prefsCache = new Map<string, { prefs: NotifyPrefs; push: boolean }>();
   for (const p of profiles) {
     try {
       const tree = await loadTree(p.id);
@@ -246,15 +280,25 @@ export async function matchProfiles(
       ]);
       await prisma.searchProfile.update({ where: { id: p.id }, data: { discoveredCount: discovered, interestingCount: interesting } });
 
-      const floor = BAND_RANK[cfg.notifications.minBand];
-      if (matched && p.notifyEnabled && cfg.notifications.enabled && !meta.blocked && !meta.userIgnored && !meta.isDemo && meta.score >= p.notifyMinScore && BAND_RANK[meta.band] >= floor) {
-        const channels = (p.notifyChannels as string[]).filter((c) => (cfg.notifications.channels as string[]).includes(c));
-        for (const ch of channels) {
-          const dedupeKey = `${ch}:${adId}:${p.id}`;
-          const exists = await prisma.notification.findUnique({ where: { dedupeKey } });
-          if (exists) continue;
-          const n = await prisma.notification.create({ data: { adId, profileId: p.id, channel: ch as "TELEGRAM" | "DISCORD", dedupeKey } });
-          await enqueue({ type: "NOTIFY", payload: { notificationId: n.id }, priority: 20, uniqueKey: `notify:${n.id}` });
+      // Meldingen: pas na volledige beoordeling (detailpagina) en nooit voor geblokkeerde/genegeerde/demo-advertenties
+      const eligible = matched && p.notifyEnabled && cfg.notifications.enabled && !meta.blocked && !meta.userIgnored && !meta.isDemo && meta.score >= p.notifyMinScore && (meta.complete || !cfg.notifications.requireFullAnalysis);
+      if (eligible) {
+        let prefs = prefsCache.get(p.userId);
+        if (!prefs) {
+          prefs = { prefs: await getPrefs(p.userId), push: (await prisma.pushSubscription.count({ where: { userId: p.userId, enabled: true } })) > 0 };
+          prefsCache.set(p.userId, prefs);
+        }
+        const runAt = quietEndsAt(prefs.prefs) ?? undefined;
+        const floor = BAND_RANK[cfg.notifications.minBand];
+        // Telegram/Discord: zoals per zoekprofiel ingesteld, tenzij de gebruiker Telegram uit zet of alleen als alternatief wil
+        const skipChat = prefs.prefs.telegram === "off" || (prefs.prefs.telegram === "fallback" && prefs.push);
+        if (!skipChat && BAND_RANK[meta.band] >= floor) {
+          const channels = (p.notifyChannels as string[]).filter((c) => (cfg.notifications.channels as string[]).includes(c));
+          for (const ch of channels) await createNotification({ adId, profileId: p.id, userId: p.userId, channel: ch as "TELEGRAM" | "DISCORD", dedupeKey: `${ch}:${adId}:${p.id}`, runAt });
+        }
+        // Web Push: één melding per gebruiker per advertentie (ook als meerdere profielen matchen)
+        if (prefs.push && prefs.prefs.push && passesPrefs(prefs.prefs, { score: meta.score, band: meta.band, netProfitCents: meta.netProfitCents, profileId: p.id }).ok) {
+          await createNotification({ adId, profileId: p.id, userId: p.userId, channel: "WEBPUSH", dedupeKey: `WEBPUSH:${adId}:${p.userId}`, runAt });
         }
       }
     } catch (e) {

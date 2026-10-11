@@ -2,7 +2,7 @@ import { Prisma, type BackgroundJob } from "@prisma/client";
 import { prisma } from "../db/client";
 import { errMsg, log } from "../log";
 
-export type JobType = "CHECK_PROFILE" | "ANALYZE_AD" | "NOTIFY" | "CLEANUP";
+export type JobType = "CHECK_PROFILE" | "FETCH_DETAIL" | "ANALYZE_AD" | "NOTIFY" | "CLEANUP";
 
 export interface EnqueueOpts {
   type: JobType;
@@ -72,25 +72,40 @@ export async function recoverStaleJobs(olderThanMs = 10 * 60_000): Promise<numbe
 
 export type Handler = (job: BackgroundJob) => Promise<void>;
 
-export async function processJobs(handlers: Partial<Record<JobType, Handler>>, opts: { maxJobs: number; deadlineMs?: number; types?: JobType[] }): Promise<{ processed: number; failed: number }> {
+/**
+ * Verwerkt jobs met `concurrency` parallelle lopers. Elke loper claimt atomisch (SKIP LOCKED),
+ * dus meerdere lopers/workers claimen nooit dezelfde job.
+ */
+export async function processJobs(handlers: Partial<Record<JobType, Handler>>, opts: { maxJobs: number; deadlineMs?: number; types?: JobType[]; concurrency?: number }): Promise<{ processed: number; failed: number }> {
   const deadline = Date.now() + (opts.deadlineMs ?? 50_000);
-  let processed = 0;
-  let failed = 0;
+  const totals = { processed: 0, failed: 0 };
   await recoverStaleJobs();
-  while (processed < opts.maxJobs && Date.now() < deadline) {
-    const job = await claimNext(opts.types);
-    if (!job) break;
-    const h = handlers[job.type as JobType];
-    try {
-      if (!h) throw new PermanentJobError(`Geen handler voor ${job.type}`);
-      await h(job);
-      await completeJob(job.id);
-    } catch (e) {
-      failed++;
-      log("warn", "Job mislukt", { id: job.id, type: job.type, attempt: job.attempts, error: errMsg(e) });
-      await failJob(job, e);
+  const runner = async () => {
+    while (totals.processed < opts.maxJobs && Date.now() < deadline) {
+      totals.processed++; // reserveer een plek vóór het claimen zodat maxJobs niet wordt overschreden
+      const job = await claimNext(opts.types);
+      if (!job) {
+        totals.processed--;
+        break;
+      }
+      const ok = await runJob(job, handlers);
+      if (!ok) totals.failed++;
     }
-    processed++;
+  };
+  await Promise.all(Array.from({ length: Math.max(1, opts.concurrency ?? 1) }, runner));
+  return totals;
+}
+
+async function runJob(job: BackgroundJob, handlers: Partial<Record<JobType, Handler>>): Promise<boolean> {
+  const h = handlers[job.type as JobType];
+  try {
+    if (!h) throw new PermanentJobError(`Geen handler voor ${job.type}`);
+    await h(job);
+    await completeJob(job.id);
+    return true;
+  } catch (e) {
+    log("warn", "Job mislukt", { id: job.id, type: job.type, attempt: job.attempts, error: errMsg(e) });
+    await failJob(job, e);
+    return false;
   }
-  return { processed, failed };
 }
