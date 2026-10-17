@@ -45,7 +45,7 @@ export async function ingestAd(raw: RawAd, opts: { origin: DataOrigin; isDemo?: 
     distanceKm: raw.distanceKm ?? null,
     category: raw.category ?? null,
     sellerType: raw.sellerType ?? null,
-    ...(raw.seller ? { sellerId: raw.seller.id ?? null, sellerName: raw.seller.name ?? null, sellerVerified: raw.seller.verified ?? null, sellerSignals: { business: raw.seller.business ?? null, anonymous: raw.seller.anonymous ?? null } as Prisma.InputJsonValue } : {}),
+    ...(raw.seller ? { sellerId: raw.seller.id ?? null, sellerName: raw.seller.name ?? null, sellerVerified: raw.seller.verified ?? null, sellerSignals: { business: raw.seller.business ?? null, anonymous: raw.seller.anonymous ?? null, rating: raw.seller.rating ?? null, reviewCount: raw.seller.reviewCount ?? null, accountAgeMonths: raw.seller.accountAgeMonths ?? null } as Prisma.InputJsonValue } : {}),
     shippingOptions: (raw.shipping ?? []) as Prisma.InputJsonValue,
     conditionText: raw.conditionText ?? null,
     publishedAt: raw.publishedAt ?? null,
