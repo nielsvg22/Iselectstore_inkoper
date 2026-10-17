@@ -12,6 +12,7 @@ interface Row {
     title: string;
     description: string;
     sellerVerified?: boolean | null;
+    sellerSignals?: unknown;
     askingPriceCents: number | null;
     location: string | null;
     distanceKm: number | null;
@@ -68,6 +69,9 @@ export function contextFromRow(r: Row, now = new Date()): FilterContext {
     sellerTrust: seller && seller.level !== "UNKNOWN" && typeof seller.score === "number" ? seller.score : null,
     sellerTrustLevel: seller?.level ?? null,
     sellerVerified: r.ad.sellerVerified ?? null,
+    sellerRating: (r.ad.sellerSignals as { rating?: number | null } | undefined)?.rating ?? null,
+    sellerReviewCount: (r.ad.sellerSignals as { reviewCount?: number | null } | undefined)?.reviewCount ?? null,
+    sellerAgeMonths: (r.ad.sellerSignals as { accountAgeMonths?: number | null } | undefined)?.accountAgeMonths ?? null,
     shippingAvailable: shipping.includes("shipping"),
     pickupAvailable: shipping.includes("pickup") || !shipping.length,
     batteryKnown: num("batteryHealth") != null,
