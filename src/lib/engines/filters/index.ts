@@ -30,6 +30,10 @@ export interface FilterContext {
   sellerTrust: number | null;
   sellerTrustLevel: string | null;
   sellerVerified: boolean | null;
+  /** Alleen expliciet aangeleverde verkopergegevens; null blijft onbekend. */
+  sellerRating: number | null;
+  sellerReviewCount: number | null;
+  sellerAgeMonths: number | null;
   shippingAvailable: boolean;
   pickupAvailable: boolean;
   batteryKnown: boolean;
@@ -88,6 +92,9 @@ export const FIELD_DEFS: FieldDef[] = [
   { key: "sellerTrust", label: "Betrouwbaarheid verkoper (0-100)", type: "number", operators: ["gte", "lte", "isKnown"], help: "Onbekend = onvoldoende gegevens; telt nooit als betrouwbaar" },
   { key: "sellerTrustLevel", label: "Betrouwbaarheidsniveau verkoper", type: "string", operators: ["in", "nin", "eq", "neq"], help: "HIGH, MEDIUM, LOW, UNKNOWN" },
   { key: "sellerVerified", label: "Verkoper geverifieerd (platform)", type: "boolean", operators: ["isTrue", "isFalse"] },
+  { key: "sellerRating", label: "Beoordeling verkoper", type: "number", operators: ["gte", "lte", "isKnown"], help: "Score uit de bron (0–5), onbekend is geen positieve beoordeling." },
+  { key: "sellerReviewCount", label: "Aantal reviews verkoper", type: "number", operators: ["gte", "lte", "isKnown"] },
+  { key: "sellerAgeMonths", label: "Accountleeftijd verkoper", type: "number", unit: "maanden", operators: ["gte", "lte", "isKnown"] },
   { key: "shippingAvailable", label: "Verzending mogelijk", type: "boolean", operators: ["isTrue", "isFalse"] },
   { key: "pickupAvailable", label: "Ophalen mogelijk", type: "boolean", operators: ["isTrue", "isFalse"] },
   { key: "batteryKnown", label: "Batterijconditie bekend", type: "boolean", operators: ["isTrue", "isFalse"] },
