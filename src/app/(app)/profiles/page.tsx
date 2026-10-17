@@ -1,126 +1,65 @@
-import { Plus, Search } from "lucide-react";
-import type { Metadata } from "next";
 import Link from "next/link";
-import { IphoneMelder } from "@/components/profile/iphone-melder";
-import { GroupActions } from "@/components/profile/group-actions";
+import type { Metadata } from "next";
+import { ArrowUpRight, Search } from "lucide-react";
+import { ApeldoornRadarSetup } from "@/components/profile/apeldoorn-radar";
 import { ProfileActions } from "@/components/profile/profile-actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { EmptyState } from "@/components/ui/states";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
-import { formatDate, timeAgo } from "@/lib/format";
+import { timeAgo } from "@/lib/format";
+import { APELDOORN_RADAR_NAME } from "@/lib/radar/apeldoorn";
 import { adapterForOrigin } from "@/lib/sources/adapters";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Zoekprofielen" };
-
-const SOURCE = { SEARCH: "Marktplaats-zoekopdracht", MANUAL_URL: "Advertentie-URL's", FEED: "Feed", DEMO: "Demodata", IMPORT: "Import", PARTNER_API: "Partner-API" } as const;
-
-/** Verdeelt een categorie in onderdelen (bijv. "iPhone 17", "iPhone 16", …, "iPhone SE", "Overige"), nieuwste eerst; binnen een onderdeel de modellen op naam. */
-function subgroups<T extends { name: string; sourceConfig: unknown }>(list: T[]) {
-  const subOf = (p: T) => (p.sourceConfig as { subgroup?: string } | null)?.subgroup ?? /^(iPhone \d+)/.exec(p.name)?.[1] ?? "Overige";
-  const map = new Map<string, T[]>();
-  for (const p of list) map.set(subOf(p), [...(map.get(subOf(p)) ?? []), p]);
-  const rank = (n: string) => (/^iPhone (\d+)$/.test(n) ? 1000 - Number(/(\d+)/.exec(n)![1]) : n === "iPhone SE" ? 2000 : 3000);
-  return [...map.entries()]
-    .map(([k, v]) => [k, v.sort((a, b) => a.name.localeCompare(b.name, "nl", { numeric: true }))] as const)
-    .sort((a, b) => rank(a[0]) - rank(b[0]) || a[0].localeCompare(b[0]));
-}
+export const metadata: Metadata = { title: "Inkoopradar" };
 
 export default async function ProfilesPage() {
   const user = await getCurrentUser();
-  const all = await prisma.searchProfile.findMany({ where: { userId: user!.id }, orderBy: { createdAt: "desc" } });
-  const groupOf = (p: (typeof all)[number]) => (p.sourceConfig as { group?: string } | null)?.group ?? null;
-  const profiles = all.filter((p) => !groupOf(p));
-  const groups = new Map<string, typeof all>();
-  for (const p of all) {
-    const g = groupOf(p);
-    if (g) groups.set(g, [...(groups.get(g) ?? []), p]);
-  }
+  const profiles = await prisma.searchProfile.findMany({ where: { userId: user!.id }, orderBy: { createdAt: "desc" } });
+  const radar = profiles.some((p) => p.name === APELDOORN_RADAR_NAME && p.active);
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+    <div className="mx-auto max-w-5xl space-y-6">
+      <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-[32px] font-semibold tracking-tight">Zoekprofielen</h1>
-          <p className="mt-1 text-muted">Definieer wat je zoekt; Deal Hunter controleert automatisch en meldt de beste matches.</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">iSelectStore · Deal Hunter</p>
+          <h1 className="mt-2 text-[30px] font-semibold tracking-tight">Zoekopdrachten</h1>
+          <p className="mt-1 text-sm text-muted">Alle kansen op één plek, zonder tientallen profielen op het scherm.</p>
         </div>
-        <Link href="/profiles/new"><Button><Plus className="h-4 w-4" />Nieuw profiel</Button></Link>
-      </div>
-      <IphoneMelder exists={groups.has("iPhone")} isAdmin={user!.role === "ADMIN"} />
-      {[...groups.entries()].map(([g, list]) => {
-        const active = list.filter((p) => p.active).length;
-        return (
-          <section key={g} className="rounded-[24px] bg-card p-6 shadow-card sm:p-8" aria-label={`Categorie ${g}`}>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h2 className="text-[18px] font-semibold tracking-tight">{g}</h2>
-                <p className="mt-0.5 text-sm text-muted">{list.length} profielen (per model) · {active} actief · elk model wordt apart en zo snel mogelijk gecontroleerd; nieuwere modellen vaker.</p>
-              </div>
-              {user!.role === "ADMIN" && <GroupActions group={g} anyActive={active > 0} />}
-            </div>
-            {subgroups(list).map(([sg, items]) => (
-              <div key={sg} className="mt-6" role="group" aria-label={sg}>
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-card-border pb-2">
-                  <h3 className="text-[15px] font-semibold">{sg}<span className="ml-2 text-xs font-normal text-muted">{items.length} {items.length === 1 ? "model" : "modellen"} · {items.filter((p) => p.active).length} actief</span></h3>
-                  {user!.role === "ADMIN" && <GroupActions group={g} subgroup={sg} anyActive={items.some((p) => p.active)} compact />}
+        <Link href="/profiles/new"><Button variant="outline"><Search className="h-4 w-4" />Eigen zoekopdracht</Button></Link>
+      </header>
+      <ApeldoornRadarSetup active={radar} profileCount={profiles.length} isAdmin={user!.role === "ADMIN"} />
+      <Card className="p-5 sm:p-7">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Actieve zoekopdrachten</h2>
+          <span className="text-sm text-muted">{profiles.filter((p) => p.active).length} actief</span>
+        </div>
+        {!profiles.length ? (
+          <p className="py-6 text-sm text-muted">Nog geen zoekopdrachten. Activeer de Apeldoorn-radar om te beginnen.</p>
+        ) : (
+          <div className="divide-y divide-card-border">
+            {profiles.slice(0, 8).map((p) => (
+              <div key={p.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <Link href={`/profiles/${p.id}`} className="inline-flex max-w-full items-center gap-2 font-semibold hover:text-accent">
+                    <span className="truncate">{p.name}</span><ArrowUpRight className="h-4 w-4 shrink-0" />
+                  </Link>
+                  <p className="mt-1 text-xs text-muted">
+                    {p.lastError ? `Fout: ${p.lastError}` : p.lastSuccessAt ? `Laatst gecontroleerd ${timeAgo(p.lastSuccessAt)}` : "Wacht op eerste controle"}
+                    {" · "}{p.discoveredCount} gevonden
+                  </p>
                 </div>
-                <ul className="divide-y divide-card-border">
-                  {items.map((p) => {
-                    const tier = (p.sourceConfig as { tier?: string }).tier;
-                    return (
-                      <li key={p.id}>
-                        <Link href={`/profiles/${p.id}`} className="flex items-center gap-3 py-3 transition hover:bg-muted-bg/50">
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-[15px] font-medium">{p.name}</span>
-                            <span className="block truncate text-xs text-muted">{p.lastError ? <span className="text-danger">Fout: {p.lastError}</span> : p.lastSuccessAt ? `Laatst gecontroleerd ${timeAgo(p.lastSuccessAt)}` : "Nog niet gecontroleerd"}</span>
-                          </span>
-                          <span className="tabular hidden text-sm text-muted sm:block">{p.discoveredCount} ontdekt</span>
-                          <Badge tone={tier === "high" ? "accent" : "neutral"}>{tier === "high" ? "Vaak" : "Normaal"}</Badge>
-                          <Badge tone={p.active ? "success" : "neutral"}>{p.active ? "Actief" : "Pauze"}</Badge>
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ul>
+                <div className="flex shrink-0 items-center gap-3">
+                  <Badge tone={p.active ? "success" : "neutral"}>{p.active ? "Actief" : "Gepauzeerd"}</Badge>
+                  <ProfileActions id={p.id} active={p.active} runnable={!!adapterForOrigin(p.sourceKind)} />
+                </div>
               </div>
             ))}
-          </section>
-        );
-      })}
-      {profiles.length === 0 && groups.size > 0 ? null : profiles.length === 0 ? (
-        <EmptyState icon={<Search className="h-6 w-6" />} title="Nog geen zoekprofielen" description="Maak een profiel zoals ‘iPhone 15 Pro inkoop’ met maximale prijs, minimale winst en afstand." action={<Link href="/profiles/new"><Button>Eerste profiel maken</Button></Link>} />
-      ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
-          {profiles.map((p) => {
-            const a = adapterForOrigin(p.sourceKind);
-            return (
-              <Card key={p.id} className="p-5 sm:p-6">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <h2 className="truncate text-lg font-semibold tracking-tight">{p.name}</h2>
-                    <p className="mt-0.5 text-sm text-muted">{SOURCE[p.sourceKind]}{p.sourceKind === "SEARCH" && ((p.sourceConfig as { queries?: string[] })?.queries ?? []).length ? ` (“${((p.sourceConfig as { queries?: string[] }).queries ?? []).join("”, “")}”)` : ""} · elke {p.intervalMinutes >= 60 ? `${p.intervalMinutes / 60} uur` : `${p.intervalMinutes} min`}</p>
-                  </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1.5">
-                    <Badge tone={p.active ? "success" : "neutral"}>{p.active ? "Actief" : "Gepauzeerd"}</Badge>
-                    {p.notifyEnabled && <Badge tone="accent">Meldingen ≥ {p.notifyMinScore}</Badge>}
-                  </div>
-                </div>
-                <dl className="mt-5 grid grid-cols-3 gap-4 text-sm">
-                  <div><dt className="text-xs text-muted">Ontdekt</dt><dd className="tabular text-xl font-semibold">{p.discoveredCount}</dd></div>
-                  <div><dt className="text-xs text-muted">Interessant</dt><dd className="tabular text-xl font-semibold text-success">{p.interestingCount}</dd></div>
-                  <div><dt className="text-xs text-muted">Laatst gelukt</dt><dd className="mt-1 font-medium" title={formatDate(p.lastSuccessAt)}>{timeAgo(p.lastSuccessAt)}</dd></div>
-                </dl>
-                {p.lastError && <p className="mt-4 rounded-xl bg-danger-soft px-3 py-2 text-xs text-danger">Laatste fout: {p.lastError}</p>}
-                <div className="mt-5 border-t border-card-border pt-4">
-                  <ProfileActions id={p.id} active={p.active} runnable={!!a} />
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-      )}
+            {profiles.length > 8 && <p className="pt-4 text-sm text-muted">Nog {profiles.length - 8} bestaande profielen. Met ‘Gebruik dit profiel’ vervang je ze allemaal na bevestiging.</p>}
+          </div>
+        )}
+      </Card>
     </div>
   );
 }
