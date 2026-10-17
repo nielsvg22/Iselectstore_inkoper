@@ -115,6 +115,10 @@ export function mapSearchListing(o: Obj, now = new Date()): RawAd | null {
       verified: typeof seller.isVerified === "boolean" ? seller.isVerified : null,
       business: Array.isArray(o.traits) ? (o.traits as unknown[]).includes("VERIFIED_SELLER") || (o.traits as unknown[]).includes("SELLER_PROFILE_URL") : null,
       anonymous: str(seller.sellerName)?.toLowerCase() === "anoniem" || seller.sellerId === 1,
+      // Alleen direct aanwezige, numerieke platformgegevens gebruiken.
+      rating: typeof seller.rating === "number" && seller.rating >= 0 && seller.rating <= 5 ? seller.rating : null,
+      reviewCount: typeof seller.reviewCount === "number" && seller.reviewCount >= 0 ? seller.reviewCount : null,
+      accountAgeMonths: typeof seller.accountAgeMonths === "number" && seller.accountAgeMonths >= 0 ? seller.accountAgeMonths : null,
     },
     shipping,
     conditionText: attrs.condition ?? null,
@@ -158,7 +162,10 @@ export function mergeDetail(list: RawAd, detail: RawAd): RawAd {
     // Detailpagina eerst: die heeft de volledige fotoset; zoekresultaat-foto's vullen alleen aan
     imageUrls: mergeImages(detail.imageUrls.map((u) => hiRes(u, "full")), list.imageUrls).slice(0, 20),
     detailLoaded: true,
-    seller: list.seller ?? detail.seller,
+    seller: detail.seller || list.seller ? {
+      ...detail.seller,
+      ...Object.fromEntries(Object.entries(list.seller ?? {}).filter(([, v]) => v != null)),
+    } : undefined,
     askingCents: list.askingCents ?? detail.askingCents ?? null,
     location: list.location ?? detail.location ?? null,
   };
