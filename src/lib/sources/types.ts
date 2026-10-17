@@ -12,7 +12,16 @@ export interface RawAd {
   category?: string | null;
   sellerType?: string | null;
   /** Alleen wat de bron zelf levert; ontbrekende gegevens blijven null (nooit aannemen) */
-  seller?: { id?: string | null; name?: string | null; verified?: boolean | null; business?: boolean | null; anonymous?: boolean | null };
+  seller?: {
+    id?: string | null;
+    name?: string | null;
+    verified?: boolean | null;
+    business?: boolean | null;
+    anonymous?: boolean | null;
+    rating?: number | null;
+    reviewCount?: number | null;
+    accountAgeMonths?: number | null;
+  };
   shipping?: string[];
   conditionText?: string | null;
   publishedAt?: Date | null;
@@ -34,8 +43,13 @@ export interface FetchContext {
   deferDetails?: boolean;
   /** Smalle resultaatlijsten (model × opslag via Marktplaats-filterpagina's); vervangt de zoektermen voor deze run */
   slices?: Array<{ url: string; label: string }>;
+  /** Sla resultaten per pagina direct op, voordat volgende netwerkrequests klaar zijn. */
+  onAds?: (ads: RawAd[]) => Promise<void>;
   /** Wordt aangeroepen zodra een smalle lijst of zoekterm is doorlopen (voor de rondlopende planning) */
-  onUnit?: (key: string, info: { pages: number; total: number | null; covered: number }) => void;
+  onUnit?: (
+    key: string,
+    info: { pages: number; total: number | null; covered: number },
+  ) => void;
   /** Zoektermen voor modellen zonder filterpagina; lopen naast de slices mee */
   extraQueries?: string[];
   /** Snelle modus: minder pagina's en een korte cache zodat de pagina vers is */
@@ -43,7 +57,12 @@ export interface FetchContext {
   /** Maximale leeftijd (sec) van een gecachte zoekpagina voor deze run */
   cacheSeconds?: number;
   /** Wordt door de bron ingevuld: aantal opgehaalde pagina's en cache-treffers */
-  stats?: { pages: number; cacheHits: number; /** totaal aantal resultaten volgens de bron (som over zoektermen) */ total?: number; /** aantal resultaten dat we daadwerkelijk hebben gezien */ covered?: number };
+  stats?: {
+    pages: number;
+    cacheHits: number;
+    /** totaal aantal resultaten volgens de bron (som over zoektermen) */ total?: number;
+    /** aantal resultaten dat we daadwerkelijk hebben gezien */ covered?: number;
+  };
   /** Alleen voor tests */
   fetchImpl?: typeof fetch;
   lookup?: (host: string) => Promise<string[]>;
@@ -64,7 +83,10 @@ export interface SourceAdapter extends AdapterStatus {
 }
 
 export class SourceError extends Error {
-  constructor(message: string, public retryable = true) {
+  constructor(
+    message: string,
+    public retryable = true,
+  ) {
     super(message);
     this.name = "SourceError";
   }

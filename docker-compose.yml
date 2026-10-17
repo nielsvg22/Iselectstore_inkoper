@@ -33,6 +33,12 @@ services:
     depends_on: { web: { condition: service_started } }
     environment: *env
     command: ["sh", "-c", "npx prisma migrate deploy && npm run worker"]
+    healthcheck:
+      test: ["CMD", "npx", "tsx", "scripts/worker-health.ts"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
 
 volumes:
   dbdata:

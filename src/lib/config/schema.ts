@@ -6,10 +6,18 @@ import { z } from "zod";
  */
 export const configSchema = z.object({
   demoMode: z.boolean().default(false),
+  radar: z
+    .object({
+      topMinProfitCents: z.number().int().min(0).default(7500),
+      topMinScore: z.number().int().min(0).max(100).default(80),
+    })
+    .default({}),
 
   ai: z
     .object({
-      provider: z.enum(["none", "anthropic", "openai", "openai_compatible"]).default("none"),
+      provider: z
+        .enum(["none", "anthropic", "openai", "openai_compatible"])
+        .default("none"),
       model: z.string().max(100).default(""),
       baseUrl: z.string().max(300).default(""),
       analyzeImages: z.boolean().default(false),
@@ -28,8 +36,8 @@ export const configSchema = z.object({
       minRoiPct: z.number().min(0).default(25),
       minDealScore: z.number().int().min(0).max(100).default(60),
       maxBuyCents: z.number().int().min(0).default(100000),
-      searchRadiusKm: z.number().min(0).default(100),
-      defaultLocation: z.string().max(100).default(""),
+      searchRadiusKm: z.number().min(0).default(40),
+      defaultLocation: z.string().max(100).default("Apeldoorn"),
       riskTolerance: z.enum(["low", "medium", "high"]).default("medium"),
     })
     .default({}),
@@ -75,7 +83,12 @@ export const configSchema = z.object({
       batteryPenaltyPctPerPoint: z.number().min(0).max(5).default(0.5),
       batteryPenaltyBelow: z.number().int().min(50).max(100).default(85),
       conditionMultipliers: z
-        .object({ A: z.number().default(1), B: z.number().default(0.95), C: z.number().default(0.85), unknown: z.number().default(0.95) })
+        .object({
+          A: z.number().default(1),
+          B: z.number().default(0.95),
+          C: z.number().default(0.85),
+          unknown: z.number().default(0.95),
+        })
         .default({}),
     })
     .default({}),
@@ -93,7 +106,12 @@ export const configSchema = z.object({
         })
         .default({}),
       bands: z
-        .object({ top: z.number().default(90), veryInteresting: z.number().default(75), interesting: z.number().default(60), moderate: z.number().default(40) })
+        .object({
+          top: z.number().default(90),
+          veryInteresting: z.number().default(75),
+          interesting: z.number().default(60),
+          moderate: z.number().default(40),
+        })
         .default({}),
     })
     .default({}),
@@ -101,7 +119,9 @@ export const configSchema = z.object({
   notifications: z
     .object({
       enabled: z.boolean().default(true),
-      minBand: z.enum(["TOP", "VERY_INTERESTING", "INTERESTING"]).default("VERY_INTERESTING"),
+      minBand: z
+        .enum(["TOP", "VERY_INTERESTING", "INTERESTING"])
+        .default("VERY_INTERESTING"),
       channels: z.array(z.enum(["TELEGRAM", "DISCORD"])).default(["TELEGRAM"]),
       /** Geen (definitieve) melding zolang de volledige advertentie (detailpagina) nog niet is beoordeeld */
       requireFullAnalysis: z.boolean().default(true),
@@ -110,10 +130,17 @@ export const configSchema = z.object({
 
   policies: z
     .object({
+      seller: z
+        .object({
+          minRating: z.number().min(0).max(5).default(4.6),
+          minReviews: z.number().int().min(0).default(15),
+          minAgeMonths: z.number().int().min(0).default(12),
+        })
+        .default({}),
       distance: z
         .object({
           /** Tot hier is ophalen acceptabel (voorbeeld klant: ±45 km) */
-          pickupMaxKm: z.number().min(0).max(1000).default(45),
+          pickupMaxKm: z.number().min(0).max(1000).default(40),
           /** Reiskosten per kilometer (heen en terug); 0 = niet meenemen */
           transportPerKmCents: z.number().int().min(0).max(500).default(0),
           /** Verzendkosten bij ophalen op afstand niet nodig; 0 = niet automatisch meenemen */
@@ -181,7 +208,18 @@ export const configSchema = z.object({
 
   sources: z
     .object({
-      allowed: z.array(z.enum(["MANUAL_URL", "IMPORT", "FEED", "PARTNER_API", "DEMO", "SEARCH"])).default(["MANUAL_URL", "IMPORT", "FEED", "DEMO", "SEARCH"]),
+      allowed: z
+        .array(
+          z.enum([
+            "MANUAL_URL",
+            "IMPORT",
+            "FEED",
+            "PARTNER_API",
+            "DEMO",
+            "SEARCH",
+          ]),
+        )
+        .default(["MANUAL_URL", "IMPORT", "FEED", "DEMO", "SEARCH"]),
       urlAllowlist: z.array(z.string().max(100)).default(["marktplaats.nl"]),
     })
     .default({}),
@@ -201,5 +239,10 @@ export const configSchema = z.object({
 export type AppConfig = z.infer<typeof configSchema>;
 export const defaultConfig: AppConfig = configSchema.parse({});
 
-export const SECRET_KEYS = ["ai.apiKey", "telegram.botToken", "discord.webhookUrl", "imap.password"] as const;
+export const SECRET_KEYS = [
+  "ai.apiKey",
+  "telegram.botToken",
+  "discord.webhookUrl",
+  "imap.password",
+] as const;
 export type SecretKey = (typeof SECRET_KEYS)[number];

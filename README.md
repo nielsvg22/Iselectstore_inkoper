@@ -1,4 +1,8 @@
-# Apple Deal Hunter
+# iSelectStore — Inkoopradar
+
+De huidige implementatie, bronbeperkingen, herstelprocedure en verificatie staan in [RADAR-2-IMPLEMENTATIE.md](docs/RADAR-2-IMPLEMENTATIE.md). De nieuwe worker migreert bestaande beheerdersprofielen eenmalig en herstelbaar naar één radar. Productie-uitrol is een afzonderlijke stap.
+
+## Bestaande applicatie
 
 Webapp voor handelaren in tweedehands Apple-producten: advertenties verzamelen, producten herkennen, marktwaarde schatten, winst berekenen, risico's detecteren, scoren (0–100) en de beste inkoopdeals melden via Telegram.
 
@@ -28,7 +32,7 @@ docker compose up --build       # web op :3000, worker en Postgres inbegrepen
 
 ### Productie (Vercel + beheerde Postgres, bijv. Neon)
 1. Zet `DATABASE_URL`, `APP_SECRET`, `CRON_SECRET` als omgevingsvariabelen. Draai `npx prisma migrate deploy` (CI of lokaal tegen de productie-DB).
-2. `vercel.json` voert tijdens de build `prisma migrate deploy` uit en roept dagelijks `/api/jobs/tick` aan (Vercel Cron stuurt `Authorization: Bearer $CRON_SECRET`). Het Hobby-plan staat alleen dagelijkse crons toe: laat voor frequentere controles een externe scheduler (bijv. cron-job.org) elke 5 minuten `POST /api/jobs/tick` aanroepen met header `Authorization: Bearer <CRON_SECRET>`, of verhoog de cron op een betaald plan. Gebruik voor Neon de directe (niet-pooler) URL met `?sslmode=require&connection_limit=5`.
+2. Voer `prisma migrate deploy` als afzonderlijke release-stap tegen de bedoelde database uit. `vercel.json` bouwt zonder databasemutaties en roept dagelijks `/api/jobs/tick` aan (Vercel Cron stuurt `Authorization: Bearer $CRON_SECRET`). Het Hobby-plan staat alleen dagelijkse crons toe: laat voor frequentere controles een externe scheduler (bijv. cron-job.org) elke 5 minuten `POST /api/jobs/tick` aanroepen met header `Authorization: Bearer <CRON_SECRET>`, of verhoog de cron op een betaald plan. Gebruik voor Neon de directe (niet-pooler) URL met `?sslmode=require&connection_limit=5`.
 3. Op Vercel is geen permanente worker: de tick verwerkt per aanroep maximaal `jobsPerTick` jobs binnen 60 s.
 4. Eigen server: Docker Compose (hierboven) of `npm run build && npm start` + `npm run worker` onder systemd/pm2, achter HTTPS (cookies zijn `Secure` in productie).
 
@@ -36,7 +40,7 @@ docker compose up --build       # web op :3000, worker en Postgres inbegrepen
 
 | Onderdeel | Status |
 |---|---|
-| **Automatisch zoeken op Marktplaats** (zoektermen + categorie + filters, alle resultaten, nieuwste eerst, volledige tekst van nieuwe advertenties) | ✅ live getest |
+| **Automatisch zoeken op Marktplaats** (zoektermen + categorie + filters, begrensde pagina-dekking, volledige tekst asynchroon) | ✅ live getest |
 | **Eigen filters** (Instellingen → Mijn filters): maken, wijzigen, toepassen op het dashboard en laden in zoekprofielen | ✅ |
 | **Volledige Apple-lijst** (±130 modellen + accessoires) als doorzoekbare productkiezer; **Apple-categorieën van Marktplaats** (live opgehaald, vernieuwbaar) | ✅ |
 | **Alle foto's** van een advertentie (detailpagina, hoge resolutie, automatisch bij openen) | ✅ |
@@ -49,7 +53,7 @@ docker compose up --build       # web op :3000, worker en Postgres inbegrepen
 | Risico: blokkades (iCloud/MDM/gestolen/IMEI/defect/onderdelen/water), oplichtingspatronen, "te mooi om waar te zijn", prompt-injectie, *handmatige controle vereist* | ✅ |
 | Zoekprofielen met AND/OR-regelboom (relationeel opgeslagen), snelle filters | ✅ |
 | Telegram (en Discord) meldingen, per profiel, zonder duplicaten | ✅ |
-| E-mail, Web Push | ❌ niet geïmplementeerd |
+| Web Push/PWA op iOS 16.4+ (geïnstalleerde webapp), testpush en voorkeuren; mailbox-alerts als invoer | ✅ geïmplementeerd; echte iPhone-ontvangst apart verifiëren |
 | Dashboard in iSelectStore-stijl (statistiektegels, categorieën, nieuwste deals, realtime meldingen), `/deals` (kaarten/tabel, filters, afstand), `/notifications`, `/stats`, detailpagina, light/dark, responsive | ✅ |
 | Inkoop-/verkoopadministratie + statistieken; verkopen voeden waardering | ✅ |
 | Jobs: wachtrij, retry/backoff, rate limiting, dagelijkse requestlimiet, foutregistratie, statuspagina | ✅ |
@@ -66,7 +70,7 @@ Instelbaar onder *Instellingen*: vraagprijs→verkoopprijs-factor (0,92), opslag
 
 ## Testen
 ```bash
-npm test               # 355 unit- + integratietests (Postgres vereist; gebruikt DB dealhunter_test)
+npm test               # 423 unit- + integratietests (Postgres vereist; gebruikt DB dealhunter_test)
 npm run lint           # TypeScript
 npm run test:e2e       # Playwright (bouwt niet; draai eerst `npm run build`; DB dealhunter_e2e)
 ```

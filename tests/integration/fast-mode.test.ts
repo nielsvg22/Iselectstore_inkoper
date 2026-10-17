@@ -5,7 +5,12 @@ import { ingestAd } from "@/lib/pipeline/ingest";
 import { saveTree } from "@/lib/pipeline/tree";
 import { deliverNotification } from "@/lib/notify/dispatch";
 import { processJobs } from "@/lib/jobs/queue";
-import { handlers, runProfileCheck, scheduleDueProfiles, runDetailFetch } from "@/lib/jobs/handlers";
+import {
+  handlers,
+  runProfileCheck,
+  scheduleDueProfiles,
+  runDetailFetch,
+} from "@/lib/jobs/handlers";
 import { getCooldown } from "@/lib/jobs/cooldown";
 import { saveConfig } from "@/lib/settings/store";
 import { clearPageCache } from "@/lib/sources/marktplaats-search";
@@ -14,22 +19,73 @@ import type { RawAd } from "@/lib/sources/types";
 import { getPerformance } from "@/lib/metrics";
 import { makeUser, resetDb } from "../helpers";
 
-vi.mock("node:dns/promises", () => ({ default: { lookup: async () => [{ address: "93.184.216.34", family: 4 }] }, lookup: async () => [{ address: "93.184.216.34", family: 4 }] }));
+vi.mock("node:dns/promises", () => ({
+  default: { lookup: async () => [{ address: "93.184.216.34", family: 4 }] },
+  lookup: async () => [{ address: "93.184.216.34", family: 4 }],
+}));
 
 const raw = (o: Partial<RawAd> = {}): RawAd => ({
-  externalId: "m3000001", url: "https://www.marktplaats.nl/v/x/m3000001-iphone", title: "iPhone 15 Pro 256GB", description: "Batterij 91%. iCloud vrij, simlockvrij. Mooi toestel zonder krassen, incl. oplader en doos.",
-  askingCents: 30000, location: "Utrecht", distanceKm: 20, imageUrls: ["https://img.example/1.jpg", "https://img.example/2.jpg", "https://img.example/3.jpg"], shipping: ["pickup", "shipping"], publishedAt: new Date(), ...o,
+  externalId: "m3000001",
+  url: "https://www.marktplaats.nl/v/x/m3000001-iphone",
+  title: "iPhone 15 Pro 256GB",
+  description:
+    "Batterij 91%. iCloud vrij, simlockvrij. Mooi toestel zonder krassen, incl. oplader en doos.",
+  askingCents: 30000,
+  location: "Utrecht",
+  distanceKm: 20,
+  imageUrls: [
+    "https://img.example/1.jpg",
+    "https://img.example/2.jpg",
+    "https://img.example/3.jpg",
+  ],
+  shipping: ["pickup", "shipping"],
+  publishedAt: new Date(),
+  ...o,
 });
 
-async function profile(userId: string, fastMode: boolean, extra: Record<string, unknown> = {}) {
-  const p = await prisma.searchProfile.create({ data: { userId, name: fastMode ? "Snel" : "Normaal", sourceKind: "SEARCH", notifyMinScore: 0, notifyChannels: [], intervalMinutes: 10, sourceConfig: { queries: ["iphone 15 pro"], fastMode, maxPages: 3, baselineAt: new Date(Date.now() - 3600_000).toISOString(), ...extra } } });
+async function profile(
+  userId: string,
+  fastMode: boolean,
+  extra: Record<string, unknown> = {},
+) {
+  const p = await prisma.searchProfile.create({
+    data: {
+      userId,
+      name: fastMode ? "Snel" : "Normaal",
+      sourceKind: "SEARCH",
+      notifyMinScore: 0,
+      notifyChannels: [],
+      intervalMinutes: 10,
+      sourceConfig: {
+        queries: ["iphone 15 pro"],
+        fastMode,
+        maxPages: 3,
+        baselineAt: new Date(Date.now() - 3600_000).toISOString(),
+        ...extra,
+      },
+    },
+  });
   await saveTree(p.id, { op: "AND", children: [] });
   return p;
 }
 async function comps() {
-  await prisma.marketComparable.createMany({ data: [700, 690, 710, 705, 695, 715, 702, 698].map((p, i) => ({ modelKey: "iphone-15-pro", storageGb: 256, priceCents: p * 100, kind: i < 2 ? ("REALIZED" as const) : ("ASKING_CURRENT" as const), observedAt: new Date(Date.now() - i * 86400000) })) });
+  await prisma.marketComparable.createMany({
+    data: [700, 690, 710, 705, 695, 715, 702, 698].map((p, i) => ({
+      modelKey: "iphone-15-pro",
+      storageGb: 256,
+      priceCents: p * 100,
+      kind: i < 2 ? ("REALIZED" as const) : ("ASKING_CURRENT" as const),
+      observedAt: new Date(Date.now() - i * 86400000),
+    })),
+  });
 }
-const jobsFor = (id: string) => prisma.backgroundJob.findMany({ where: { type: "CHECK_PROFILE", payload: { path: ["profileId"], equals: id } } });
+const jobsFor = (id: string) =>
+  prisma.backgroundJob.findMany({
+    where: {
+      type: "CHECK_PROFILE",
+      payload: { path: ["profileId"], equals: id },
+    },
+  });
 
 beforeEach(async () => {
   await resetDb();
@@ -47,7 +103,9 @@ describe("snelle modus: planning", () => {
     await prisma.searchProfile.updateMany({ data: { lastCheckedAt: ago(70) } });
 
     await scheduleDueProfiles(); // globaal uit: beide wachten op 10 minuten
-    expect((await jobsFor(fast.id)).length + (await jobsFor(slow.id)).length).toBe(0);
+    expect(
+      (await jobsFor(fast.id)).length + (await jobsFor(slow.id)).length,
+    ).toBe(0);
 
     await saveConfig({ scheduler: { fast: { enabled: true } } });
     await scheduleDueProfiles();
@@ -55,20 +113,32 @@ describe("snelle modus: planning", () => {
     expect((await jobsFor(fast.id))[0].priority).toBe(28); // detectie gaat voor detailpagina's
     expect((await jobsFor(slow.id)).length).toBe(0);
 
-    await prisma.searchProfile.update({ where: { id: fast.id }, data: { lastCheckedAt: ago(30) } });
+    await prisma.searchProfile.update({
+      where: { id: fast.id },
+      data: { lastCheckedAt: ago(30) },
+    });
     await prisma.backgroundJob.deleteMany();
     await scheduleDueProfiles();
     expect((await jobsFor(fast.id)).length).toBe(0); // nog geen minuut geleden
 
-    await prisma.searchProfile.update({ where: { id: slow.id }, data: { lastCheckedAt: ago(11 * 60) } });
+    await prisma.searchProfile.update({
+      where: { id: slow.id },
+      data: { lastCheckedAt: ago(11 * 60) },
+    });
     await scheduleDueProfiles();
     expect((await jobsFor(slow.id)).length).toBe(1);
   });
 
   it("totaalrem: nooit meer dan het ingestelde aantal pagina-requests per minuut", async () => {
     const { user } = await makeUser();
-    await saveConfig({ scheduler: { fast: { enabled: true, maxRequestsPerMinute: 2, pages: 2 } } });
-    const ps = [await profile(user.id, true), await profile(user.id, true), await profile(user.id, true)];
+    await saveConfig({
+      scheduler: { fast: { enabled: true, maxRequestsPerMinute: 2, pages: 2 } },
+    });
+    const ps = [
+      await profile(user.id, true),
+      await profile(user.id, true),
+      await profile(user.id, true),
+    ];
     const n = await scheduleDueProfiles();
     expect(n).toBeLessThan(3); // budget 2 requests, elk profiel kost 2 pagina's
     expect(n).toBeGreaterThanOrEqual(1);
@@ -84,7 +154,8 @@ describe("snelle modus: blokkade (403/429) wordt gerespecteerd", () => {
     let hits = 0;
     vi.stubGlobal("fetch", async (u: string) => {
       const url = new URL(u);
-      if (url.pathname === "/robots.txt") return new Response("User-agent: *\nDisallow: /lrp/api/search*");
+      if (url.pathname === "/robots.txt")
+        return new Response("User-agent: *\nDisallow: /lrp/api/search*");
       hits++;
       return new Response("Too many requests", { status: 429 });
     });
@@ -93,7 +164,10 @@ describe("snelle modus: blokkade (403/429) wordt gerespecteerd", () => {
     expect(cd).not.toBeNull();
     expect(cd!.until.getTime() - Date.now()).toBeGreaterThan(14 * 60_000);
     const before = hits;
-    await prisma.searchProfile.update({ where: { id: p.id }, data: { lastCheckedAt: new Date(Date.now() - 3600_000) } });
+    await prisma.searchProfile.update({
+      where: { id: p.id },
+      data: { lastCheckedAt: new Date(Date.now() - 3600_000) },
+    });
     expect(await scheduleDueProfiles()).toBe(0); // gepauzeerd
     await expect(runProfileCheck(p.id)).rejects.toThrow(/Gepauzeerd/);
     expect(hits).toBe(before); // tijdens de pauze geen enkel request naar de bron
@@ -106,128 +180,280 @@ describe("snelle modus: blokkade (403/429) wordt gerespecteerd", () => {
 });
 
 describe("snelle modus: voorlopige push direct, definitieve push na de detailpagina", () => {
-  const okSender = (calls: Array<{ payload: string }>): PushSender => async (_s, payload) => { calls.push({ payload }); return { statusCode: 201 }; };
+  const okSender =
+    (calls: Array<{ payload: string }>): PushSender =>
+    async (_s, payload) => {
+      calls.push({ payload });
+      return { statusCode: 201 };
+    };
 
   async function setup(fastMode: boolean) {
     const { user } = await makeUser();
-    await saveConfig({ scheduler: { fast: { enabled: true } }, notifications: { enabled: true } });
+    await saveConfig({
+      scheduler: { fast: { enabled: true } },
+      notifications: { enabled: true },
+    });
     await profile(user.id, fastMode);
-    await prisma.pushSubscription.create({ data: { userId: user.id, endpoint: "https://push.example/a", p256dh: "p".repeat(30), auth: "a".repeat(12) } });
+    await prisma.pushSubscription.create({
+      data: {
+        userId: user.id,
+        endpoint: "https://push.example/a",
+        p256dh: "p".repeat(30),
+        auth: "a".repeat(12),
+      },
+    });
     await comps();
     return user;
   }
-  const analyze = () => processJobs(handlers, { maxJobs: 50, types: ["ANALYZE_AD"], concurrency: 2 });
+  const analyze = () =>
+    processJobs(handlers, {
+      maxJobs: 50,
+      types: ["ANALYZE_AD"],
+      concurrency: 2,
+    });
 
-  it("snel profiel: voorlopige push zonder te wachten op de detailpagina, daarna precies één definitieve die dezelfde melding vervangt (zelfde tag)", async () => {
+  it("snel profiel: voorlopige push zonder te wachten op de detailpagina, detailverrijking zonder tweede melding", async () => {
     await setup(true);
-    const a = await ingestAd(raw({ detailLoaded: false }), { origin: "SEARCH", partial: true });
+    const a = await ingestAd(raw({ detailLoaded: false }), {
+      origin: "SEARCH",
+      partial: true,
+    });
     await analyze();
-    const prov = await prisma.notification.findMany({ where: { adId: a.adId, channel: "WEBPUSH" } });
+    const prov = await prisma.notification.findMany({
+      where: { adId: a.adId, channel: "WEBPUSH" },
+    });
     expect(prov).toHaveLength(1);
-    expect(prov[0].dedupeKey.endsWith(":p")).toBe(true);
+    expect(prov[0].dedupeKey.endsWith(":p")).toBe(false);
     const calls: Array<{ payload: string }> = [];
     await deliverNotification(prov[0].id, undefined, { push: okSender(calls) });
     const p1 = JSON.parse(calls[0].payload);
-    expect(p1).toMatchObject({ provisional: true, url: `/ads/${a.adId}`, tag: `ad-${a.adId}` });
+    expect(p1).toMatchObject({
+      provisional: true,
+      url: `/ads/${a.adId}`,
+      tag: `ad-${a.adId}`,
+    });
     expect(p1.title).toMatch(/^Voorlopig/);
 
     vi.stubGlobal("fetch", async (u: string) => {
-      if (new URL(u).pathname === "/robots.txt") return new Response("User-agent: *");
-      return new Response(`<html><head><script type="application/ld+json">${JSON.stringify({ "@type": "Product", name: "iPhone 15 Pro 256GB", description: "Volledig: batterij 91%, icloud vrij, simlockvrij, ophalen of verzenden. ".repeat(3), sku: "m3000001", image: ["https://img.example/1.jpg", "https://img.example/9.jpg"], offers: { price: "300", priceCurrency: "EUR" } })}</script></head></html>`, { headers: { "content-type": "text/html" } });
+      if (new URL(u).pathname === "/robots.txt")
+        return new Response("User-agent: *");
+      return new Response(
+        `<html><head><script type="application/ld+json">${JSON.stringify({ "@type": "Product", name: "iPhone 15 Pro 256GB", description: "Volledig: batterij 91%, icloud vrij, simlockvrij, ophalen of verzenden. ".repeat(3), sku: "m3000001", image: ["https://img.example/1.jpg", "https://img.example/9.jpg"], offers: { price: "300", priceCurrency: "EUR" } })}</script></head></html>`,
+        { headers: { "content-type": "text/html" } },
+      );
     });
     await runDetailFetch(a.adId);
     await analyze();
     await analyze(); // herhaalde analyse maakt niets dubbel
-    const all = await prisma.notification.findMany({ where: { adId: a.adId, channel: "WEBPUSH" }, orderBy: { createdAt: "asc" } });
-    expect(all).toHaveLength(2); // voorlopig + definitief
-    const fin = all.find((n) => !n.dedupeKey.endsWith(":p"))!;
-    await deliverNotification(fin.id, undefined, { push: okSender(calls) });
-    const p2 = JSON.parse(calls[1].payload);
-    expect(p2.tag).toBe(p1.tag); // zelfde tag: vervangt de voorlopige melding op het toestel
-    // de definitieve melding wacht niet meer op de volledige advertentie (andere voorbehouden, zoals onzekere marktwaarde, kunnen blijven staan)
-    expect(p2.body).not.toMatch(/volledige advertentie/);
+    const all = await prisma.notification.findMany({
+      where: { adId: a.adId, channel: "WEBPUSH" },
+      orderBy: { createdAt: "asc" },
+    });
+    expect(all).toHaveLength(1); // detailanalyse veroorzaakt geen tweede push
+    await deliverNotification(all[0].id, undefined, { push: okSender(calls) });
+    expect(calls).toHaveLength(1);
     expect(p1.body).toMatch(/volledige advertentie nog niet beoordeeld/);
   });
 
   it("normaal profiel: geen voorlopige push (wacht op volledige beoordeling)", async () => {
     await setup(false);
-    const a = await ingestAd(raw({ detailLoaded: false }), { origin: "SEARCH", partial: true });
+    const a = await ingestAd(raw({ detailLoaded: false }), {
+      origin: "SEARCH",
+      partial: true,
+    });
     await analyze();
-    expect(await prisma.notification.count({ where: { adId: a.adId } })).toBe(0);
+    expect(await prisma.notification.count({ where: { adId: a.adId } })).toBe(
+      0,
+    );
   });
 });
 
 describe("snelle modus: hele keten na ophalen (nagebootste bron en pushdienst)", () => {
   it("nieuwe iPhone op de zoekpagina → voorlopige push verzonden binnen enkele seconden eigen verwerkingstijd", async () => {
     const { user } = await makeUser();
-    await saveConfig({ scheduler: { fast: { enabled: true } }, notifications: { enabled: true } });
-    const p = await profile(user.id, true, { queries: ["iphone 15 pro"], category: "telecommunicatie/mobiele-telefoons-apple-iphone" });
-    await prisma.pushSubscription.create({ data: { userId: user.id, endpoint: "https://push.example/a", p256dh: "p".repeat(30), auth: "a".repeat(12) } });
-    await prisma.marketComparable.createMany({ data: [700, 690, 710, 705, 695, 715, 702, 698].map((x, i) => ({ modelKey: "iphone-15-pro", storageGb: 128, priceCents: x * 100 - 20000, kind: i < 2 ? ("REALIZED" as const) : ("ASKING_CURRENT" as const), observedAt: new Date(Date.now() - i * 86400000) })) });
+    await saveConfig({
+      scheduler: { fast: { enabled: true } },
+      notifications: { enabled: true },
+    });
+    const p = await profile(user.id, true, {
+      queries: ["iphone 15 pro"],
+      category: "telecommunicatie/mobiele-telefoons-apple-iphone",
+    });
+    await prisma.pushSubscription.create({
+      data: {
+        userId: user.id,
+        endpoint: "https://push.example/a",
+        p256dh: "p".repeat(30),
+        auth: "a".repeat(12),
+      },
+    });
+    await prisma.marketComparable.createMany({
+      data: [700, 690, 710, 705, 695, 715, 702, 698].map((x, i) => ({
+        modelKey: "iphone-15-pro",
+        storageGb: 128,
+        priceCents: x * 100 - 20000,
+        kind: i < 2 ? ("REALIZED" as const) : ("ASKING_CURRENT" as const),
+        observedAt: new Date(Date.now() - i * 86400000),
+      })),
+    });
     const html = readFileSync("tests/fixtures/mp-search.html", "utf8");
     vi.stubGlobal("fetch", async (u: string) => {
       const url = new URL(u);
-      if (url.pathname === "/robots.txt") return new Response("User-agent: *\nDisallow: /lrp/api/search*");
+      if (url.pathname === "/robots.txt")
+        return new Response("User-agent: *\nDisallow: /lrp/api/search*");
       return new Response(html, { headers: { "content-type": "text/html" } });
     });
     const sent: number[] = [];
     const t0 = Date.now();
     await runProfileCheck(p.id); // detectie: zoekpagina → ingest
     const calls: Array<{ payload: string }> = [];
-    const sender: PushSender = async (_s, payload) => { calls.push({ payload }); sent.push(Date.now() - t0); return { statusCode: 201 }; };
-    const benchHandlers = { ...handlers, NOTIFY: async (job: { payload: unknown }) => deliverNotification((job.payload as { notificationId: string }).notificationId, undefined, { push: sender }) };
-    await processJobs(benchHandlers as never, { maxJobs: 50, types: ["ANALYZE_AD", "NOTIFY"], concurrency: 3 });
+    const sender: PushSender = async (_s, payload) => {
+      calls.push({ payload });
+      sent.push(Date.now() - t0);
+      return { statusCode: 201 };
+    };
+    const benchHandlers = {
+      ...handlers,
+      NOTIFY: async (job: { payload: unknown }) =>
+        deliverNotification(
+          (job.payload as { notificationId: string }).notificationId,
+          undefined,
+          { push: sender },
+        ),
+    };
+    await processJobs(benchHandlers as never, {
+      maxJobs: 50,
+      types: ["ANALYZE_AD", "NOTIFY"],
+      concurrency: 3,
+    });
     expect(calls.length).toBeGreaterThan(0);
     expect(JSON.parse(calls[0].payload).provisional).toBe(true);
     expect(sent[0]).toBeLessThan(3000); // detectie → eerste push (ons deel van de keten)
     // detailpagina's staan klaar maar blokkeren de detectie niet
-    expect(await prisma.backgroundJob.count({ where: { type: "FETCH_DETAIL" } })).toBeGreaterThan(0);
+    expect(
+      await prisma.backgroundJob.count({ where: { type: "FETCH_DETAIL" } }),
+    ).toBeGreaterThan(0);
   });
 });
 
 describe("alleen echt nieuwe advertenties worden gemeld", () => {
   async function prep(baselineOffsetMs: number | null) {
     const { user } = await makeUser();
-    await saveConfig({ scheduler: { fast: { enabled: true } }, notifications: { enabled: true } });
-    await profile(user.id, true, baselineOffsetMs == null ? { baselineAt: undefined } : { baselineAt: new Date(Date.now() + baselineOffsetMs).toISOString() });
-    await prisma.pushSubscription.create({ data: { userId: user.id, endpoint: "https://push.example/a", p256dh: "p".repeat(30), auth: "a".repeat(12) } });
+    await saveConfig({
+      scheduler: { fast: { enabled: true } },
+      notifications: { enabled: true },
+    });
+    await profile(
+      user.id,
+      true,
+      baselineOffsetMs == null
+        ? { baselineAt: undefined }
+        : { baselineAt: new Date(Date.now() + baselineOffsetMs).toISOString() },
+    );
+    await prisma.pushSubscription.create({
+      data: {
+        userId: user.id,
+        endpoint: "https://push.example/a",
+        p256dh: "p".repeat(30),
+        auth: "a".repeat(12),
+      },
+    });
     await comps();
   }
-  const analyze = () => processJobs(handlers, { maxJobs: 50, types: ["ANALYZE_AD"], concurrency: 2 });
+  const analyze = () =>
+    processJobs(handlers, {
+      maxJobs: 50,
+      types: ["ANALYZE_AD"],
+      concurrency: 2,
+    });
 
   it("nulmeting: advertenties die bij de eerste controle al bestonden geven nooit een melding", async () => {
     await prep(+60_000); // baseline ligt ná de eerste zichtbaarheid van de advertentie
     const a = await ingestAd(raw(), { origin: "SEARCH", partial: true });
     await analyze();
-    expect(await prisma.notification.count({ where: { adId: a.adId } })).toBe(0);
+    expect(await prisma.notification.count({ where: { adId: a.adId } })).toBe(
+      0,
+    );
   });
 
   it("eerste controle loopt nog (nog geen nulmeting): geen meldingen", async () => {
     await prep(null);
     const a = await ingestAd(raw(), { origin: "SEARCH", partial: true });
     await analyze();
-    expect(await prisma.notification.count({ where: { adId: a.adId } })).toBe(0);
+    expect(await prisma.notification.count({ where: { adId: a.adId } })).toBe(
+      0,
+    );
   });
 
   it("oude advertentie die we pas nu tegenkomen (geplaatst >30 uur geleden) geeft geen melding; een verse wel", async () => {
     await prep(-3600_000);
-    const old = await ingestAd(raw({ externalId: "m3000010", url: "https://www.marktplaats.nl/v/x/m3000010-a", title: "iPhone 15 Pro 256GB oud", location: "Zwolle", imageUrls: ["https://img.example/o1.jpg", "https://img.example/o2.jpg", "https://img.example/o3.jpg"], publishedAt: new Date(Date.now() - 72 * 3600_000) }), { origin: "SEARCH", partial: true });
-    const fresh = await ingestAd(raw({ externalId: "m3000011", url: "https://www.marktplaats.nl/v/x/m3000011-a", title: "iPhone 15 Pro 256GB vers", location: "Breda", imageUrls: ["https://img.example/v1.jpg", "https://img.example/v2.jpg", "https://img.example/v3.jpg"], publishedAt: new Date() }), { origin: "SEARCH", partial: true });
+    const old = await ingestAd(
+      raw({
+        externalId: "m3000010",
+        url: "https://www.marktplaats.nl/v/x/m3000010-a",
+        title: "iPhone 15 Pro 256GB oud",
+        location: "Zwolle",
+        imageUrls: [
+          "https://img.example/o1.jpg",
+          "https://img.example/o2.jpg",
+          "https://img.example/o3.jpg",
+        ],
+        publishedAt: new Date(Date.now() - 72 * 3600_000),
+      }),
+      { origin: "SEARCH", partial: true },
+    );
+    const fresh = await ingestAd(
+      raw({
+        externalId: "m3000011",
+        url: "https://www.marktplaats.nl/v/x/m3000011-a",
+        title: "iPhone 15 Pro 256GB vers",
+        location: "Breda",
+        imageUrls: [
+          "https://img.example/v1.jpg",
+          "https://img.example/v2.jpg",
+          "https://img.example/v3.jpg",
+        ],
+        publishedAt: new Date(),
+      }),
+      { origin: "SEARCH", partial: true },
+    );
     await analyze();
-    expect(await prisma.notification.count({ where: { adId: old.adId } })).toBe(0);
-    expect(await prisma.notification.count({ where: { adId: fresh.adId, channel: "WEBPUSH" } })).toBe(1);
+    expect(await prisma.notification.count({ where: { adId: old.adId } })).toBe(
+      0,
+    );
+    expect(
+      await prisma.notification.count({
+        where: { adId: fresh.adId, channel: "WEBPUSH" },
+      }),
+    ).toBe(1);
   });
 });
 
 describe("dekking: snelle modus bekijkt álle resultaten van een smalle zoekopdracht", () => {
-  const base = JSON.parse(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/.exec(readFileSync("tests/fixtures/mp-search.html", "utf8"))![1]);
+  const base = JSON.parse(
+    /<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/.exec(
+      readFileSync("tests/fixtures/mp-search.html", "utf8"),
+    )![1],
+  );
   const proto = base.props.pageProps.searchRequestAndResponse.listings[1];
   const TOTAL = 102;
   const page = (n: number) => {
     const from = (n - 1) * 30;
-    const listings = Array.from({ length: Math.max(0, Math.min(30, TOTAL - from)) }, (_, i) => ({ ...proto, itemId: `m47${String(from + i).padStart(8, "0")}`, title: `iPhone 15 Pro 128GB nr ${from + i}`, vipUrl: `/v/telecommunicatie/mobiele-telefoons-apple-iphone/m47${String(from + i).padStart(8, "0")}-iphone-15-pro-nr-${from + i}` }));
+    const listings = Array.from(
+      { length: Math.max(0, Math.min(30, TOTAL - from)) },
+      (_, i) => ({
+        ...proto,
+        itemId: `m47${String(from + i).padStart(8, "0")}`,
+        title: `iPhone 15 Pro 128GB nr ${from + i}`,
+        vipUrl: `/v/telecommunicatie/mobiele-telefoons-apple-iphone/m47${String(from + i).padStart(8, "0")}-iphone-15-pro-nr-${from + i}`,
+      }),
+    );
     const data = JSON.parse(JSON.stringify(base));
-    Object.assign(data.props.pageProps.searchRequestAndResponse, { listings, totalResultCount: TOTAL, maxAllowedPageNumber: 4 });
+    Object.assign(data.props.pageProps.searchRequestAndResponse, {
+      listings,
+      totalResultCount: TOTAL,
+      maxAllowedPageNumber: 4,
+    });
     return `<html><script id="__NEXT_DATA__" type="application/json">${JSON.stringify(data)}</script></html>`;
   };
   let pages: number[] = [];
@@ -235,58 +461,138 @@ describe("dekking: snelle modus bekijkt álle resultaten van een smalle zoekopdr
     pages = [];
     vi.stubGlobal("fetch", async (u: string) => {
       const url = new URL(u);
-      if (url.pathname === "/robots.txt") return new Response("User-agent: *\nDisallow: /lrp/api/search*");
+      if (url.pathname === "/robots.txt")
+        return new Response("User-agent: *\nDisallow: /lrp/api/search*");
       const m = /\/p\/(\d+)\//.exec(url.pathname);
       pages.push(m ? Number(m[1]) : 1);
-      return new Response(page(m ? Number(m[1]) : 1), { headers: { "content-type": "text/html" } });
+      return new Response(page(m ? Number(m[1]) : 1), {
+        headers: { "content-type": "text/html" },
+      });
     });
   };
 
   it("snelle modus: alle 4 pagina's (102 resultaten) in één controle, dekking 100%; gewoon profiel met 3 pagina's: 88% en een waarschuwing-waarde in Prestaties", async () => {
     const { user } = await makeUser();
-    await saveConfig({ scheduler: { fast: { enabled: true, pages: 8 } }, limits: { maxAdsPerRun: 30 } });
+    await saveConfig({
+      scheduler: { fast: { enabled: true, pages: 8 } },
+      limits: { maxAdsPerRun: 30 },
+    });
     const fast = await profile(user.id, true, { fetchDetails: false });
     stub();
     await runProfileCheck(fast.id);
     expect(pages).toEqual([1, 2, 3, 4]); // stopt na de laatste pagina, ondanks bovengrens 8 en maxAdsPerRun 30
     expect(await prisma.advertisement.count()).toBe(TOTAL);
-    const run = await prisma.checkRun.findFirstOrThrow({ where: { profileId: fast.id } });
-    expect(run).toMatchObject({ totalResults: TOTAL, covered: TOTAL, pages: 4 });
+    const run = await prisma.checkRun.findFirstOrThrow({
+      where: { profileId: fast.id },
+    });
+    expect(run).toMatchObject({
+      totalResults: TOTAL,
+      covered: TOTAL,
+      pages: 4,
+    });
 
     clearPageCache();
     await saveConfig({ limits: { maxAdsPerRun: 120 } });
-    const slow = await profile(user.id, false, { fetchDetails: false, maxPages: 3, queries: ["iphone 15 pro nr"] });
+    const slow = await profile(user.id, false, {
+      fetchDetails: false,
+      maxPages: 3,
+      queries: ["iphone 15 pro nr"],
+    });
     stub();
     await runProfileCheck(slow.id);
     expect(pages).toEqual([1, 2, 3]);
     const perf = await getPerformance(1);
-    expect(perf.profiles.find((p) => p.id === fast.id)?.coverage).toEqual({ total: TOTAL, covered: TOTAL, pct: 100 });
-    expect(perf.profiles.find((p) => p.id === slow.id)?.coverage).toEqual({ total: TOTAL, covered: 90, pct: 88 });
+    expect(perf.profiles.find((p) => p.id === fast.id)?.coverage).toEqual({
+      total: TOTAL,
+      covered: TOTAL,
+      pct: 100,
+    });
+    expect(perf.profiles.find((p) => p.id === slow.id)?.coverage).toEqual({
+      total: TOTAL,
+      covered: 90,
+      pct: 88,
+    });
   });
 });
 
 describe("profielen per model: eigen interval en eerlijke verdeling binnen het paginabudget", () => {
   it("prioriteitsmodel elke 3 min, overig model elke 20 min; grootste achterstand eerst; rem begrenst het aantal controles per ronde", async () => {
     const { user } = await makeUser();
-    await saveConfig({ scheduler: { fast: { enabled: true, maxRequestsPerMinute: 8, intervalSeconds: 60, priorityEveryMinutes: 3, normalEveryMinutes: 20 } } });
-    const mk = (name: string, tier: "high" | "normal") => prisma.searchProfile.create({ data: { userId: user.id, name, sourceKind: "SEARCH", notifyChannels: [], sourceConfig: { queries: [name], fastMode: true, tier, auto: true, group: "iPhone" } } });
+    await saveConfig({
+      scheduler: {
+        fast: {
+          enabled: true,
+          maxRequestsPerMinute: 8,
+          intervalSeconds: 60,
+          priorityEveryMinutes: 3,
+          normalEveryMinutes: 20,
+        },
+      },
+    });
+    const mk = (name: string, tier: "high" | "normal") =>
+      prisma.searchProfile.create({
+        data: {
+          userId: user.id,
+          name,
+          sourceKind: "SEARCH",
+          notifyChannels: [],
+          sourceConfig: {
+            queries: [name],
+            fastMode: true,
+            tier,
+            auto: true,
+            group: "iPhone",
+          },
+        },
+      });
     const hi = await mk("iPhone 15 Pro", "high");
     const lo = await mk("iPhone 11", "normal");
     const ago = (m: number) => new Date(Date.now() - m * 60_000);
-    await prisma.searchProfile.update({ where: { id: hi.id }, data: { lastCheckedAt: ago(2) } });
-    await prisma.searchProfile.update({ where: { id: lo.id }, data: { lastCheckedAt: ago(10) } });
+    await prisma.searchProfile.update({
+      where: { id: hi.id },
+      data: { lastCheckedAt: ago(2) },
+    });
+    await prisma.searchProfile.update({
+      where: { id: lo.id },
+      data: { lastCheckedAt: ago(10) },
+    });
     expect(await scheduleDueProfiles()).toBe(0); // 2 min < 3 en 10 min < 20
 
-    await prisma.searchProfile.update({ where: { id: hi.id }, data: { lastCheckedAt: ago(4) } });
+    await prisma.searchProfile.update({
+      where: { id: hi.id },
+      data: { lastCheckedAt: ago(4) },
+    });
     expect(await scheduleDueProfiles()).toBe(1);
     expect((await jobsFor(hi.id)).length).toBe(1);
     expect((await jobsFor(lo.id)).length).toBe(0);
 
     await prisma.backgroundJob.deleteMany();
-    await prisma.searchProfile.update({ where: { id: hi.id }, data: { lastCheckedAt: ago(4) } }); // ratio 1,33
-    await prisma.searchProfile.update({ where: { id: lo.id }, data: { lastCheckedAt: ago(60) } }); // ratio 3,0 → eerst
-    await prisma.checkRun.create({ data: { profileId: lo.id, ok: true, pages: 8, finishedAt: new Date(), startedAt: new Date(Date.now() - 10 * 60_000) } });
-    await prisma.checkRun.create({ data: { profileId: hi.id, ok: true, pages: 8, finishedAt: new Date(), startedAt: new Date(Date.now() - 10 * 60_000) } });
+    await prisma.searchProfile.update({
+      where: { id: hi.id },
+      data: { lastCheckedAt: ago(4) },
+    }); // ratio 1,33
+    await prisma.searchProfile.update({
+      where: { id: lo.id },
+      data: { lastCheckedAt: ago(60) },
+    }); // ratio 3,0 → eerst
+    await prisma.checkRun.create({
+      data: {
+        profileId: lo.id,
+        ok: true,
+        pages: 8,
+        finishedAt: new Date(),
+        startedAt: new Date(Date.now() - 10 * 60_000),
+      },
+    });
+    await prisma.checkRun.create({
+      data: {
+        profileId: hi.id,
+        ok: true,
+        pages: 8,
+        finishedAt: new Date(),
+        startedAt: new Date(Date.now() - 10 * 60_000),
+      },
+    });
     expect(await scheduleDueProfiles()).toBe(1); // budget 8 pagina's: alleen de eerste past, de ander wacht
     expect((await jobsFor(lo.id)).length).toBe(1);
     expect((await jobsFor(hi.id)).length).toBe(0);

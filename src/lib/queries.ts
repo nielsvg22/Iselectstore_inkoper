@@ -37,25 +37,63 @@ export async function listDeals(f: DealFilters) {
       userState: f.userState ? (f.userState as never) : { not: "IGNORED" },
       ...(f.q ? { title: { contains: f.q, mode: "insensitive" } } : {}),
       ...(f.review ? { needsManualReview: true } : {}),
-      ...(f.family ? { product: { family: { in: f.family.split(",").flatMap((x) => familiesOf(x) ?? [x]) } } } : {}),
-      ...(f.maxDistanceKm ? { OR: [{ distanceKm: null }, { distanceKm: { lte: f.maxDistanceKm } }] } : {}),
-      ...(f.profileId ? { matches: { some: { profileId: f.profileId, matched: true } } } : {}),
+      ...(f.family
+        ? {
+            product: {
+              family: {
+                in: f.family.split(",").flatMap((x) => familiesOf(x) ?? [x]),
+              },
+            },
+          }
+        : {}),
+      ...(f.maxDistanceKm ? { distanceKm: { lte: f.maxDistanceKm } } : {}),
+      ...(f.profileId
+        ? { matches: { some: { profileId: f.profileId, matched: true } } }
+        : {}),
     },
   };
   const orderBy: Prisma.DealAnalysisOrderByWithRelationInput =
-    f.sort === "profit" ? { netProfitCents: "desc" } : f.sort === "roi" ? { roiPct: "desc" } : f.sort === "new" ? { ad: { firstSeenAt: "desc" } } : f.sort === "price" ? { askingCents: "asc" } : { score: "desc" };
-  const include = { ad: { include: { images: { orderBy: { position: "asc" as const }, take: 1 }, _count: { select: { images: true } }, product: { include: { specs: true } }, risk: true } } };
+    f.sort === "profit"
+      ? { netProfitCents: "desc" }
+      : f.sort === "roi"
+        ? { roiPct: "desc" }
+        : f.sort === "new"
+          ? { ad: { firstSeenAt: "desc" } }
+          : f.sort === "price"
+            ? { askingCents: "asc" }
+            : { score: "desc" };
+  const include = {
+    ad: {
+      include: {
+        images: { orderBy: { position: "asc" as const }, take: 1 },
+        _count: { select: { images: true } },
+        product: { include: { specs: true } },
+        risk: true,
+      },
+    },
+  };
   const take = Math.min(200, f.limit ?? 48);
   const skip = f.offset ?? 0;
   if (f.savedTree) {
     // Eigen filter: laad een ruime, gesorteerde kandidatenset en pas de regelboom per advertentie toe
-    const candidates = await prisma.dealAnalysis.findMany({ where, orderBy: [orderBy, { createdAt: "desc" }], take: 1500, include });
+    const candidates = await prisma.dealAnalysis.findMany({
+      where,
+      orderBy: [orderBy, { createdAt: "desc" }],
+      take: 1500,
+      include,
+    });
     const tree = f.savedTree;
     const matched = candidates.filter((r) => evaluate(tree, contextFromRow(r)));
     return { rows: matched.slice(skip, skip + take), total: matched.length };
   }
   const [rows, total] = await Promise.all([
-    prisma.dealAnalysis.findMany({ where, orderBy: [orderBy, { createdAt: "desc" }], take, skip, include }),
+    prisma.dealAnalysis.findMany({
+      where,
+      orderBy: [orderBy, { createdAt: "desc" }],
+      take,
+      skip,
+      include,
+    }),
     prisma.dealAnalysis.count({ where }),
   ]);
   return { rows, total };
@@ -63,23 +101,55 @@ export async function listDeals(f: DealFilters) {
 
 export async function dashboardStats() {
   const cfg = await getConfig();
-  const adWhere = { isDemo: cfg.demoMode, duplicateOfId: null, userState: { not: "IGNORED" as const } };
+  const adWhere = {
+    isDemo: cfg.demoMode,
+    duplicateOfId: null,
+    userState: { not: "IGNORED" as const },
+  };
   const since = new Date(Date.now() - 24 * 3600_000);
   const [newAds, deals, review, totalAds] = await Promise.all([
-    prisma.advertisement.count({ where: { ...adWhere, firstSeenAt: { gte: since } } }),
+    prisma.advertisement.count({
+      where: { ...adWhere, firstSeenAt: { gte: since } },
+    }),
     prisma.dealAnalysis.findMany({
-      where: { isCurrent: true, blocked: false, score: { gte: cfg.targets.minDealScore }, ad: adWhere },
-      select: { netProfitCents: true, conservativeProfitCents: true, roiPct: true, uncertain: true },
+      where: {
+        isCurrent: true,
+        blocked: false,
+        score: { gte: cfg.targets.minDealScore },
+        ad: adWhere,
+      },
+      select: {
+        netProfitCents: true,
+        conservativeProfitCents: true,
+        roiPct: true,
+        uncertain: true,
+      },
       take: 5000,
     }),
-    prisma.advertisement.count({ where: { ...adWhere, needsManualReview: true } }),
+    prisma.advertisement.count({
+      where: { ...adWhere, needsManualReview: true },
+    }),
     prisma.advertisement.count({ where: adWhere }),
   ]);
   const positive = deals.filter((d) => d.netProfitCents > 0);
   const totalProfit = positive.reduce((a, d) => a + d.netProfitCents, 0);
-  const conservative = positive.reduce((a, d) => a + Math.max(0, d.conservativeProfitCents), 0);
-  const avgRoi = positive.length ? positive.reduce((a, d) => a + d.roiPct, 0) / positive.length : 0;
-  return { newAds, interesting: deals.length, totalProfit, conservativeProfit: conservative, uncertainCount: deals.filter((d) => d.uncertain).length, avgRoi, review, totalAds };
+  const conservative = positive.reduce(
+    (a, d) => a + Math.max(0, d.conservativeProfitCents),
+    0,
+  );
+  const avgRoi = positive.length
+    ? positive.reduce((a, d) => a + d.roiPct, 0) / positive.length
+    : 0;
+  return {
+    newAds,
+    interesting: deals.length,
+    totalProfit,
+    conservativeProfit: conservative,
+    uncertainCount: deals.filter((d) => d.uncertain).length,
+    avgRoi,
+    review,
+    totalAds,
+  };
 }
 
 export async function getAdDetail(id: string) {
@@ -97,37 +167,93 @@ export async function getAdDetail(id: string) {
     },
   });
   if (!ad) return null;
-  const valuations = await prisma.valuationHistory.findMany({ where: { adId: id }, orderBy: { computedAt: "asc" }, take: 50 });
+  const valuations = await prisma.valuationHistory.findMany({
+    where: { adId: id },
+    orderBy: { computedAt: "asc" },
+    take: 50,
+  });
   const modelKey = ad.product?.modelKey ?? "";
   const comparables = modelKey
-    ? await prisma.marketComparable.findMany({ where: { modelKey, isDemo: ad.isDemo, OR: [{ sourceAdId: null }, { sourceAdId: { not: id } }] }, orderBy: { observedAt: "desc" }, take: 30 })
+    ? await prisma.marketComparable.findMany({
+        where: {
+          modelKey,
+          isDemo: ad.isDemo,
+          OR: [{ sourceAdId: null }, { sourceAdId: { not: id } }],
+        },
+        orderBy: { observedAt: "desc" },
+        take: 30,
+      })
     : [];
   const similar = modelKey
     ? await prisma.advertisement.findMany({
-        where: { id: { not: id }, isDemo: ad.isDemo, duplicateOfId: null, product: { modelKey } },
-        include: { images: { take: 1, orderBy: { position: "asc" } }, analyses: { where: { isCurrent: true }, take: 1 } },
+        where: {
+          id: { not: id },
+          isDemo: ad.isDemo,
+          duplicateOfId: null,
+          product: { modelKey },
+        },
+        include: {
+          images: { take: 1, orderBy: { position: "asc" } },
+          analyses: { where: { isCurrent: true }, take: 1 },
+        },
         orderBy: { lastSeenAt: "desc" },
         take: 8,
       })
     : [];
-  return { ad, valuations, comparables, similar, current: ad.analyses.find((a) => a.isCurrent) ?? null };
+  return {
+    ad,
+    valuations,
+    comparables,
+    similar,
+    current: ad.analyses.find((a) => a.isCurrent) ?? null,
+  };
 }
 
 export async function purchaseStats(userId: string) {
-  const purchases = await prisma.purchase.findMany({ where: { userId }, include: { sale: true }, orderBy: { createdAt: "desc" } });
-  const bought = purchases.filter((p) => ["BOUGHT", "LISTED", "SOLD"].includes(p.status) && p.buyPriceCents != null);
+  const purchases = await prisma.purchase.findMany({
+    where: { userId },
+    include: { sale: true },
+    orderBy: { createdAt: "desc" },
+  });
+  const bought = purchases.filter(
+    (p) =>
+      ["BOUGHT", "LISTED", "SOLD"].includes(p.status) &&
+      p.buyPriceCents != null,
+  );
   const sold = purchases.filter((p) => p.status === "SOLD" && p.sale);
   const totalBuy = bought.reduce((a, p) => a + (p.buyPriceCents ?? 0), 0);
-  const stock = purchases.filter((p) => ["BOUGHT", "LISTED"].includes(p.status));
-  const stockValue = stock.reduce((a, p) => a + (p.buyPriceCents ?? 0) + p.repairCostCents + p.extraCostCents, 0);
+  const stock = purchases.filter((p) =>
+    ["BOUGHT", "LISTED"].includes(p.status),
+  );
+  const stockValue = stock.reduce(
+    (a, p) => a + (p.buyPriceCents ?? 0) + p.repairCostCents + p.extraCostCents,
+    0,
+  );
   const profits = sold.map((p) => ({
     p,
-    profit: p.sale!.salePriceCents - (p.buyPriceCents ?? 0) - p.repairCostCents - p.extraCostCents - p.sale!.extraCostCents,
-    days: p.boughtAt ? Math.max(0, Math.round((p.sale!.soldAt.getTime() - p.boughtAt.getTime()) / 86400000)) : null,
+    profit:
+      p.sale!.salePriceCents -
+      (p.buyPriceCents ?? 0) -
+      p.repairCostCents -
+      p.extraCostCents -
+      p.sale!.extraCostCents,
+    days: p.boughtAt
+      ? Math.max(
+          0,
+          Math.round(
+            (p.sale!.soldAt.getTime() - p.boughtAt.getTime()) / 86400000,
+          ),
+        )
+      : null,
   }));
   const realized = profits.reduce((a, x) => a + x.profit, 0);
-  const days = profits.filter((x) => x.days != null).map((x) => x.days as number);
-  const byModel = new Map<string, { label: string; profit: number; count: number }>();
+  const days = profits
+    .filter((x) => x.days != null)
+    .map((x) => x.days as number);
+  const byModel = new Map<
+    string,
+    { label: string; profit: number; count: number }
+  >();
   for (const x of profits) {
     const k = x.p.modelKey ?? x.p.title;
     const cur = byModel.get(k) ?? { label: x.p.title, profit: 0, count: 0 };
@@ -139,7 +265,10 @@ export async function purchaseStats(userId: string) {
     .sort((a, b) => a.p.sale!.soldAt.getTime() - b.p.sale!.soldAt.getTime())
     .reduce<Array<{ date: string; cumulative: number }>>((acc, x) => {
       const prev = acc.length ? acc[acc.length - 1].cumulative : 0;
-      acc.push({ date: x.p.sale!.soldAt.toISOString().slice(0, 10), cumulative: prev + x.profit });
+      acc.push({
+        date: x.p.sale!.soldAt.toISOString().slice(0, 10),
+        cumulative: prev + x.profit,
+      });
       return acc;
     }, []);
   return {
