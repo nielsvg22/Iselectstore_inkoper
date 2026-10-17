@@ -136,6 +136,9 @@ export async function analyzeAd(adId: string, deps: AnalyzeDeps = {}): Promise<{
   const costs = costsFromConfig(cfg, { repairCents, shippingCents: overrides.costs?.shippingCents ?? dist.shippingCents ?? undefined, transportCents: overrides.costs?.transportCents ?? dist.transportCents ?? undefined, otherCents: overrides.costs?.otherCents });
   const seller = assessSeller({
     verified: ad.sellerVerified, business: (ad.sellerSignals as { business?: boolean | null })?.business ?? null, anonymous: (ad.sellerSignals as { anonymous?: boolean | null })?.anonymous ?? null,
+    rating: (ad.sellerSignals as { rating?: number | null })?.rating ?? null,
+    reviewCount: (ad.sellerSignals as { reviewCount?: number | null })?.reviewCount ?? null,
+    accountAgeMonths: (ad.sellerSignals as { accountAgeMonths?: number | null })?.accountAgeMonths ?? null,
     photoCount, descriptionLength: ad.description.length, askingCents: ad.askingPriceCents, expectedCents: val.expectedCents, valuationConfidence: val.confidence, riskFlags: risk.flags, shipping: shippingList,
   });
   const tax = taxFromConfig(cfg, overrides.costs?.marginSchemeEligible);
@@ -251,6 +254,9 @@ export async function analyzeAd(adId: string, deps: AnalyzeDeps = {}): Promise<{
       sellerTrust: seller.level === "UNKNOWN" ? null : seller.score,
       sellerTrustLevel: seller.level,
       sellerVerified: ad.sellerVerified ?? null,
+      sellerRating: (ad.sellerSignals as { rating?: number | null })?.rating ?? null,
+      sellerReviewCount: (ad.sellerSignals as { reviewCount?: number | null })?.reviewCount ?? null,
+      sellerAgeMonths: (ad.sellerSignals as { accountAgeMonths?: number | null })?.accountAgeMonths ?? null,
       shippingAvailable: shippingList.includes("shipping"),
       pickupAvailable: shippingList.includes("pickup") || !shippingList.length,
       batteryKnown: battery != null,
