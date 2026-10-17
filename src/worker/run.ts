@@ -5,6 +5,8 @@ import { prisma } from "../lib/db/client";
 import { pollMailbox } from "../lib/mail/poll";
 import { installApeldoornRadar } from "../lib/radar/provision";
 import { getConfig } from "../lib/settings/store";
+import { jobLanes } from "../lib/jobs/lanes";
+import { upgradeRadarPolling } from "../lib/radar/fast-polling";
 
 const configuredInterval = Number(process.env.WORKER_INTERVAL_SECONDS ?? 3);
 const idleMs =
@@ -73,6 +75,7 @@ async function main() {
       });
       if (marker) return "al-gedaan" as const;
       await installApeldoornRadar(admin.id);
+      await upgradeRadarPolling();
       await prisma.appSettings.create({
         data: {
           key: "provision:smart-radar-v2",
@@ -82,7 +85,7 @@ async function main() {
       const r = "gedaan" as const;
       if (r === "gedaan")
         console.log(
-          "[worker] iPhone-melder automatisch aangemaakt en snelle modus aangezet",
+          "[worker] Smart Inkoopradar aangemaakt en snelle modus aangezet",
         );
       return r;
     } catch (e) {
@@ -94,19 +97,19 @@ async function main() {
     while (!stop && (await provision()) !== "al-gedaan")
       await new Promise((r) => setTimeout(r, 30_000).unref());
   })();
-  const lane = async (
-    types: Parameters<typeof processJobs>[1]["types"],
-    concurrency: number,
-  ) => {
+  await upgradeRadarPolling();
+  const lane = async (options: ReturnType<typeof jobLanes>[number]) => {
     while (!stop) {
       try {
         const r = await processJobs(handlers, {
-          types,
-          concurrency,
+          ...options,
           maxJobs: 100,
           deadlineMs: 5000,
         });
-        if (r.processed) continue;
+        if (r.processed) {
+          console.log(`[worker:${options.name}] verwerkt=${r.processed} mislukt=${r.failed}`);
+          continue;
+        }
       } catch (e) {
         console.error("[worker] lane:", (e as Error).message);
       }
@@ -114,33 +117,28 @@ async function main() {
     }
   };
   const cfg = await getConfig();
-  const lanes = [
-    lane(["CHECK_PROFILE", "FETCH_DETAIL"], 1),
-    lane(["ANALYZE_AD", "CLEANUP"], cfg.scheduler.concurrency),
-    lane(["NOTIFY"], 1),
-  ];
+  console.log(`[worker] detectie-interval=${cfg.scheduler.fast.intervalSeconds}s requestlimiet=${cfg.scheduler.fast.maxRequestsPerMinute}/min`);
+  const lanes = jobLanes(cfg.scheduler.concurrency).map(lane);
+  let heartbeatAt = 0;
   while (!stop) {
     try {
       const scheduled = await scheduleDueProfiles();
-      await prisma.appSettings.upsert({
-        where: { key: "worker:heartbeat" },
-        create: {
-          key: "worker:heartbeat",
-          value: { at: new Date().toISOString() },
-        },
-        update: { value: { at: new Date().toISOString() } },
-      });
-      const r = { scheduled, processed: 0, failed: 0 };
-      if (r.scheduled || r.processed)
-        console.log(
-          `[worker] gepland=${r.scheduled} verwerkt=${r.processed} mislukt=${r.failed}`,
-        );
-      // Er was werk: direct door (lage latentie). Anders even wachten.
-      if (r.processed > 0) continue;
+      if (Date.now() - heartbeatAt >= 10_000) {
+        await prisma.appSettings.upsert({
+          where: { key: "worker:heartbeat" },
+          create: {
+            key: "worker:heartbeat",
+            value: { at: new Date().toISOString() },
+          },
+          update: { value: { at: new Date().toISOString() } },
+        });
+        heartbeatAt = Date.now();
+      }
+      if (scheduled) console.log(`[worker] controles gepland=${scheduled}`);
     } catch (e) {
       console.error("[worker] fout:", (e as Error).message);
     }
-    await sleep(idleMs);
+    await sleep(cfg.scheduler.fast.enabled ? Math.min(idleMs, 1000) : idleMs);
   }
   await Promise.all(lanes);
   await prisma.$disconnect();

@@ -215,7 +215,7 @@ export async function installApeldoornRadar(userId: string) {
     scheduler: {
       fast: {
         enabled: true,
-        intervalSeconds: 60,
+        intervalSeconds: 30,
         pages: 1,
         maxRequestsPerMinute: cfg.scheduler.fast.maxRequestsPerMinute,
       },

@@ -13,13 +13,14 @@ export function throttleFor(id: string, secs: number) {
   return t;
 }
 
-export async function fetchListingUrl(url: string, opts: { allowlist: string[]; minSecondsBetween: number; respectRobots?: boolean; fetchImpl?: typeof fetch; lookup?: (host: string) => Promise<string[]>; throttleId?: string }): Promise<RawAd> {
+export async function fetchListingUrl(url: string, opts: { allowlist: string[]; minSecondsBetween: number; respectRobots?: boolean; fetchImpl?: typeof fetch; lookup?: (host: string) => Promise<string[]>; throttleId?: string; requestPriority?: "discovery" | "background" }): Promise<RawAd> {
   const res = await safeFetch(url, {
     allowlist: opts.allowlist,
     respectRobots: opts.respectRobots ?? true,
     fetchImpl: opts.fetchImpl,
     lookup: opts.lookup,
     throttle: throttleFor(opts.throttleId ?? "url", opts.minSecondsBetween),
+    requestPriority: opts.requestPriority,
   });
   if (res.status === 404 || res.status === 410) throw new SourceError("Advertentie niet meer beschikbaar (404/410)", false);
   if (res.status === 401 || res.status === 403 || res.status === 429) {

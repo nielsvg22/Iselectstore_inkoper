@@ -58,7 +58,7 @@ export function parseFacets(html: string, category: string, now = new Date()): F
 const mem = new Map<string, FacetMap>();
 
 /** Facetten per categorie (24 uur gecachet, in geheugen en database zodat web en worker ze delen). */
-export async function getFacets(category: string, deps: { fetchImpl?: typeof fetch; lookup?: (h: string) => Promise<string[]> } = {}, now = new Date()): Promise<FacetMap> {
+export async function getFacets(category: string, deps: { fetchImpl?: typeof fetch; lookup?: (h: string) => Promise<string[]>; requestPriority?: "discovery" | "background" } = {}, now = new Date()): Promise<FacetMap> {
   const hit = mem.get(category);
   if (hit && now.getTime() - new Date(hit.fetchedAt).getTime() < TTL) return hit;
   const key = `facets:${category}`;
@@ -69,7 +69,7 @@ export async function getFacets(category: string, deps: { fetchImpl?: typeof fet
     return saved;
   }
   const cfg = await getConfig();
-  const res = await safeFetch(`${MARKTPLAATS_ORIGIN}/l/${category}/`, { allowlist: cfg.sources.urlAllowlist, respectRobots: true, fetchImpl: deps.fetchImpl, lookup: deps.lookup, throttle: deps.fetchImpl || process.env.NODE_ENV === "test" ? undefined : th, maxBytes: 4_000_000 });
+  const res = await safeFetch(`${MARKTPLAATS_ORIGIN}/l/${category}/`, { allowlist: cfg.sources.urlAllowlist, respectRobots: true, fetchImpl: deps.fetchImpl, lookup: deps.lookup, throttle: deps.fetchImpl || process.env.NODE_ENV === "test" ? undefined : th, maxBytes: 4_000_000, requestPriority: deps.requestPriority });
   if (res.status === 401 || res.status === 403 || res.status === 429) throw new SourceError(`Marktplaats weigert toegang (HTTP ${res.status}). Er wordt niet geprobeerd dit te omzeilen.`, res.status === 429);
   if (res.status >= 400) throw new SourceError(`Marktplaats gaf HTTP ${res.status} voor de categoriepagina`);
   const map = parseFacets(res.text, category, now);

@@ -336,14 +336,14 @@ export const searchAdapter: SourceAdapter = {
     const units: Array<{ key: string; urlFor: (page: number) => string }> = ctx
       .slices?.length
       ? [
+          ...(ctx.extraQueries ?? []).map((q) =>
+            queryUnit(q, sc.category || undefined),
+          ),
           ...ctx.slices.map((sl) => ({
             key: sl.url,
             urlFor: (page: number) =>
               page > 1 ? `${sl.url}p/${page}/` : sl.url,
           })),
-          ...(ctx.extraQueries ?? []).map((q) =>
-            queryUnit(q, sc.category || undefined),
-          ),
         ]
       : sc.queries.map((q) => queryUnit(q, sc.category || undefined));
     outer: for (const unit of units) {

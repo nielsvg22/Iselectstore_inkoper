@@ -21,6 +21,7 @@ export interface SafeFetchOptions extends SsrfOptions {
   fetchImpl?: typeof fetch;
   respectRobots?: boolean;
   throttle?: Throttle;
+  requestPriority?: "discovery" | "background";
 }
 
 export interface SafeResponse {
@@ -135,7 +136,7 @@ export async function safeFetch(
       if (hit && Date.now() - hit.at < 3_600_000) disallow = hit.disallow;
       else {
         try {
-          if (marktplaats) await waitForMarktplaatsSlot();
+          if (marktplaats) await waitForMarktplaatsSlot(opts.requestPriority);
           const r = await doFetch(`${u.origin}/robots.txt`, {
             headers: { "user-agent": USER_AGENT },
             signal: AbortSignal.timeout(5000),
@@ -156,7 +157,7 @@ export async function safeFetch(
         );
     }
     if (opts.throttle) await opts.throttle.wait();
-    if (marktplaats) await waitForMarktplaatsSlot();
+    if (marktplaats) await waitForMarktplaatsSlot(opts.requestPriority);
     const res = await doFetch(u.toString(), {
       redirect: "manual",
       headers: {

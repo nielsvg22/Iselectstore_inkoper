@@ -4,7 +4,7 @@ import { getCooldown } from "../jobs/cooldown";
 import { SourceError } from "./types";
 
 /** Eén gedeelde pacing voor web, cron en worker, inclusief details. Geen lokale proceslimiet. */
-export async function waitForMarktplaatsSlot() {
+export async function waitForMarktplaatsSlot(priority: "discovery" | "background" = "discovery") {
   const cooldown = await getCooldown("marktplaats-search");
   if (cooldown)
     throw new SourceError(
@@ -17,12 +17,32 @@ export async function waitForMarktplaatsSlot() {
     cfg.limits.minSecondsBetweenRequests * 1000,
     60000 / cfg.scheduler.fast.maxRequestsPerMinute,
   );
-  const slot = await reserveMarktplaatsSlot(gap);
-  const delay = slot - Date.now();
-  if (delay > 0) await new Promise((r) => setTimeout(r, delay));
-  // Een ander proces kan tijdens het wachten een blokkade hebben ontvangen.
-  if (await getCooldown("marktplaats-search"))
-    throw new SourceError("Bron inmiddels gepauzeerd", false);
+  // Reserveer alleen het huidige vrije slot, nooit toekomstige slots voor een detailachterstand.
+  // Zo kan een nieuwe zoekcontrole voorrang krijgen zonder de gezamenlijke limiet te verhogen.
+  for (;;) {
+    if (await getCooldown("marktplaats-search"))
+      throw new SourceError("Bron inmiddels gepauzeerd", false);
+    if (await tryMarktplaatsSlot(gap, priority)) return;
+    await new Promise((r) => setTimeout(r, 250));
+  }
+}
+
+export async function tryMarktplaatsSlot(gap: number, priority: "discovery" | "background", now = Date.now()) {
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('marktplaats-request-gate'))`;
+    const row = await tx.appSettings.findUnique({ where: { key: "source:marktplaats:next-request" } });
+    if (Number((row?.value as { at?: number } | null)?.at ?? 0) > now) return false;
+    if (priority === "background" && await tx.backgroundJob.findFirst({
+      where: { type: "CHECK_PROFILE", OR: [{ status: "RUNNING" }, { status: "PENDING", runAt: { lte: new Date(now) } }] },
+      select: { id: true },
+    })) return false;
+    await tx.appSettings.upsert({
+      where: { key: "source:marktplaats:next-request" },
+      create: { key: "source:marktplaats:next-request", value: { at: now + gap } },
+      update: { value: { at: now + gap } },
+    });
+    return true;
+  });
 }
 
 export async function reserveMarktplaatsSlot(gap: number, now = Date.now()) {

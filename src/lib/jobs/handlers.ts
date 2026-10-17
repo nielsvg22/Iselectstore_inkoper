@@ -23,6 +23,7 @@ import {
 import {
   buildSlices,
   getFacets,
+  peekFacets,
   getLastFullSearch,
   setLastFullSearch,
   sliceSpecsFromTree,
@@ -131,7 +132,35 @@ export async function runProfileCheck(
       string,
       { at: string; pages: number; total: number | null }
     > = {};
-    if (
+    let searchConfig = (profile.sourceConfig ?? {}) as Record<string, unknown>;
+    if (fast && sc.smartRadar) {
+      // Twee pagina's per ronde: eerst de brede hoofdzoekterm, dan één roterende
+      // productfamilie of modelslice. Geen netwerk voor facetplanning vóór detectie.
+      const configured = (searchConfig.queries as string[] | undefined) ?? ["iphone"];
+      const primary = configured.find((q) => q.toLowerCase() === "iphone") ?? configured[0] ?? "iphone";
+      const others = configured.filter((q) => q !== primary);
+      const cycle = Math.floor(Date.now() / (cfg.scheduler.fast.intervalSeconds * 1000));
+      const specs = specsFromConfig(searchConfig as Parameters<typeof specsFromConfig>[0]);
+      const facets = new Map<string, FacetMap>();
+      for (const category of new Set(specs.map((x) => x.model.category))) {
+        const cached = await peekFacets(category);
+        if (cached) facets.set(category, cached);
+        if (!cached || Date.now() - Date.parse(cached.fetchedAt) > 24 * 3600_000)
+          await enqueue({ type: "REFRESH_FACETS", payload: { category }, priority: 26,
+            uniqueKey: `facets:${category}:${day()}` });
+      }
+      const built = buildSlices(specs, facets);
+      if (built.slices.length && (cycle % 2 === 0 || !others.length)) {
+        sliceStateBefore = await getSliceState(profileId);
+        slices = selectSlices(built.slices, sliceStateBefore, Date.now(), 1, {
+          highMs: cfg.scheduler.fast.priorityEveryMinutes * 60_000,
+          normalMs: cfg.scheduler.fast.normalEveryMinutes * 60_000,
+        });
+      }
+      if (slices?.length) extraQueries = [primary];
+      searchConfig = { ...searchConfig, queries: [primary,
+        ...(!slices?.length && others.length ? [others[Math.floor(cycle / 2) % others.length]] : [])], maxPages: 1 };
+    } else if (
       fast &&
       tree &&
       (profile.sourceConfig as { sliceSearch?: boolean } | null)
@@ -174,18 +203,6 @@ export async function runProfileCheck(
         }
       }
     }
-    if (sc.smartRadar && slices?.length) {
-      const queries = (profile.sourceConfig as { queries?: string[] })
-        .queries ?? ["iphone"];
-      const others = queries.filter((q) => q !== "iphone");
-      extraQueries = [
-        "iphone",
-        ...(others.length
-          ? [others[Math.floor(Date.now() / 60000) % others.length]]
-          : []),
-      ];
-    }
-    if (fullSearch) await setLastFullSearch(profileId);
     let created = 0;
     let changed = 0;
     const processed = new Set<string>();
@@ -213,7 +230,7 @@ export async function runProfileCheck(
       slices,
       onAds: ingestPage,
       query: profile.query,
-      config: (profile.sourceConfig ?? {}) as Record<string, unknown>,
+      config: searchConfig,
       maxAds: fast
         ? Math.max(cfg.limits.maxAdsPerRun, cfg.scheduler.fast.pages * 30 * 4)
         : cfg.limits.maxAdsPerRun,
@@ -228,7 +245,7 @@ export async function runProfileCheck(
           total: i.total,
         };
       },
-      fast: fast ? { pages: cfg.scheduler.fast.pages } : undefined,
+      fast: fast ? { pages: sc.smartRadar ? 1 : cfg.scheduler.fast.pages } : undefined,
       cacheSeconds: fast
         ? Math.min(cfg.scheduler.pageCacheSeconds, 15)
         : Math.min(
@@ -236,6 +253,7 @@ export async function runProfileCheck(
             Math.max(0, Math.floor((profile.intervalMinutes * 60) / 2)),
           ),
     });
+    if (fullSearch) await setLastFullSearch(profileId);
     if (sliceStateBefore && Object.keys(unitResults).length)
       await setSliceState(profileId, {
         ...sliceStateBefore,
@@ -280,6 +298,10 @@ export async function runProfileCheck(
         covered: stats.covered ?? null,
       },
     });
+    if (sc.smartRadar) console.log(`[radar] ${JSON.stringify({
+      startedAt: new Date(t0).toISOString(), durationMs: Date.now() - t0,
+      pages: stats.pages, fetched: ads.length, created, changed,
+    })}`);
     return { fetched: ads.length, created, changed };
   } catch (e) {
     const msg = errMsg(e);
@@ -348,6 +370,7 @@ export async function runDetailFetch(
       ),
       fetchImpl,
       throttleId: "search-detail",
+      requestPriority: "background",
     });
     const attrs = (
       ad.rawPayload as { attributes?: Record<string, string | number> } | null
@@ -406,6 +429,9 @@ export async function runDetailFetch(
 }
 
 export const handlers: Partial<Record<JobType, Handler>> = {
+  async REFRESH_FACETS(job: BackgroundJob) {
+    await getFacets((job.payload as { category: string }).category, { requestPriority: "background" });
+  },
   async CHECK_PROFILE(job: BackgroundJob) {
     await runProfileCheck((job.payload as { profileId: string }).profileId);
   },

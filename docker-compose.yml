@@ -30,6 +30,7 @@ services:
   worker:
     build: .
     restart: unless-stopped
+    stop_grace_period: 90s
     depends_on: { web: { condition: service_started } }
     environment: *env
     command: ["sh", "-c", "npx prisma migrate deploy && npm run worker"]
