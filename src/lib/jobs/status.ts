@@ -13,7 +13,7 @@ export async function getJobStatus(externalId?: string) {
     getConfig(),
     prisma.appSettings.findUnique({ where: { key: "worker:heartbeat" } }),
     prisma.pushSubscription.findMany({ take: 20, select: {
-      enabled: true, failures: true, lastSuccessAt: true, lastFailureAt: true, lastError: true,
+      enabled: true, failures: true, lastSuccessAt: true, lastFailureAt: true, lastError: true, userAgent: true,
     } }),
     prisma.user.findMany({ take: 20, select: { notifyPrefs: true } }),
     prisma.searchProfile.findMany({ where: { active: true }, take: 50, select: {
@@ -40,7 +40,11 @@ export async function getJobStatus(externalId?: string) {
     config: { notificationsEnabled: cfg.notifications.enabled,
       requireFullAnalysis: cfg.notifications.requireFullAnalysis,
       fastEnabled: cfg.scheduler.fast.enabled, intervalSeconds: cfg.scheduler.fast.intervalSeconds },
-    devices: devices.map((d) => ({ ...d, lastError: redactError(d.lastError) })),
+    devices: devices.map(({ userAgent, ...d }) => ({ ...d, lastError: redactError(d.lastError),
+      platform: /iPhone|iPad|iPod|Macintosh.*Mobile/i.test(userAgent) ? "ios"
+        : /Android/i.test(userAgent) ? "android"
+        : /Windows|Macintosh|X11/i.test(userAgent) ? "desktop" : "unknown",
+    })),
     preferences: users.map((u) => {
       const p = notifyPrefsSchema.parse(u.notifyPrefs ?? {});
       return { push: p.push, mode: p.mode, minScore: p.minScore, minProfitEuro: p.minProfitEuro,

@@ -29,13 +29,14 @@ describe("afgeschermde operationele advertentie- en pushtrace", () => {
   });
   it("onderscheidt pushacceptatie van uitsluitend een in-app-melding, zonder apparaatsleutels te lekken", async () => {
     const { user } = await makeUser(); const a = await ad();
-    await prisma.pushSubscription.create({ data: { userId: user.id, endpoint: "https://push.example/private-device-token", auth: "device-auth-secret", p256dh: "device-key-secret", lastSuccessAt: new Date() } });
+    await prisma.pushSubscription.create({ data: { userId: user.id, endpoint: "https://push.example/private-device-token", auth: "device-auth-secret", p256dh: "device-key-secret", lastSuccessAt: new Date(), userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)" } });
     await prisma.notification.create({ data: { adId: a.adId, userId: user.id, channel: "INAPP", status: "SENT", sentAt: new Date(), dedupeKey: "inapp-test" } });
     let d = await (await status("m1234567890")).json();
     expect(d.ads[0].stage).not.toBe("push_accepted");
     await prisma.notification.create({ data: { adId: a.adId, userId: user.id, channel: "WEBPUSH", status: "SENT", sentAt: new Date(), dedupeKey: "push-test" } });
     d = await (await status("m1234567890")).json();
     expect(d.ads[0].stage).toBe("push_accepted"); expect(d.latestNotifications[0].ad.externalId).toBe("m1234567890");
+    expect(d.devices[0].platform).toBe("ios");
     for (const secret of ["private-device-token", "device-auth-secret", "device-key-secret", user.email]) expect(JSON.stringify(d)).not.toContain(secret);
   });
   it("toont wachtrij en mislukking afzonderlijk en redigeert endpointadressen in fouten", async () => {
