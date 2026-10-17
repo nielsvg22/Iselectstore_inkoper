@@ -12,7 +12,7 @@ export interface RawAd {
   category?: string | null;
   sellerType?: string | null;
   /** Alleen wat de bron zelf levert; ontbrekende gegevens blijven null (nooit aannemen) */
-  seller?: { id?: string | null; name?: string | null; verified?: boolean | null; business?: boolean | null; anonymous?: boolean | null };
+  seller?: { id?: string | null; name?: string | null; verified?: boolean | null; business?: boolean | null; anonymous?: boolean | null; rating?: number | null; reviewCount?: number | null; accountAgeMonths?: number | null };
   shipping?: string[];
   conditionText?: string | null;
   publishedAt?: Date | null;
