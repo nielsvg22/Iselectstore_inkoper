@@ -144,3 +144,9 @@ Vóór uitrol is opnieuw een volledige herstelbare databasekopie gemaakt en met 
 De nieuwe rondes begonnen om 06:25:22.553, 06:25:53.743 en 06:26:24.863 UTC. Het doelinterval staat daadwerkelijk op 30 seconden; de bestaande requestlimiet blijft **12 per minuut**. Heartbeat en publieke healthcheck zijn gezond. `stop_grace_period: 90s` staat ook in de werkelijk gegenereerde Coolify-Compose-configuratie.
 
 In deze korte nameting zijn **geen nieuwe advertenties** ontdekt en **geen nieuwe pushmeldingen** aangemaakt. Er is één actief geregistreerd pushapparaat. De nameting bewijst het kortere controle-interval en succesvolle bronrequests, geen publicatie-tot-push-latentie of ontvangst op een iPhone. De tijdelijke deploymenthooks worden na verificatie verwijderd en de oorspronkelijke automatische-deployinstelling hersteld.
+
+## Operationele trace bij ontbrekende melding
+
+`GET /api/jobs/status` is alleen beschikbaar met de bestaande operator/scheduler-Bearer (`CRON_SECRET`, minimaal 16 tekens). De route is alleen-lezen, begrensd en niet gecachet. `?externalId=m1234567890` zoekt één specifieke Marktplaats-advertentie. De response onderscheidt niet gevonden, analyse afwachten, niet gematcht, uitsluiten/duplicaat en push in wachtrij, mislukt, overgeslagen of geaccepteerd. `push_accepted` betekent een opgeslagen succesvolle serververzending; ontvangst en weergave op de telefoon zijn daarmee niet bewezen. In-appmeldingen tellen hiervoor niet als push.
+
+De algemene response bevat recente echte pushstatussen, beperkte apparaatgezondheid, notificatiedrempels, heartbeat en wachtrijstatussen. Er worden geen pushendpoints, apparaatsleutels, authenticatiegegevens of gebruikers-e-mailadressen teruggegeven. Foutmeldingen met endpoint-URL's worden geredigeerd. Vijf gerichte integratietests controleren autorisatie, invoervalidatie, advertentieselectie, de verschillende pushstadia en het weglaten van gevoelige gegevens. Typecontrole en productiebuild slagen.
