@@ -127,3 +127,20 @@ Deze keuze geeft brede iPhone-detectie voorrang. Andere productfamilies en model
 Actieve jobs vernieuwen hun databaselease elke tien seconden. Verlaten claims worden na één minuut herstelbaar in plaats van na tien minuten. Het claimnummer (`attempts`) beschermt leasevernieuwing, afronding en foutregistratie tegen late updates van een oudere claim. Een afzonderlijke snelle analyseloper reserveert capaciteit binnen de ingestelde analyseconcurrency (bij concurrency 1 zijn twee lopers nodig om beide fasen onafhankelijk te houden). De Compose-worker krijgt 90 seconden om een lopende bronrequest/zoekronde bij een gecontroleerde stop af te ronden. Nieuwe tests controleren leasevernieuwing en herstel inclusief verouderde claims.
 
 Validatie van deze versnelling: `npm run lint` geslaagd; `npm test` **432 geslaagd** in 27 bestanden; `npm run build` geslaagd; `npm run test:e2e` **16 geslaagd**. Een echte lokale worker op een afzonderlijke lege testdatabase vernieuwde zijn heartbeat en stopte met SIGTERM met exitcode 0 in 0,53 seconde. De bron- en pushketentest gebruikt nagebootste diensten en bewijst geen iPhone-ontvangst.
+
+### Gemeten op de bestaande Coolify-productieapp
+
+Codecommit `41e8a00f94cd9bd355dfd127ff7316ee861da90e` is succesvol uitgerold via deployment `zomujf4mcgr8qe3ckpxu8b9s`, afgerond 2026-10-17 06:26:30 UTC. De bestaande app blijft bereikbaar op https://deals.85.190.105.138.nip.io.
+
+Vóór uitrol is opnieuw een volledige herstelbare databasekopie gemaakt en met `pg_restore --list` gecontroleerd: `/var/lib/postgresql/data/iselect-backups/pre-radar-fast-41e8a00f94cd.dump`, **11.743.255 bytes**. Het bestaande databasevolume, alle omgevingsvariabelen en credentials zijn behouden. Vóór en na uitrol: **5.804 advertenties, 1 inkooprecord, 35 profielrecords en 73 regels**. Er is één actieve centrale radar en één profielback-up.
+
+| Echte productiecontroles | Vóór | Na |
+| --- | ---: | ---: |
+| Steekproef | 6 geslaagde rondes | 3 geslaagde rondes |
+| Mediaan start-tot-start | 65,11 s | 31,16 s |
+| Gemiddelde rondeduur | 11,90 s | 8,95 s |
+| Zoekpagina's per ronde | 3 | 2 |
+
+De nieuwe rondes begonnen om 06:25:22.553, 06:25:53.743 en 06:26:24.863 UTC. Het doelinterval staat daadwerkelijk op 30 seconden; de bestaande requestlimiet blijft **12 per minuut**. Heartbeat en publieke healthcheck zijn gezond. `stop_grace_period: 90s` staat ook in de werkelijk gegenereerde Coolify-Compose-configuratie.
+
+In deze korte nameting zijn **geen nieuwe advertenties** ontdekt en **geen nieuwe pushmeldingen** aangemaakt. Er is één actief geregistreerd pushapparaat. De nameting bewijst het kortere controle-interval en succesvolle bronrequests, geen publicatie-tot-push-latentie of ontvangst op een iPhone. De tijdelijke deploymenthooks worden na verificatie verwijderd en de oorspronkelijke automatische-deployinstelling hersteld.
