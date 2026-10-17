@@ -1,6 +1,6 @@
 # iSelectStore — Inkoopradar
 
-De huidige implementatie, bronbeperkingen, herstelprocedure en verificatie staan in [RADAR-2-IMPLEMENTATIE.md](docs/RADAR-2-IMPLEMENTATIE.md). De nieuwe worker migreert bestaande beheerdersprofielen eenmalig en herstelbaar naar één radar. Productie-uitrol is een afzonderlijke stap.
+De huidige implementatie, bronbeperkingen, herstelprocedure en verificatie staan in [RADAR-2-IMPLEMENTATIE.md](docs/RADAR-2-IMPLEMENTATIE.md). De nieuwe worker migreert bestaande beheerdersprofielen eenmalig en herstelbaar naar één radar. Na expliciete toestemming is de geteste featurebranch op Coolify uitgerold: [open de app](https://deals.85.190.105.138.nip.io).
 
 ## Bestaande applicatie
 

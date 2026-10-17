@@ -64,7 +64,7 @@ De worker-smoketest is uitgevoerd op een derde lege lokale database: migraties t
 
 - Bronvoorwaarden/toestemming, publicatievolgorde en pagina-dekking; meet nieuwe echte advertenties over langere tijd. Geen garantie van 60 seconden.
 - Toegestane bron voor reviews/accountleeftijd; tot die tijd geen automatische externe verzendgoedkeuring bij ontbrekende data.
-- VPS/Coolify: actieve branch, migratie, workerlogs, heartbeat, HTTPS, databaseback-up, restart bij uitval en beschikbare capaciteit.
+- VPS/Coolify: branch, migratie, workerlogs, heartbeat, HTTPS en lokale databaseback-up zijn bij onderstaande uitrol gecontroleerd. Langdurige uptime, echte uitvalherstelproeven en maximale capaciteit vragen vervolgmetingen; een back-up buiten dezelfde VPS blijft gewenst.
 - iPhone met iOS 16.4+: Safari → Deel → Zet op beginscherm → app openen → meldingen toestaan → echte testpush → sluiten → echte melding ontvangen → juiste advertentie openen. Controleer Focus en batterijbeleid.
 - Realistische marktwaardes en kosten blijven afhankelijk van eigen verkopen/vergelijkingen en ingevulde reparatie-/verzendkosten.
 
@@ -79,3 +79,33 @@ De worker-smoketest is uitgevoerd op een derde lege lokale database: migraties t
 - Actuele publieke Marktplaats-HTML: 30 advertenties correct geparseerd, 30 met berekende Apeldoorn-afstand, 0 met reviews/accountleeftijd. Geen productie-ingest uitgevoerd tijdens deze controle.
 
 Bij de browsertests zijn een te brede heranalyseknop en testisolatie rond demomodus gecorrigeerd. De test accepteert de echte headless-browsermelding dat notificaties geblokkeerd zijn; zij claimt geen echte iPhone-bezorging. De gesimuleerde pushdienst is apart in integratietests getest.
+
+
+## Geautoriseerde productie-uitrol op Coolify
+
+De eigenaar gaf tijdens de sessie expliciet toestemming om te deployen. Op 2026-10-17 om 06:03:18 UTC heeft Coolify deployment `yfhcga7uxfvpqdynqwmk6saq` succesvol afgerond voor codecommit `d9cefa3c8d69a0f3fcd2e83bbe2144b7b3d6fca2`, branch `feature/deal-hunter-2`.
+
+**Live app:** https://deals.85.190.105.138.nip.io
+
+Er is alleen aan de bestaande Coolify-app voor deze repository gewerkt. De Vercel-productiesite en andere repositories/services zijn niet uitgerold of aangepast.
+
+Voor de build draaide in de bestaande PostgreSQL-container een volledige `pg_dump -Fc`, waarvan de archive-inhoud met `pg_restore --list` is gecontroleerd. De back-up staat op het bestaande databasevolume:
+
+`/var/lib/postgresql/data/iselect-backups/pre-radar-v2-d9cefa3c8d69.dump`
+
+Grootte: **11.442.706 bytes**. Het volume `haonfhb2akz6mysfscxffkso_dbdata` en zijn Coolify-storage zijn behouden. Dit is een herstelkopie op dezelfde VPS, geen externe disaster-recovery-back-up.
+
+| Controle | Vóór | Na uitrol |
+| --- | ---: | ---: |
+| Advertenties | 5.679 | 5.680 |
+| Inkooprecords | 1 | 1 |
+| Profielrecords | 34 | 35 |
+| Profielregels | 70 | 73 |
+| Actieve centrale radar | — | 1 |
+| Herstelbare profielback-ups | — | 1 |
+
+De 34 oorspronkelijke profielen en 70 regels blijven bewaard; de nieuwe radar voegt één profiel en drie regels toe. Database-migraties zijn succesvol toegepast. De worker-healthcheck is aanwezig in de daadwerkelijke Compose-configuratie; de productie-heartbeat was gezond (`2026-10-17T06:03:18.078Z`). De publieke healthcheck gaf na de uitrol HTTP 200 met `{"ok":true,"db":true}`. De workerlogs tonen controles om 06:03:23 en 06:04:23 UTC; dat is planning op circa 60 seconden, geen gemeten publicatie-tot-push-latentie.
+
+Eén detailrequest kreeg HTTP 500 van de bron en werd volgens de retrylogica opnieuw ingepland. Er is geen blokkade omzeild. De database-, sessie- en VAPID-/pushcredentials zijn bytegelijk gebleven. De tijdelijke pre-/post-deploymentcommando's worden na verificatie verwijderd en de oorspronkelijke automatische-deployinstelling wordt hersteld. De app blijft de featurebranch volgen.
+
+Echte ontvangst op een iPhone en volledige brondekking binnen 60 seconden zijn ook na deze geslaagde uitrol **niet** geverifieerd.
