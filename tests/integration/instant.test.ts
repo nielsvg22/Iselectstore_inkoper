@@ -168,4 +168,21 @@ describe("detectie zonder wachtrijblokkade", () => {
     expect(await upgradeRadarPolling()).toBe(false);
     expect((await getConfig(true)).scheduler.fast.intervalSeconds).toBe(120);
   });
+
+  it("benut een hoger bestaand requestbudget voor alle productgroepen en bewaart echte controletijden", async () => {
+    const { user } = await makeUser(); const radar = await installApeldoornRadar(user.id);
+    await saveConfig({ scheduler: { fast: { intervalSeconds: 30, maxRequestsPerMinute: 12 } }, limits: { minSecondsBetweenRequests: 0 } });
+    const paths: string[] = [];
+    vi.stubGlobal("fetch", async (input: string) => {
+      const path = new URL(input).pathname;
+      if (path === "/robots.txt") return new Response("User-agent: *");
+      paths.push(path); return new Response(readFileSync("tests/fixtures/mp-search.html", "utf8"));
+    });
+    await runProfileCheck(radar.id);
+    expect(paths).toEqual(["/q/iphone/", "/q/macbook/", "/q/ipad/", "/q/apple+watch/", "/q/airpods/"]);
+    const state = await prisma.appSettings.findUniqueOrThrow({ where: { key: `slice:state:${radar.id}` } });
+    expect(Object.keys(state.value as object).filter(k => k.startsWith("q:"))).toHaveLength(5);
+    const run = await prisma.checkRun.findFirstOrThrow();
+    expect(run.sourceId).toBe("marktplaats-search"); expect(run.pages).toBe(5);
+  });
 });

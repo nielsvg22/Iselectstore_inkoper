@@ -7,7 +7,8 @@ import {
   specsFromConfig,
   type RoundEstimate,
 } from "./sources/slice-plan";
-import { getConfig } from "./settings/store";
+import { getConfig, getSecret } from "./settings/store";
+import { officialGateState, tokenFingerprint, OFFICIAL_SOURCE } from "./sources/marktplaats-official";
 
 export function percentile(values: number[], p: number): number | null {
   if (!values.length) return null;
@@ -54,6 +55,7 @@ export interface PerformanceData {
     overdue: boolean;
     coverage: { total: number; covered: number; pct: number } | null;
     rounds: (RoundEstimate & { seen: number }) | null;
+    units: Array<{ label: string; lastCheckedAt: string | null }>;
   }>;
   activeProfiles: number;
   lastSuccessSeconds: number | null;
@@ -67,6 +69,7 @@ export interface PerformanceData {
   adsPerHour: Array<{ hour: string; count: number }>;
   newAds24h: number;
   latency: {
+    publicationToDetection: Dist;
     prefilter: Dist;
     fullAnalysis: Dist;
     toNotification: Dist;
@@ -79,7 +82,12 @@ export interface PerformanceData {
     pending: number;
     skipped: number;
   };
+  /** Interval plus observed processing, NOT a publication-to-push bound. */
   estimatedMaxDetectionDelayMinutes: number | null;
+  sources: Array<{ id: string; label: string; status: string; lastSuccessAt: string | null;
+    scanInterval: Dist; checks: number; discovered: number; errors: number; lastError: string | null;
+    requestsToday: number; requestLimit: number; nextRequestAt: string | null }>;
+
   queue: { pending: number; running: number; dead: number };
   cooldown: { until: string; reason: string } | null;
   fast: { enabled: boolean; profiles: number; intervalSeconds: number };
@@ -125,15 +133,17 @@ export async function getPerformance(days = 7): Promise<PerformanceData> {
     }),
     prisma.checkRun.findMany({
       where: { startedAt: { gte: since24 } },
-      select: { ok: true, durationMs: true, pages: true, cacheHits: true },
+      orderBy: { startedAt: "asc" },
+      select: { ok: true, durationMs: true, pages: true, cacheHits: true, sourceId: true, profileId: true, startedAt: true, finishedAt: true, created: true },
     }),
     prisma.advertisement.findMany({
       where: { isDemo: false, firstSeenAt: { gte: since } },
-      select: { firstSeenAt: true, prefilteredAt: true, analyzedAt: true },
+      select: { firstSeenAt: true, prefilteredAt: true, analyzedAt: true, publishedAt: true, rawPayload: true },
     }),
     prisma.notification.findMany({
       where: { createdAt: { gte: since }, channel: { not: "INAPP" } },
       select: {
+        channel: true,
         createdAt: true,
         sentAt: true,
         status: true,
@@ -154,14 +164,21 @@ export async function getPerformance(days = 7): Promise<PerformanceData> {
       : p.sourceKind === "SEARCH"
         ? Math.max(p.intervalMinutes, cfg.scheduler.minIntervalMinutes)
         : p.intervalMinutes;
+  const unitsFor = new Map<string, Array<{ label: string; lastCheckedAt: string | null }>>();
   const roundsFor = new Map<string, RoundEstimate & { seen: number }>();
   for (const p of profiles) {
     const sc = (p.sourceConfig ?? {}) as {
       sliceModels?: string[];
       sliceStorages?: number[];
       priorityModels?: string[];
+      smartRadar?: boolean; queries?: string[];
     };
-    if (!p.active || !cfg.scheduler.fast.enabled || !sc.sliceModels?.length)
+    if (sc.smartRadar && p.active) {
+      const state = await getSliceState(p.id);
+      unitsFor.set(p.id, (sc.queries ?? [p.sourceKind === "SEARCH" ? "iphone" : ""]).filter(Boolean)
+        .map(q => ({ label: q, lastCheckedAt: state[`q:${q}`]?.at ?? null })));
+    }
+    if (sc.smartRadar || !p.active || !cfg.scheduler.fast.enabled || !sc.sliceModels?.length)
       continue;
     const specs = specsFromConfig(sc);
     const facets = new Map<string, FacetMap>();
@@ -196,6 +213,7 @@ export async function getPerformance(days = 7): Promise<PerformanceData> {
       overdue: p.active && (since == null || since > interval * 60 * 2 + 120),
       coverage: cov.get(p.id) ?? null,
       rounds: roundsFor.get(p.id) ?? null,
+      units: unitsFor.get(p.id) ?? [],
     };
   });
   const active = prof.filter((p) => p.active);
@@ -217,11 +235,14 @@ export async function getPerformance(days = 7): Promise<PerformanceData> {
     if (k in hours) hours[k]++;
   }
   const real = notifs.filter((n) => !n.ad.isDemo);
-  const sent = real.filter((n) => n.sentAt);
+  const sent = real.filter((n) => n.sentAt && n.channel === "WEBPUSH");
   const analysisSecs = ads
     .filter((a) => a.analyzedAt)
     .map((a) => sec(a.firstSeenAt, a.analyzedAt!));
   const dist = {
+    publicationToDetection: summarize(ads.filter(a => a.publishedAt &&
+      (a.rawPayload as { attributes?: { publicationPrecision?: string } } | null)?.attributes?.publicationPrecision === "exact")
+      .map(a => sec(a.publishedAt!, a.firstSeenAt))),
     prefilter: summarize(
       ads
         .filter((a) => a.prefilteredAt)
@@ -255,7 +276,34 @@ export async function getPerformance(days = 7): Promise<PerformanceData> {
     where: { key: "worker:heartbeat" },
   });
   const heartbeat = (heartbeatRow?.value as { at?: string } | null)?.at ?? null;
+  const [health, gate, token] = await Promise.all([prisma.sourceHealth.findMany(), officialGateState(), getSecret("marktplaats.accessToken")]);
+  const sources = [
+    { id: "marktplaats-search", label: "Publieke zoekpagina’s", enabled: cfg.sources.allowed.includes("SEARCH"), limit: cfg.scheduler.fast.maxRequestsPerMinute },
+    { id: OFFICIAL_SOURCE, label: "Officiële Search API", enabled: cfg.officialApi.enabled && cfg.sources.allowed.includes("PARTNER_API"), limit: cfg.officialApi.requestsPerMinute },
+  ].map(source => {
+    const h = health.find(h => h.id === source.id);
+    // Old runs have no source id; do not attribute them to an unproven source.
+    const scans = runs.filter(r => r.sourceId === source.id);
+    const previous = new Map<string, Date>(); const intervals: number[] = [];
+    for (const r of scans) {
+      const prev = previous.get(r.profileId);
+      if (prev) intervals.push(sec(prev, r.startedAt));
+      previous.set(r.profileId, r.startedAt);
+    }
+    const official = source.id === OFFICIAL_SOURCE;
+    const blocked = token && gate.blockedFingerprint === tokenFingerprint(token);
+    return { id: source.id, label: source.label,
+      status: !source.enabled ? "Uitgeschakeld" : official && !cfg.officialApi.accessApproved ? "Toegang niet bevestigd"
+        : official && !token ? "OAuth-token ontbreekt" : official && blocked ? `Gepauzeerd na HTTP ${gate.status}`
+        : official && (gate.nextAt ?? 0) > now.getTime() ? "Wacht op requestslot" : !h ? "Nog niet gecontroleerd" : h.ok ? "Laatste controle geslaagd" : "Bronfout",
+      lastSuccessAt: h?.lastOkAt?.toISOString() ?? null, scanInterval: summarize(intervals), checks: scans.length,
+      discovered: scans.reduce((n, r) => n + r.created, 0), errors: scans.filter(r => !r.ok && r.finishedAt).length,
+      lastError: h?.lastError ?? null, requestsToday: h?.day === now.toISOString().slice(0, 10) ? h.requestsToday : 0,
+      requestLimit: source.limit, nextRequestAt: official && gate.nextAt && gate.nextAt > now.getTime() ? new Date(gate.nextAt).toISOString() : null,
+    };
+  });
   return {
+    sources,
     worker: {
       heartbeat,
       healthy:
@@ -283,7 +331,7 @@ export async function getPerformance(days = 7): Promise<PerformanceData> {
       pending: real.filter((n) => n.status === "PENDING").length,
       skipped: real.filter((n) => n.status === "SKIPPED").length,
     },
-    // Schatting: een nieuwe advertentie wordt uiterlijk één controle-interval + verwerkingstijd na plaatsing gezien (mits hij in de opgehaalde pagina's staat)
+    // Alleen een controle-/verwerkingsschatting; de bron bepaalt indexering en rangschikking.
     estimatedMaxDetectionDelayMinutes:
       maxInterval == null
         ? null

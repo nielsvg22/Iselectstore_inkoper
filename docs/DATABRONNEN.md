@@ -1,15 +1,21 @@
 # Databronnen en Marktplaats-integratie
 
-## Onderzoeksresultaat
+## Actuele API-rechten (18 oktober 2026)
+
+Zie [het onderzoek met echte read-only resultaten](OFFICIELE-API-ONDERZOEK.md).
+De officiële Search API bestaat; met de bestaande GoedGeplaatst-key is externe
+zoektoegang niet beschikbaar aangetoond. De nieuwe adapter blijft standaard uit.
+
+## Publieke zoekpagina’s (eerder onderzoek)
 
 | Vraag | Bevinding (gecontroleerd op 2026-10-10) |
 |---|---|
-| Is er een publiek gedocumenteerde Marktplaats-zoek-API voor kopers? | **Nee.** Alleen verkopers-/partnerintegraties (advertenties plaatsen). |
+| Bestaat een gedocumenteerde Marktplaats-zoek-API? | **Ja**, `GET /v2/search`; eigen OAuth-toegang/scopes vereist. Geen geverifieerde toegang met onze huidige key. |
 | Mag de interne JSON-zoek-API (`/lrp/api/search`) gebruikt worden? | **Nee.** `robots.txt` verbiedt expliciet `/lrp/api/search*`, `/lp/api/listings*`, `/search?q=*` en `*/n/*`. Deze app gebruikt ze **niet**. |
 | Zijn de gewone zoek-/categoriepagina's toegestaan? | **Ja volgens robots.txt**: `/q/<zoekterm>/`, `/l/<categorie>/q/<zoekterm>/` en `/p/<n>/` staan niet in de Disallow-lijst. Ze leveren HTTP 200 met alle resultaten als ingebedde data (`__NEXT_DATA__`, 30 per pagina). |
 | Werkt het ophalen echt? | **Ja, live getest** (dezelfde code als de app, 2 pagina's + detailpagina's): echte advertenties met titel, prijs, plaats, foto's, batterij/kleur-kenmerken en volledige tekst. |
 
-> robots.txt is geen gebruiksvoorwaarde. Controleer zelf of automatisch gebruik past bij de voorwaarden van Marktplaats. De app blijft daarom bewust rustig: minimaal 3 s tussen requests, standaard 3 pagina's per zoekterm, dagelijkse requestlimiet, geen omzeiling van blokkades (bij 403/429 of een botcontrole stopt hij met een duidelijke melding).
+> robots.txt is geen gebruiksvoorwaarde. Controleer zelf of automatisch gebruik past bij de voorwaarden van Marktplaats. De app blijft daarom bewust rustig: minimaal 3 s tussen requests, standaard 3 pagina's per zoekterm, gedeelde requestpacing, geen omzeiling van blokkades (bij 403/429 of een botcontrole stopt hij met een duidelijke melding).
 
 ## Hoe automatisch zoeken werkt (zoekprofiel → bron "Zoeken op Marktplaats")
 
@@ -17,12 +23,12 @@
 2. De app haalt de zoekpagina's op (robots.txt-controle, SSRF-bescherming, vertraging) en leest alle advertenties uit.
 3. **Jouw filters** (maximale prijs, model, afstand, winst, risico, …) worden door de app zelf toegepast — Marktplaats' eigen filters zijn niet via toegestane URL's beschikbaar. Prijs- en modelfilters werken al als voorselectie vóór het opslaan; koopadvertenties ("gezocht") en losse accessoires worden altijd weggefilterd.
 4. Van advertenties waarvan we de detailpagina nog niet hebben wordt die opgehaald (nieuwste eerst, max. `maxDetailsPerRun` = 40 per run): de zoekresultaten bevatten maar 1–3 foto's en een tekst die op 200 tekens is afgekapt, terwijl risico's (bijv. iCloud) vaak verderop staan. Bij het openen van een advertentie in de app wordt dit zo nodig direct nog eens gedaan. Volledige tekst en fotoset worden daarna nooit meer door een kortere samenvatting overschreven.
-5. Daarna: herkenning → waardering → winst → risico → score → melding via Telegram.
+5. Snelle modus: per pagina opslaan → voorselectie → voorlopige push; detailpagina/AI en volledige waardering lopen onafhankelijk op de achtergrond. Normale modus kan wachten op volledige beoordeling.
 
 ## Overige bronnen
 - **URL-import** (`/import`): losse advertentie-URL's.
 - **Export-import** (JSON/CSV) en **feed-profielen** voor data uit andere toegestane bronnen.
-- **Partner-API**: plaatshouder voor een officiële integratie (`partnerAdapter`).
+- **Officiële Search API**: geconfigureerde adapter (`partnerAdapter`), standaard uit; vereist eigen goedgekeurde OAuth-toegang. Zie het onderzoek.
 - **Demodata**: gemarkeerde voorbeeldadvertenties, gescheiden van echte data.
 
 ## Verifiëren in je eigen omgeving
@@ -30,7 +36,7 @@
 
 ## Bekende beperkingen
 - De paginastructuur kan wijzigen; dan meldt de app "Onverwachte structuur van de zoekpagina" (zie Status) en moet `src/lib/sources/marktplaats-search.ts` worden aangepast. De tests bevatten een fixture van de huidige structuur.
-- Afstand is onbekend zonder ingestelde locatie (`distanceMeters = -1000`); afstandsfilters laten zulke advertenties door ("indien bekend").
+- Afstand wordt vanaf Apeldoorn uit betrouwbare coördinaten berekend. Ontbrekende coördinaten geven onbekend en geen automatische verzendgoedkeuring; filters laten onbekend alleen door als dat is ingesteld.
 - Publicatiedatum is bij benadering ("Vandaag", "Gisteren", "5 okt.").
 - De prijs van advertenties met "bieden vanaf" wordt als vraagprijs behandeld; "zie omschrijving"/"op aanvraag" geeft geen prijs.
 

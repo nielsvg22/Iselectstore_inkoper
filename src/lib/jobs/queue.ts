@@ -2,7 +2,7 @@ import { Prisma, type BackgroundJob } from "@prisma/client";
 import { prisma } from "../db/client";
 import { errMsg, log } from "../log";
 
-export type JobType = "CHECK_PROFILE" | "FETCH_DETAIL" | "REFRESH_FACETS" | "ANALYZE_AD" | "NOTIFY" | "CLEANUP";
+export type JobType = "CHECK_PROFILE" | "CHECK_OFFICIAL_PROFILE" | "FETCH_DETAIL" | "REFRESH_FACETS" | "ANALYZE_AD" | "NOTIFY" | "CLEANUP";
 export type AnalysisMode = "quick" | "full";
 
 export interface EnqueueOpts {

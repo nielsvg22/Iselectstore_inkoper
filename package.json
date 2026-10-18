@@ -17,7 +17,8 @@
     "worker": "tsx src/worker/run.ts",
     "postinstall": "prisma generate",
     "test:e2e": "playwright test",
-    "verify:source": "tsx scripts/verify-source.ts"
+    "verify:source": "tsx scripts/verify-source.ts",
+    "verify:official": "tsx scripts/verify-official-api.ts"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",

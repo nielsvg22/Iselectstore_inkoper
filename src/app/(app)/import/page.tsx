@@ -21,7 +21,7 @@ export default async function ImportPage() {
           <div className="space-y-1.5">
             <p className="font-medium">Zo gaat Deal Hunter met bronnen om</p>
             <ul className="list-disc space-y-1 pl-5 text-muted">
-              <li>Er is geen publiek gedocumenteerde Marktplaats-zoek-API; er wordt daarom niets ‘automatisch gescrapet’ en geen eindpunt aangenomen.</li>
+              <li>De officiële Marktplaats Search API vereist eigen goedgekeurde OAuth-toegang. De bestaande zoekbron en imports zijn beschikbaar; de officiële bron staat standaard uit.</li>
               <li>URL-import haalt alleen pagina&apos;s op die jij opgeeft, met robots.txt-controle, vertraging en SSRF-bescherming. CAPTCHA, login of rate limits worden nooit omzeild.</li>
               <li>Controleer of je gebruik past bij de voorwaarden van de bron. Lukt uitlezen niet, gebruik dan de export-import hieronder.</li>
             </ul>

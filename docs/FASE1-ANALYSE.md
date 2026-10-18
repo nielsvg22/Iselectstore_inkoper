@@ -32,7 +32,7 @@
 - De sortering "nieuwste eerst" (`SORT_INDEX`) bestaat alleen als **client-side URL-fragment** of in de verboden API; een query-parameter wordt door de server genegeerd (vergeleken: identieke resultaten). De server-gerenderde pagina gebruikt `OPTIMIZED`, waarin betaalde "dagtoppers" vooraan staan en oudere advertenties door nieuwe heen lopen. **Nieuwste-eerst is dus via toegestane pagina's niet af te dwingen**; detectie hangt af van (a) specifieke zoektermen/categorieën en (b) meerdere pagina's per run.
 - Verkopersgegevens in zoekresultaten: `sellerId` (anoniem = 1), `sellerName` ("Anoniem"), `isVerified`, trait `VERIFIED_SELLER` (zakelijk). **Geen** beoordelingen, accountleeftijd of verkoopverleden. Die blijven dus "Onbekend".
 - Publicatiedatum is grof ("Vandaag", "Gisteren", datum) – niet geschikt voor exacte vertraging; daarom meten we **eerste detectie door onze scraper** (`firstSeenAt`).
-- Officiële/geautoriseerde bron voor snellere detectie: er is (bij ons bekend) geen publieke Marktplaats-API voor zoeken; een geautoriseerde feed/partnerintegratie moet met Marktplaats worden afgesproken. Tot die tijd is polling de enige toegestane methode.
+- Correctie 18 oktober 2026: de officiële Search API is gedocumenteerd (`GET /v2/search`), maar de bestaande GoedGeplaatst-autorisatie geeft geen aangetoonde zoektoegang. Eigen OAuth/scopes en bronlimieten moeten worden bevestigd. Zie [het actuele onderzoek](OFFICIELE-API-ONDERZOEK.md).
 
 ## Gevolgen voor het ontwerp
 1. Ingest eerst (alleen zoekresultaat), detail asynchroon; melding pas na volledige beoordeling.

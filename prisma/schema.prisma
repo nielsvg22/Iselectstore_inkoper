@@ -545,6 +545,7 @@ model PushSubscription {
 model CheckRun {
   id          String   @id @default(cuid())
   profileId   String
+  sourceId    String?
   startedAt   DateTime @default(now())
   finishedAt  DateTime?
   durationMs  Int?
@@ -559,5 +560,6 @@ model CheckRun {
   covered      Int?
 
   @@index([profileId, startedAt])
+  @@index([sourceId, startedAt])
   @@index([startedAt])
 }

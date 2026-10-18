@@ -5,6 +5,7 @@ export function jobLanes(concurrency: number): Array<{
   name: string; types: JobType[]; concurrency: number; analysisMode?: AnalysisMode;
 }> {
   return [
+    { name: "officieel", types: ["CHECK_OFFICIAL_PROFILE"], concurrency: 1 },
     { name: "detectie", types: ["CHECK_PROFILE"], concurrency: 1 },
     { name: "details", types: ["FETCH_DETAIL", "REFRESH_FACETS"], concurrency: 1 },
     { name: "snel", types: ["ANALYZE_AD"], concurrency: 1, analysisMode: "quick" },

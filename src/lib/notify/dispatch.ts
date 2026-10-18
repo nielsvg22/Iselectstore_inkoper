@@ -71,7 +71,7 @@ export async function dealMessageForAd(
     uncertain: a.uncertain,
     adId: ad.id,
     ...provisionalInfo(
-      ad.origin === "SEARCH" && !ad.detailFetchedAt,
+      ["SEARCH", "PARTNER_API"].includes(ad.origin) && !ad.detailFetchedAt,
       Boolean(raw.detailFailed),
       a.uncertain,
       ad.needsManualReview,

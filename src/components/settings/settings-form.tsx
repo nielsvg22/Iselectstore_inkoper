@@ -789,6 +789,23 @@ export function SettingsForm({
           </CardContent>
         </Card>
 
+        <Card id="official-api">
+          <CardHeader><div><CardTitle>Marktplaats Search API</CardTitle>
+            <CardDescription>Officiële zoektoegang vereist een eigen Marktplaats OAuth-token en goedgekeurde rechten. Een GoedGeplaatst-sleutel geeft deze rechten niet. De bron blijft standaard uit.</CardDescription>
+          </div></CardHeader>
+          <CardContent className="space-y-5">
+            <Switch checked={c.officialApi.accessApproved} onChange={v => set("officialApi", { accessApproved: v })} label="Marktplaats heeft zoektoegang voor onze applicatie bevestigd" />
+            <Switch checked={c.officialApi.enabled} onChange={v => set("officialApi", { enabled: v })} label="Officiële zoekbron inschakelen naast de bestaande radar" />
+            <SecretField k="marktplaats.accessToken" label="Eigen Marktplaats OAuth access token" placeholder="Eigen OAuth-token, geen GoedGeplaatst API-key" hint="Versleuteld opgeslagen. Bij HTTP 401/403 pauzeert deze bron tot het token is vervangen. Een token moet tijdig opnieuw worden geautoriseerd; de plaatsingskoppeling wordt niet gewijzigd." />
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Field label="Controle-interval (seconden)"><Input type="number" min="30" max="3600" value={c.officialApi.intervalSeconds} onChange={e => set("officialApi", { intervalSeconds: Number(e.target.value) })} /></Field>
+              <Field label="Requests per minuut" hint="Stel dit in volgens de toegestane API-limiet."><Input type="number" min="1" max="30" value={c.officialApi.requestsPerMinute} onChange={e => set("officialApi", { requestsPerMinute: Number(e.target.value) })} /></Field>
+              <Field label="Resultaten per controle"><Input type="number" min="1" max="200" value={c.officialApi.pageSize} onChange={e => set("officialApi", { pageSize: Number(e.target.value) })} /></Field>
+            </div>
+            <p className="text-sm text-muted">Sta ook ‘Officiële partner-API’ toe bij Databronnen. Eén brede zoekopdracht dekt de producten van de centrale radar. De gedocumenteerde API biedt geen sortering op publicatietijd; volledige detectie binnen 60 seconden is daarmee niet aangetoond.</p>
+          </CardContent>
+        </Card>
+
         <Card id="mailbox">
           <CardHeader>
             <div>

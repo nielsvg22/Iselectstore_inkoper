@@ -1,4 +1,5 @@
 import { distanceFromApeldoorn } from "../radar/safety";
+import { shippingFromDelivery } from "./delivery";
 import { z } from "zod";
 import { hiRes, mergeImages } from "../images";
 import { prisma } from "../db/client";
@@ -136,10 +137,7 @@ export function mapSearchListing(o: Obj, now = new Date()): RawAd | null {
       : null;
   const loc = (o.location ?? {}) as Obj;
   const attrs = { ...attrMap(o.attributes), ...attrMap(o.extendedAttributes) };
-  const delivery = (attrs.delivery ?? "").toLowerCase();
-  const shipping: string[] = [];
-  if (delivery.includes("ophalen")) shipping.push("pickup");
-  if (delivery.includes("verzend")) shipping.push("shipping");
+  const shipping = shippingFromDelivery(attrs.delivery);
   const dist = distanceFromApeldoorn(loc.latitude, loc.longitude);
   const structured: Record<string, string | number> = {};
   for (const [k, v] of Object.entries(attrs))
@@ -269,11 +267,13 @@ export function mergeDetail(list: RawAd, detail: RawAd): RawAd {
     askingCents: list.askingCents ?? detail.askingCents ?? null,
     location: list.location ?? detail.location ?? null,
     distanceKm: list.distanceKm ?? detail.distanceKm ?? null,
+    shipping: detail.shipping?.length ? detail.shipping : list.shipping,
+    conditionText: detail.conditionText ?? list.conditionText,
     publishedAt: detail.publishedAt ?? list.publishedAt,
     attributes: {
       ...list.attributes,
       ...detail.attributes,
-      publicationPrecision: detail.publishedAt ? "exact" : "day",
+      publicationPrecision: (detail.publishedAt ? detail.attributes?.publicationPrecision : list.attributes?.publicationPrecision) ?? "unknown",
     },
   };
 }

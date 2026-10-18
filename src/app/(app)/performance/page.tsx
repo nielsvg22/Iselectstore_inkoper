@@ -58,6 +58,7 @@ function Tile({
 const LAT: Array<
   [keyof Awaited<ReturnType<typeof getPerformance>>["latency"], string, string]
 > = [
+  ["publicationToDetection", "Publicatie → detectie (alleen exacte tijdstippen)", "gemeten"],
   ["prefilter", "Eerste detectie → snelle voorselectie", "gemeten"],
   ["fullAnalysis", "Eerste detectie → volledige analyse", "gemeten"],
   ["toNotification", "Eerste detectie → melding aangemaakt", "gemeten"],
@@ -101,7 +102,7 @@ export default async function PerformancePage() {
         <p className="mt-1 max-w-3xl text-muted">
           Gemeten snelheid van de detectieketen. Tijden beginnen bij de{" "}
           <strong>eerste detectie door onze scraper</strong>; de publicatietijd
-          van Marktplaats is te grof (alleen dag) om als meting te gebruiken.
+          wordt alleen meegerekend wanneer de bron een exact tijdstip levert. Daglabels tellen niet mee.
         </p>
       </div>
 
@@ -113,6 +114,20 @@ export default async function PerformancePage() {
           {d.worker.heartbeat ?? "Nog niet gestart"} · Heartbeat bewijst
           liveness, bronresultaten staan hieronder.
         </p>
+      </section>
+      <section className="grid gap-4 lg:grid-cols-2" aria-label="Databronnen">
+        {d.sources.map(s => <div key={s.id} className="rounded-2xl bg-card p-5 text-sm">
+          <h2 className="font-semibold">{s.label}</h2>
+          <p className="mt-1 text-muted">{s.status}</p>
+          <dl className="mt-4 grid grid-cols-2 gap-3">
+            <div><dt className="text-muted">Laatste succes</dt><dd>{s.lastSuccessAt ? timeAgo(s.lastSuccessAt) : "Nog geen"}</dd></div>
+            <div><dt className="text-muted">Werkelijk controle-interval</dt><dd>{fmt(s.scanInterval.avg)} gemiddeld · {s.scanInterval.n} intervallen</dd></div>
+            <div><dt className="text-muted">Laatste 24 uur</dt><dd>{s.checks} controles · {s.discovered} nieuw · {s.errors} fouten</dd></div>
+            <div><dt className="text-muted">Bronbudget</dt><dd>Max. {s.requestLimit} requests/min · {s.requestsToday} zoekrequests vandaag</dd></div>
+          </dl>
+          {s.lastError && <p className="mt-3 text-danger">{s.lastError}</p>}
+          {s.nextRequestAt && <p className="mt-2 text-muted">Volgend request op zijn vroegst {new Date(s.nextRequestAt).toLocaleTimeString("nl-NL")}</p>}
+        </div>)}
       </section>
       <details className="rounded-2xl bg-card p-5">
         <summary className="cursor-pointer font-medium">
@@ -151,7 +166,7 @@ export default async function PerformancePage() {
                       } | null
                     )?.attributes?.publicationPrecision === "day"
                       ? "(dagindicatie)"
-                      : ""}
+                      : (a.rawPayload as { attributes?: { publicationPrecision?: string } } | null)?.attributes?.publicationPrecision === "exact" ? "(exact)" : a.publishedAt ? "(precisie onbekend)" : ""}
                   </td>
                   <td className="p-2">{a.firstSeenAt.toISOString()}</td>
                   <td className="p-2">
@@ -380,6 +395,10 @@ export default async function PerformancePage() {
                       ? `Fout: ${p.lastError}`
                       : `elke ${p.intervalMinutes} min`}
                   </p>
+                  {p.units.length > 0 && <div className="mt-2 space-y-1 text-xs text-muted">
+                    {p.units.map(u => <p key={u.label}>{u.label} · {u.lastCheckedAt ? timeAgo(u.lastCheckedAt) : "nog niet gecontroleerd"}</p>)}
+                    <p>Een snelle hoofdcontrole betekent niet dat elke productgroep tegelijk is gecontroleerd.</p>
+                  </div>}
                   {p.rounds && (
                     <p className="text-xs text-muted">
                       Rondlopend: {p.rounds.slices} smalle lijsten (

@@ -2,11 +2,14 @@
 
 De huidige implementatie, bronbeperkingen, herstelprocedure en verificatie staan in [RADAR-2-IMPLEMENTATIE.md](docs/RADAR-2-IMPLEMENTATIE.md). De nieuwe worker migreert bestaande beheerdersprofielen eenmalig en herstelbaar naar één radar. Na expliciete toestemming is de geteste featurebranch op Coolify uitgerold: [open de app](https://deals.85.190.105.138.nip.io).
 
+
+De nieuwe branch `feature/official-api-realtime-radar` voegt een standaard uitgeschakelde officiële Search-adapter, eerlijke zoekverdeling en bronmetingen toe. **Deze branch is niet naar productie gedeployed.** Echte API-rechten, gemeten snelheid en resterende verificatie: [OFFICIELE-API-ONDERZOEK.md](docs/OFFICIELE-API-ONDERZOEK.md).
+
 ## Bestaande applicatie
 
 Webapp voor handelaren in tweedehands Apple-producten: advertenties verzamelen, producten herkennen, marktwaarde schatten, winst berekenen, risico's detecteren, scoren (0–100) en de beste inkoopdeals melden via Telegram.
 
-> **Marktplaats:** de app zoekt zelf op jouw zoektermen via de publieke zoekpagina's die robots.txt toestaat (de verboden JSON-API wordt niet gebruikt), past jouw filters toe en haalt alle resultaten op. Dit is live getest, maar robots.txt is geen gebruiksvoorwaarde: lees [docs/DATABRONNEN.md](docs/DATABRONNEN.md) en controleer de voorwaarden van Marktplaats.
+> **Marktplaats:** de app zoekt zelf op jouw zoektermen via de publieke zoekpagina's die robots.txt toestaat (de verboden JSON-API wordt niet gebruikt), past jouw filters toe en verwerkt de opgehaalde pagina’s. Dit is live getest, maar robots.txt is geen gebruiksvoorwaarde: lees [docs/DATABRONNEN.md](docs/DATABRONNEN.md) en controleer de voorwaarden van Marktplaats.
 
 ## Stack
 Next.js 15 (App Router) · TypeScript · Tailwind CSS 4 · shadcn/ui-stijl componenten · PostgreSQL + Prisma 6 · Zod · Recharts · DB-gebaseerde jobwachtrij · Telegram/Discord · Vitest + Playwright.
@@ -70,7 +73,7 @@ Instelbaar onder *Instellingen*: vraagprijs→verkoopprijs-factor (0,92), opslag
 
 ## Testen
 ```bash
-npm test               # 423 unit- + integratietests (Postgres vereist; gebruikt DB dealhunter_test)
+npm test               # unit- + integratietests (Postgres vereist; gebruikt DB dealhunter_test)
 npm run lint           # TypeScript
 npm run test:e2e       # Playwright (bouwt niet; draai eerst `npm run build`; DB dealhunter_e2e)
 ```

@@ -4,10 +4,13 @@ import {
   ParseError,
   parseListingHtml,
   parsePriceToCents,
+  publicationPrecision,
 } from "@/lib/sources/listing-parser";
 import { parseCsv, parseFeed } from "@/lib/sources/feed-parser";
 import { buildDealMessage } from "@/lib/notify/message";
 import { sendDiscord, sendTelegram } from "@/lib/notify/senders";
+import { shippingFromDelivery } from "@/lib/sources/delivery";
+import { mergeDetail } from "@/lib/sources/marktplaats-search";
 
 const LD = `<html><head><title>x</title>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"Product","name":"iPhone 15 Pro 256GB zwart","description":"Batterij 91%. iCloud vrij.","image":["https://img.example/a.jpg","https://img.example/b.jpg"],"sku":"m2123456789","offers":{"@type":"Offer","price":"350.00","priceCurrency":"EUR","itemCondition":"https://schema.org/UsedCondition","url":"https://www.marktplaats.nl/v/telecommunicatie/mobiele-telefoons-apple-iphone/m2123456789-iphone-15-pro"}}</script></head><body></body></html>`;
@@ -17,6 +20,28 @@ const STATE = `<html><body><script id="__NEXT_DATA__" type="application/json">${
 const OG = `<html><head><meta property="og:title" content="iPad Pro 11 &amp; pencil"><meta property="og:description" content="Mooie iPad"><meta property="og:image" content="https://img.example/o.jpg"><meta property="product:price:amount" content="1.250,00"></head></html>`;
 
 describe("advertentie-parser", () => {
+  it("neemt alleen expliciete verzendinformatie over, inclusief ontkenningen", () => {
+    expect(shippingFromDelivery("Ophalen of Verzenden")).toEqual(["pickup", "shipping"]);
+    expect(shippingFromDelivery("Ophalen, niet verzenden")).toEqual(["pickup"]);
+    expect(shippingFromDelivery("Alleen ophalen, geen verzending")).toEqual(["pickup"]);
+    expect(shippingFromDelivery("Verzenden is niet mogelijk")).toEqual([]);
+    expect(shippingFromDelivery(undefined)).toEqual([]);
+  });
+  it("verrijkt API-samenvattingen met echte bezorggegevens en promoveert daglabels nooit tot exact", () => {
+    const detail = parseListingHtml(STATE.replace('"date":"2026-10-09T10:00:00Z"', '"date":"2026-10-09"').replace('"key":"Opslagcapaciteit"', '"key":"delivery"').replace('"value":"512 GB"', '"value":"Ophalen of Verzenden"'), "https://www.marktplaats.nl/v/computers/m987654321-macbook");
+    const merged = mergeDetail({ externalId: detail.externalId, url: detail.url, title: detail.title, imageUrls: [], shipping: [] }, detail);
+    expect(merged.shipping).toEqual(["pickup", "shipping"]);
+    expect(merged.attributes?.publicationPrecision).toBe("day");
+  });
+  it("onderscheidt een exact tijdstip met tijdzone van een daglabel of lokale tijd", () => {
+    expect(publicationPrecision("2026-10-18T07:00:00Z")).toBe("exact");
+    expect(publicationPrecision("2026-10-18T09:00:00+02:00")).toBe("exact");
+    expect(publicationPrecision("2026-10-18")).toBe("day");
+    expect(publicationPrecision("2026-10-18T07:00:00")).toBe("unknown");
+    expect(publicationPrecision("vandaag")).toBe("unknown");
+    expect(publicationPrecision("2026-02-30T07:00:00Z")).toBe("unknown");
+    expect(publicationPrecision(null)).toBe("unknown");
+  });
   it("leest JSON-LD (schema.org Product)", () => {
     const ad = parseListingHtml(
       LD,

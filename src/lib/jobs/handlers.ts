@@ -7,6 +7,8 @@ import { analyzeAd } from "../pipeline/analyze";
 import { ingestAd } from "../pipeline/ingest";
 import { getConfig } from "../settings/store";
 import { adapterForOrigin } from "../sources/adapters";
+import { officialAdapter, officialReady, OFFICIAL_SOURCE } from "../sources/marktplaats-official";
+import { planSmartUnits, smartPageBudget } from "../sources/smart-plan";
 import { loadTree } from "../pipeline/tree";
 import { buildPrefilter } from "../sources/prefilter";
 import { fetchListingUrl } from "../sources/adapters-shared";
@@ -72,6 +74,7 @@ async function recordSource(
 
 export async function runProfileCheck(
   profileId: string,
+  official = false,
 ): Promise<{ fetched: number; created: number; changed: number }> {
   const profile = await prisma.searchProfile.findUnique({
     where: { id: profileId },
@@ -79,11 +82,11 @@ export async function runProfileCheck(
   if (!profile || !profile.active)
     return { fetched: 0, created: 0, changed: 0 };
   const cfg = await getConfig();
-  const adapter = adapterForOrigin(profile.sourceKind);
+  const adapter = official ? officialAdapter : adapterForOrigin(profile.sourceKind);
   if (!adapter)
     throw new PermanentJobError(`Onbekende bron ${profile.sourceKind}`);
-  if (!cfg.sources.allowed.includes(profile.sourceKind)) {
-    await prisma.searchProfile.update({
+  if (!cfg.sources.allowed.includes(adapter.origin)) {
+    if (!official) await prisma.searchProfile.update({
       where: { id: profileId },
       data: {
         lastCheckedAt: new Date(),
@@ -109,7 +112,7 @@ export async function runProfileCheck(
         `Gepauzeerd tot ${cd.until.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" })}: ${cd.reason}`,
       );
   }
-  const run = await prisma.checkRun.create({ data: { profileId } });
+  const run = await prisma.checkRun.create({ data: { profileId, sourceId: adapter.id } });
   const t0 = Date.now();
   const stats: {
     pages: number;
@@ -118,7 +121,7 @@ export async function runProfileCheck(
     covered?: number;
   } = { pages: 0, cacheHits: 0 };
   try {
-    const tree = adapter.origin === "SEARCH" ? await loadTree(profileId) : null;
+    const tree = ["SEARCH", "PARTNER_API"].includes(adapter.origin) ? await loadTree(profileId) : null;
     const prefilter = tree ? buildPrefilter(tree) : undefined;
     // Slim zoeken (snelle modus): smalle filterpagina's per model/opslag; af en toe de volledige zoekterm als vangnet
     let slices: Slice[] | undefined;
@@ -134,12 +137,8 @@ export async function runProfileCheck(
     > = {};
     let searchConfig = (profile.sourceConfig ?? {}) as Record<string, unknown>;
     if (fast && sc.smartRadar) {
-      // Twee pagina's per ronde: eerst de brede hoofdzoekterm, dan één roterende
-      // productfamilie of modelslice. Geen netwerk voor facetplanning vóór detectie.
       const configured = (searchConfig.queries as string[] | undefined) ?? ["iphone"];
-      const primary = configured.find((q) => q.toLowerCase() === "iphone") ?? configured[0] ?? "iphone";
-      const others = configured.filter((q) => q !== primary);
-      const cycle = Math.floor(Date.now() / (cfg.scheduler.fast.intervalSeconds * 1000));
+      sliceStateBefore = await getSliceState(profileId);
       const specs = specsFromConfig(searchConfig as Parameters<typeof specsFromConfig>[0]);
       const facets = new Map<string, FacetMap>();
       for (const category of new Set(specs.map((x) => x.model.category))) {
@@ -150,16 +149,13 @@ export async function runProfileCheck(
             uniqueKey: `facets:${category}:${day()}` });
       }
       const built = buildSlices(specs, facets);
-      if (built.slices.length && (cycle % 2 === 0 || !others.length)) {
-        sliceStateBefore = await getSliceState(profileId);
-        slices = selectSlices(built.slices, sliceStateBefore, Date.now(), 1, {
-          highMs: cfg.scheduler.fast.priorityEveryMinutes * 60_000,
-          normalMs: cfg.scheduler.fast.normalEveryMinutes * 60_000,
-        });
-      }
-      if (slices?.length) extraQueries = [primary];
-      searchConfig = { ...searchConfig, queries: [primary,
-        ...(!slices?.length && others.length ? [others[Math.floor(cycle / 2) % others.length]] : [])], maxPages: 1 };
+      const budget = smartPageBudget(cfg.scheduler.fast.intervalSeconds,
+        cfg.scheduler.fast.maxRequestsPerMinute, cfg.limits.minSecondsBetweenRequests,
+        cfg.scheduler.fast.pagesPerRun);
+      const units = planSmartUnits(configured, built.slices, sliceStateBefore, budget);
+      slices = built.slices.filter(s => units.some(u => u.url === s.url));
+      extraQueries = units.filter(u => u.query).map(u => u.query!);
+      searchConfig = { ...searchConfig, queries: extraQueries, maxPages: 1 };
     } else if (
       fast &&
       tree &&
@@ -207,17 +203,17 @@ export async function runProfileCheck(
     let changed = 0;
     const processed = new Set<string>();
     const wantsDetail =
-      adapter.origin === "SEARCH" &&
+      ["SEARCH", "PARTNER_API"].includes(adapter.origin) &&
       ((profile.sourceConfig ?? {}) as { fetchDetails?: boolean })
         .fetchDetails !== false;
     const ingestPage = async (page: RawAd[]) => {
       for (const raw of page) {
         if (processed.has(raw.externalId)) continue;
         processed.add(raw.externalId);
-        const r = await ingestAd(raw, {
+        const r = await ingestAd({ ...raw, attributes: { ...raw.attributes, detectionSource: adapter.id } }, {
           origin: adapter.origin,
           isDemo: adapter.origin === "DEMO",
-          partial: adapter.origin === "SEARCH",
+          partial: ["SEARCH", "PARTNER_API"].includes(adapter.origin),
         });
         if (r.created) created++;
         if (r.changed) changed++;
@@ -257,12 +253,10 @@ export async function runProfileCheck(
     if (sliceStateBefore && Object.keys(unitResults).length)
       await setSliceState(profileId, {
         ...sliceStateBefore,
-        ...Object.fromEntries(
-          Object.entries(unitResults).filter(([k]) => k.startsWith("http")),
-        ),
+        ...unitResults,
       });
     await ingestPage(ads);
-    await recordSource(adapter.id, true, undefined, Math.max(1, stats.pages));
+    await recordSource(adapter.id, true, undefined, stats.pages);
     const now = new Date();
     // Eerste geslaagde controle van een zoekprofiel = "nulmeting": wat er al stond wordt nooit als nieuwe deal gemeld
     const baseline =
@@ -275,7 +269,7 @@ export async function runProfileCheck(
             },
           }
         : {};
-    await prisma.searchProfile.update({
+    if (!official) await prisma.searchProfile.update({
       where: { id: profileId },
       data: {
         lastCheckedAt: new Date(t0),
@@ -312,8 +306,8 @@ export async function runProfileCheck(
       !(await getCooldown(adapter.id))
     )
       await setCooldown(adapter.id, msg);
-    await recordSource(adapter.id, false, msg, 1);
-    await prisma.searchProfile.update({
+    await recordSource(adapter.id, false, msg, stats.pages);
+    if (!official) await prisma.searchProfile.update({
       where: { id: profileId },
       data: { lastCheckedAt: new Date(t0), lastError: msg },
     });
@@ -432,6 +426,9 @@ export const handlers: Partial<Record<JobType, Handler>> = {
   async REFRESH_FACETS(job: BackgroundJob) {
     await getFacets((job.payload as { category: string }).category, { requestPriority: "background" });
   },
+  async CHECK_OFFICIAL_PROFILE(job: BackgroundJob) {
+    await runProfileCheck((job.payload as { profileId: string }).profileId, true);
+  },
   async CHECK_PROFILE(job: BackgroundJob) {
     await runProfileCheck((job.payload as { profileId: string }).profileId);
   },
@@ -498,7 +495,7 @@ export async function scheduleDueProfiles(now = new Date()): Promise<number> {
   // Totaal-rem voor snelle profielen: maximaal N pagina-requests per minuut over alles samen
   const recentPages = await prisma.checkRun.aggregate({
     _sum: { pages: true },
-    where: { startedAt: { gte: new Date(now.getTime() - 60_000) } },
+    where: { startedAt: { gte: new Date(now.getTime() - 60_000) }, OR: [{ sourceId: null }, { sourceId: "marktplaats-search" }] },
   });
   let budget =
     cfg.scheduler.fast.maxRequestsPerMinute - (recentPages._sum.pages ?? 0);
@@ -507,6 +504,7 @@ export async function scheduleDueProfiles(now = new Date()): Promise<number> {
   const lastRuns = await prisma.checkRun.findMany({
     where: {
       ok: true,
+      OR: [{ sourceId: null }, { sourceId: "marktplaats-search" }],
       startedAt: { gte: new Date(now.getTime() - 6 * 3600_000) },
     },
     orderBy: { startedAt: "desc" },
@@ -593,6 +591,17 @@ export async function scheduleDueProfiles(now = new Date()): Promise<number> {
       maxAttempts: 3,
     });
     if (r.created) n++;
+  }
+  // Independent lane/source budget, within the same visible central profile.
+  if (cfg.sources.allowed.includes("PARTNER_API") && await officialReady()) {
+    for (const p of profiles.filter(p => p.sourceKind === "SEARCH" && (p.sourceConfig as { smartRadar?: boolean } | null)?.smartRadar)) {
+      const last = await prisma.checkRun.findFirst({ where: { profileId: p.id, sourceId: OFFICIAL_SOURCE }, orderBy: { startedAt: "desc" } });
+      if (last && now.getTime() - last.startedAt.getTime() < cfg.officialApi.intervalSeconds * 1000) continue;
+      if (await prisma.backgroundJob.findFirst({ where: { type: "CHECK_OFFICIAL_PROFILE", status: { in: ["PENDING", "RUNNING"] }, payload: { path: ["profileId"], equals: p.id } } })) continue;
+      const result = await enqueue({ type: "CHECK_OFFICIAL_PROFILE", payload: { profileId: p.id }, priority: 28,
+        uniqueKey: `official:${p.id}:${Math.floor(now.getTime() / (cfg.officialApi.intervalSeconds * 1000))}`, maxAttempts: 3 });
+      if (result.created) n++;
+    }
   }
   await enqueue({
     type: "CLEANUP",

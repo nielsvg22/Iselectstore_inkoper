@@ -9,7 +9,7 @@ export const GET = route(async () => ({ config: await getConfig(true), secrets: 
 
 const schema = z.object({
   config: z.record(z.string(), z.unknown()).optional(),
-  secrets: z.record(z.enum(SECRET_KEYS), z.string().max(500).nullable()).optional(),
+  secrets: z.record(z.enum(SECRET_KEYS), z.string().max(4096).nullable()).optional(),
 });
 
 export const PUT = route(

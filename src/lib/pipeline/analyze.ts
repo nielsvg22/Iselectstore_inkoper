@@ -662,7 +662,7 @@ export async function analyzeAd(
         publishedAt: ad.publishedAt,
         origin: ad.origin,
         complete:
-          ad.origin !== "SEARCH" ||
+          !["SEARCH", "PARTNER_API"].includes(ad.origin) ||
           Boolean(ad.detailFetchedAt) ||
           Boolean(
             (ad.rawPayload as { detailFailed?: boolean } | null)?.detailFailed,

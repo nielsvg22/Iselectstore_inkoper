@@ -6,6 +6,14 @@ import { z } from "zod";
  */
 export const configSchema = z.object({
   demoMode: z.boolean().default(false),
+  officialApi: z.object({
+    enabled: z.boolean().default(false),
+    /** Alleen na expliciete toestemming/scopes van Marktplaats; een GoedGeplaatst-key volstaat niet. */
+    accessApproved: z.boolean().default(false),
+    intervalSeconds: z.number().int().min(30).max(3600).default(60),
+    requestsPerMinute: z.number().int().min(1).max(30).default(2),
+    pageSize: z.number().int().min(1).max(200).default(100),
+  }).default({}),
   radar: z
     .object({
       topMinProfitCents: z.number().int().min(0).default(7500),
@@ -244,5 +252,6 @@ export const SECRET_KEYS = [
   "telegram.botToken",
   "discord.webhookUrl",
   "imap.password",
+  "marktplaats.accessToken",
 ] as const;
 export type SecretKey = (typeof SECRET_KEYS)[number];

@@ -4,6 +4,7 @@ import { parseFeed } from "./feed-parser";
 import { fetchListingUrl, throttleFor } from "./adapters-shared";
 import { safeFetch } from "./safe-fetch";
 import { searchAdapter } from "./marktplaats-search";
+import { officialAdapter } from "./marktplaats-official";
 import { SourceError, type FetchContext, type RawAd, type SourceAdapter } from "./types";
 
 export { fetchListingUrl };
@@ -67,17 +68,7 @@ export const demoAdapter: SourceAdapter = {
   },
 };
 
-export const partnerAdapter: SourceAdapter = {
-  id: "partner-api",
-  label: "Officiële partner-API (niet geconfigureerd)",
-  origin: "PARTNER_API",
-  minIntervalMinutes: 15,
-  automatic: true,
-  description: "Plaatshouder voor een officiële Marktplaats-partnerintegratie. Er is geen publiek gedocumenteerde zoek-API gevonden; zodra u toegang en documentatie van Marktplaats krijgt kan hier een adapter worden aangesloten.",
-  async fetchProfile() {
-    throw new SourceError("Geen officiële Marktplaats-API-toegang geconfigureerd. Zie docs/DATABRONNEN.md.", false);
-  },
-};
+export const partnerAdapter = officialAdapter;
 
 const ALL: SourceAdapter[] = [searchAdapter, urlAdapter, feedAdapter, demoAdapter, partnerAdapter];
 export const listAdapters = () => ALL;

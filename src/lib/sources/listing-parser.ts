@@ -1,7 +1,17 @@
 import { distanceFromApeldoorn } from "../radar/safety";
 import type { RawAd } from "./types";
+import { shippingFromDelivery } from "./delivery";
 
 export class ParseError extends Error {}
+
+/** A calendar date or local time without offset is not a publication instant. */
+export function publicationPrecision(value: string | null): "exact" | "day" | "unknown" {
+  if (!value || Number.isNaN(Date.parse(value))) return "unknown";
+  const calendar = /^\d{4}-\d{2}-\d{2}/.exec(value)?.[0];
+  if (!calendar || new Date(calendar).toISOString().slice(0, 10) !== calendar) return "unknown";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return "day";
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})$/i.test(value) ? "exact" : "unknown";
+}
 
 /** "€ 1.250,00" | "350" | 350 -> cents */
 export function parsePriceToCents(v: unknown): number | null {
@@ -203,6 +213,7 @@ function fromListingObject(
     },
     sellerType:
       asStr(seller.sellerType) ?? (seller.isVerified ? "verified" : null),
+    shipping: shippingFromDelivery(Object.entries(attrs).find(([key]) => key.toLowerCase() === "delivery")?.[1]),
     category: asStr(o.categoryName) ?? asStr(o.category) ?? null,
     conditionText: asStr(o.itemCondition) ?? asStr(o.condition) ?? null,
     publishedAt:
@@ -213,8 +224,7 @@ function fromListingObject(
     attributes: {
       ...attrs,
       distanceReference: "Apeldoorn",
-      publicationPrecision:
-        published && !Number.isNaN(Date.parse(published)) ? "exact" : "unknown",
+      publicationPrecision: publicationPrecision(published),
     },
     url: abs,
   };

@@ -82,10 +82,20 @@ test("radar: echte data, bewaren, filters, herstel en mobiel", async ({
   expect(await db.savedFilter.count({ where: { userId: user.id } })).toBe(3);
   await page.goto("/performance");
   await expect(page.getByText("Worker:", { exact: false })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Officiële Search API", exact: true })).toBeVisible();
+  await expect(page.getByText("Uitgeschakeld", { exact: true })).toBeVisible();
+  await expect(page.getByText("Publicatie → detectie (alleen exacte tijdstippen)")).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: "test-results/performance-mobile.png", fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await page.getByText("Tijdlijn laatste 30 advertenties").click();
   await expect(
     page.getByRole("columnheader", { name: "Detectie", exact: true }),
   ).toBeVisible();
+  await page.goto("/settings");
+  await expect(page.getByRole("heading", { name: "Marktplaats Search API", exact: true })).toBeVisible();
+  await expect(page.getByLabel("Eigen Marktplaats OAuth access token", { exact: true })).toHaveValue("");
   await page.goto("/");
   await expect(
     page.getByRole("link", { name: "Bekijk op Marktplaats ↗" }),

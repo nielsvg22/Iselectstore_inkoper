@@ -8,7 +8,6 @@ import {
 } from "../engines/dedupe";
 import { mergeImages } from "../images";
 import { recognizeByRules } from "../engines/recognition";
-import { enqueue } from "../jobs/queue";
 import type { RawAd } from "../sources/types";
 
 export interface IngestResult {
@@ -19,18 +18,28 @@ export interface IngestResult {
   duplicateOfId: string | null;
 }
 
-export async function ingestAd(
-  raw: RawAd,
-  opts: {
-    origin: DataOrigin;
-    isDemo?: boolean;
-    source?: string;
-    enqueueAnalysis?: boolean;
-    /** bronnen die alleen een samenvatting leveren (zoekresultaten): overschrijf nooit volledige tekst/foto's */ partial?: boolean;
-  },
-): Promise<IngestResult> {
+export interface IngestOptions {
+  origin: DataOrigin;
+  isDemo?: boolean;
+  source?: string;
+  enqueueAnalysis?: boolean;
+  partial?: boolean;
+}
+
+export async function ingestAd(raw: RawAd, opts: IngestOptions): Promise<IngestResult> {
   const source = opts.source ?? (opts.isDemo ? "demo" : "marktplaats");
-  const existing = await prisma.advertisement.findUnique({
+  const externalId = source === "marktplaats" && /^m\d+$/i.test(raw.externalId.trim())
+    ? raw.externalId.trim().toLowerCase() : raw.externalId;
+  return prisma.$transaction(async tx => {
+    // Serialise only the same canonical advertisement, across all ingestion sources/processes.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`ingest:${source}:${externalId}`}))`;
+    return ingestLocked(tx, { ...raw, externalId }, opts);
+  }, { timeout: 30000, maxWait: 30000 });
+}
+
+async function ingestLocked(db: Prisma.TransactionClient, raw: RawAd, opts: IngestOptions): Promise<IngestResult> {
+  const source = opts.source ?? (opts.isDemo ? "demo" : "marktplaats");
+  const existing = await db.advertisement.findUnique({
     where: { source_externalId: { source, externalId: raw.externalId } },
     select: {
       id: true,
@@ -43,6 +52,9 @@ export async function ingestAd(
       distanceKm: true,
       rawPayload: true,
       sellerSignals: true,
+      sellerId: true, sellerName: true, sellerVerified: true,
+      location: true, postalCode: true, category: true, sellerType: true,
+      shippingOptions: true, conditionText: true,
       images: { select: { url: true }, orderBy: { position: "asc" } },
     },
   });
@@ -62,6 +74,15 @@ export async function ingestAd(
           imageUrls,
         );
   }
+  const partial = opts.partial && !raw.detailLoaded;
+  const askingCents = raw.askingCents === undefined && partial ? existing?.askingPriceCents ?? null : raw.askingCents ?? null;
+  const oldAttrs = (existing?.rawPayload as { attributes?: Record<string, string | number> } | null)?.attributes ?? {};
+  const keepPublication = Boolean(existing?.publishedAt && (oldAttrs.publicationPrecision === "exact"
+    ? raw.attributes?.publicationPrecision !== "exact"
+    : existing.detailFetchedAt && !raw.detailLoaded));
+  const previousSignals = existing?.sellerSignals as Record<string, unknown> | null;
+  const sameSeller = !raw.seller?.id || !existing?.sellerId || raw.seller.id === existing.sellerId;
+  const signal = (key: string, value: unknown) => value ?? (sameSeller ? previousSignals?.[key] : null) ?? null;
   const rec = recognizeByRules({
     title: raw.title,
     description,
@@ -75,7 +96,7 @@ export async function ingestAd(
   const hash = contentHash({
     title: raw.title,
     description,
-    askingCents: raw.askingCents ?? null,
+    askingCents,
     imageUrls,
   });
   const now = new Date();
@@ -86,57 +107,44 @@ export async function ingestAd(
     url: raw.url,
     title: raw.title.slice(0, 300),
     description: description.slice(0, 20000),
-    askingPriceCents: raw.askingCents ?? null,
-    location: raw.location ?? null,
-    postalCode: raw.postalCode ?? null,
-    distanceKm: raw.distanceKm ?? null,
-    category: raw.category ?? null,
-    sellerType: raw.sellerType ?? null,
+    askingPriceCents: askingCents,
+    location: raw.location ?? (partial ? existing?.location : null) ?? null,
+    postalCode: raw.postalCode ?? (partial ? existing?.postalCode : null) ?? null,
+    distanceKm: raw.distanceKm ?? (partial ? existing?.distanceKm : null) ?? null,
+    category: raw.category ?? (partial ? existing?.category : null) ?? null,
+    sellerType: raw.sellerType ?? (partial ? existing?.sellerType : null) ?? null,
     ...(raw.seller
       ? {
-          sellerId: raw.seller.id ?? null,
-          sellerName: raw.seller.name ?? null,
-          sellerVerified: raw.seller.verified ?? null,
+          sellerId: raw.seller.id ?? existing?.sellerId ?? null,
+          sellerName: raw.seller.name ?? (sameSeller ? existing?.sellerName : null) ?? null,
+          sellerVerified: raw.seller.verified ?? (sameSeller ? existing?.sellerVerified : null) ?? null,
           sellerSignals: {
-            business: raw.seller.business ?? null,
-            anonymous: raw.seller.anonymous ?? null,
-            rating: raw.seller.rating ?? null,
-            reviewCount: raw.seller.reviewCount ?? null,
-            accountAgeMonths: raw.seller.accountAgeMonths ?? null,
+            business: signal("business", raw.seller.business),
+            anonymous: signal("anonymous", raw.seller.anonymous),
+            rating: signal("rating", raw.seller.rating),
+            reviewCount: signal("reviewCount", raw.seller.reviewCount),
+            accountAgeMonths: signal("accountAgeMonths", raw.seller.accountAgeMonths),
           } as Prisma.InputJsonValue,
         }
       : {}),
-    shippingOptions: (raw.shipping ?? []) as Prisma.InputJsonValue,
-    conditionText: raw.conditionText ?? null,
+    shippingOptions: (raw.shipping ?? (partial ? existing?.shippingOptions : null) ?? []) as Prisma.InputJsonValue,
+    conditionText: raw.conditionText ?? (partial ? existing?.conditionText : null) ?? null,
     publishedAt:
-      existing?.detailFetchedAt && !raw.detailLoaded
-        ? existing.publishedAt
+      keepPublication
+        ? existing!.publishedAt
         : (raw.publishedAt ?? existing?.publishedAt ?? null),
     lastSeenAt: now,
     lastCheckedOkAt: now,
     ...(raw.detailLoaded ? { detailFetchedAt: now } : {}),
     fingerprint: fp,
     contentHash: hash,
-    rawPayload: (raw.attributes
-      ? {
-          ...((existing?.rawPayload as object) ?? {}),
-          attributes: {
-            ...((existing?.rawPayload as { attributes?: object } | null)
-              ?.attributes ?? {}),
-            ...raw.attributes,
-            ...(existing?.detailFetchedAt && !raw.detailLoaded
-              ? {
-                  publicationPrecision:
-                    (
-                      existing.rawPayload as {
-                        attributes?: { publicationPrecision?: string };
-                      } | null
-                    )?.attributes?.publicationPrecision ?? "unknown",
-                }
-              : {}),
-          },
-        }
-      : undefined) as Prisma.InputJsonValue | undefined,
+    rawPayload: {
+      ...((existing?.rawPayload as object) ?? {}),
+      attributes: { ...oldAttrs, ...raw.attributes,
+        firstDetectionSource: oldAttrs.firstDetectionSource ?? (existing ? "unknown" : raw.attributes?.detectionSource ?? opts.origin),
+        ...(keepPublication ? { publicationPrecision: oldAttrs.publicationPrecision ?? "unknown" } : {}),
+      },
+    } as Prisma.InputJsonValue,
   };
 
   let adId: string;
@@ -145,7 +153,7 @@ export async function ingestAd(
   let priceChanged = false;
 
   if (!existing) {
-    const ad = await prisma.advertisement.create({
+    const ad = await db.advertisement.create({
       data: {
         ...data,
         source,
@@ -164,27 +172,27 @@ export async function ingestAd(
     created = true;
     changed = true;
     if (raw.askingCents != null)
-      await prisma.priceHistory.create({
+      await db.priceHistory.create({
         data: { adId, priceCents: raw.askingCents },
       });
   } else {
     adId = existing.id;
     changed = existing.contentHash !== hash;
-    priceChanged = existing.askingPriceCents !== (raw.askingCents ?? null);
-    await prisma.advertisement.update({
+    priceChanged = existing.askingPriceCents !== askingCents;
+    await db.advertisement.update({
       where: { id: adId },
       data: { ...data, status: changed ? "NEW" : undefined },
     });
     if (changed) {
-      await prisma.advertisementImage.deleteMany({ where: { adId } });
-      await prisma.advertisementImage.createMany({
+      await db.advertisementImage.deleteMany({ where: { adId } });
+      await db.advertisementImage.createMany({
         data: imageUrls
           .slice(0, 12)
           .map((url, position) => ({ adId, url, position })),
       });
     }
     if (priceChanged && raw.askingCents != null)
-      await prisma.priceHistory.create({
+      await db.priceHistory.create({
         data: { adId, priceCents: raw.askingCents },
       });
   }
@@ -193,7 +201,7 @@ export async function ingestAd(
   let duplicateOfId: string | null = null;
   if (changed) {
     const since = new Date(Date.now() - 45 * 86400000);
-    const cands = await prisma.advertisement.findMany({
+    const cands = await db.advertisement.findMany({
       where: {
         id: { not: adId },
         isDemo: data.isDemo,
@@ -224,8 +232,8 @@ export async function ingestAd(
       {
         id: adId,
         title: raw.title,
-        askingCents: raw.askingCents ?? null,
-        location: raw.location ?? null,
+        askingCents,
+        location: raw.location ?? (partial ? existing?.location : null) ?? null,
         imageUrls,
         modelKey: rec.modelKey,
         storageGb: storage,
@@ -233,12 +241,12 @@ export async function ingestAd(
       list,
     );
     duplicateOfId = dup?.duplicateOfId ?? null;
-    await prisma.advertisement.update({
+    await db.advertisement.update({
       where: { id: adId },
       data: { duplicateOfId },
     });
   } else {
-    const cur = await prisma.advertisement.findUnique({
+    const cur = await db.advertisement.findUnique({
       where: { id: adId },
       select: { duplicateOfId: true },
     });
@@ -246,15 +254,15 @@ export async function ingestAd(
   }
 
   if (changed && !duplicateOfId && opts.enqueueAnalysis !== false) {
-    await prisma.advertisement.update({
+    await db.advertisement.update({
       where: { id: adId },
       data: { status: "QUEUED" },
     });
-    await enqueue({
-      type: "ANALYZE_AD",
-      payload: { adId, quick: opts.partial === true && !raw.detailLoaded },
-      priority: created ? 20 : 12,
-      uniqueKey: `analyze:${adId}:${hash}`,
+    const uniqueKey = `analyze:${adId}:${hash}`;
+    await db.backgroundJob.upsert({
+      where: { uniqueKey }, update: {},
+      create: { type: "ANALYZE_AD", payload: { adId, quick: opts.partial === true && !raw.detailLoaded },
+        priority: created ? 20 : 12, uniqueKey },
     });
   }
   return { adId, created, changed, priceChanged, duplicateOfId };
