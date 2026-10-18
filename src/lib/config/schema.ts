@@ -198,6 +198,8 @@ export const configSchema = z.object({
         .object({
           enabled: z.boolean().default(false),
           intervalSeconds: z.number().int().min(30).max(600).default(60),
+          /** Centrale radar: overlappend recent venster via publieke HTML; 0 = oude brede zoekroute. */
+          recentWindowMinutes: z.number().int().min(0).max(60).default(5),
           /** Maximaal aantal pagina's per zoekterm; de controle stopt eerder zodra alle resultaten zijn gezien */
           pages: z.number().int().min(1).max(40).default(20),
           /** Bovengrens voor het totaal aantal pagina-requests per minuut over alle snelle profielen */

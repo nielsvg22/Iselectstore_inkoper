@@ -114,6 +114,11 @@ export default async function PerformancePage() {
           {d.worker.heartbeat ?? "Nog niet gestart"} · Heartbeat bewijst
           liveness, bronresultaten staan hieronder.
         </p>
+        {d.fast.enabled && d.fast.recentWindowMinutes > 0 && <p className="mt-2 text-sm text-muted">
+          Recente detectie: minimaal {d.fast.recentWindowMinutes} minuten overlap.
+          Per zoekterm wordt gecontroleerd of de bron dit tijdvenster toepast.
+          Indexeringsvertraging blijft afhankelijk van Marktplaats.
+        </p>}
       </section>
       <section className="grid gap-4 lg:grid-cols-2" aria-label="Databronnen">
         {d.sources.map(s => <div key={s.id} className="rounded-2xl bg-card p-5 text-sm">
@@ -396,7 +401,11 @@ export default async function PerformancePage() {
                       : `elke ${p.intervalMinutes} min`}
                   </p>
                   {p.units.length > 0 && <div className="mt-2 space-y-1 text-xs text-muted">
-                    {p.units.map(u => <p key={u.label}>{u.label} · {u.lastCheckedAt ? timeAgo(u.lastCheckedAt) : "nog niet gecontroleerd"}</p>)}
+                    {p.units.map(u => <div key={u.label}>
+                      <p>{u.label} · {u.lastCheckedAt ? timeAgo(u.lastCheckedAt) : "nog niet gecontroleerd"}</p>
+                      {u.since && <p>Venster vanaf {new Date(u.since).toLocaleTimeString("nl-NL")} · {u.total ?? "?"} resultaten
+                        {u.complete === false ? ` · vervolg op pagina ${u.nextPage ?? "?"}` : " · ronde afgerond"}</p>}
+                    </div>)}
                     <p>Een snelle hoofdcontrole betekent niet dat elke productgroep tegelijk is gecontroleerd.</p>
                   </div>}
                   {p.rounds && (

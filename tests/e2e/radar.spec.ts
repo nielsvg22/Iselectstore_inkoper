@@ -82,6 +82,7 @@ test("radar: echte data, bewaren, filters, herstel en mobiel", async ({
   expect(await db.savedFilter.count({ where: { userId: user.id } })).toBe(3);
   await page.goto("/performance");
   await expect(page.getByText("Worker:", { exact: false })).toBeVisible();
+  await expect(page.getByText("Recente detectie:", { exact: false })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Officiële Search API", exact: true })).toBeVisible();
   await expect(page.getByText("Uitgeschakeld", { exact: true })).toBeVisible();
   await expect(page.getByText("Publicatie → detectie (alleen exacte tijdstippen)")).toBeVisible();
@@ -96,6 +97,7 @@ test("radar: echte data, bewaren, filters, herstel en mobiel", async ({
   await page.goto("/settings");
   await expect(page.getByRole("heading", { name: "Marktplaats Search API", exact: true })).toBeVisible();
   await expect(page.getByLabel("Eigen Marktplaats OAuth access token", { exact: true })).toHaveValue("");
+  await expect(page.getByLabel("Recent zoekvenster (minuten)", { exact: true })).toHaveValue("5");
   await page.goto("/");
   await expect(
     page.getByRole("link", { name: "Bekijk op Marktplaats ↗" }),

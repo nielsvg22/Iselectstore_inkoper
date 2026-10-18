@@ -55,7 +55,8 @@ export interface PerformanceData {
     overdue: boolean;
     coverage: { total: number; covered: number; pct: number } | null;
     rounds: (RoundEstimate & { seen: number }) | null;
-    units: Array<{ label: string; lastCheckedAt: string | null }>;
+    units: Array<{ label: string; lastCheckedAt: string | null; since: string | null;
+      nextPage: number | null; complete: boolean | null; total: number | null }>;
   }>;
   activeProfiles: number;
   lastSuccessSeconds: number | null;
@@ -90,7 +91,7 @@ export interface PerformanceData {
 
   queue: { pending: number; running: number; dead: number };
   cooldown: { until: string; reason: string } | null;
-  fast: { enabled: boolean; profiles: number; intervalSeconds: number };
+  fast: { enabled: boolean; profiles: number; intervalSeconds: number; recentWindowMinutes: number };
 }
 
 export async function getPerformance(days = 7): Promise<PerformanceData> {
@@ -164,7 +165,7 @@ export async function getPerformance(days = 7): Promise<PerformanceData> {
       : p.sourceKind === "SEARCH"
         ? Math.max(p.intervalMinutes, cfg.scheduler.minIntervalMinutes)
         : p.intervalMinutes;
-  const unitsFor = new Map<string, Array<{ label: string; lastCheckedAt: string | null }>>();
+  const unitsFor = new Map<string, PerformanceData["profiles"][number]["units"]>();
   const roundsFor = new Map<string, RoundEstimate & { seen: number }>();
   for (const p of profiles) {
     const sc = (p.sourceConfig ?? {}) as {
@@ -176,7 +177,12 @@ export async function getPerformance(days = 7): Promise<PerformanceData> {
     if (sc.smartRadar && p.active) {
       const state = await getSliceState(p.id);
       unitsFor.set(p.id, (sc.queries ?? [p.sourceKind === "SEARCH" ? "iphone" : ""]).filter(Boolean)
-        .map(q => ({ label: q, lastCheckedAt: state[`q:${q}`]?.at ?? null })));
+        .map(q => {
+          const unit = state[`q:${q}`];
+          return { label: q, lastCheckedAt: unit?.at ?? null,
+            since: unit?.recentSinceMs ? new Date(unit.recentSinceMs).toISOString() : null,
+            nextPage: unit?.nextPage ?? null, complete: unit?.complete ?? null, total: unit?.total ?? null };
+        }));
     }
     if (sc.smartRadar || !p.active || !cfg.scheduler.fast.enabled || !sc.sliceModels?.length)
       continue;
@@ -348,6 +354,7 @@ export async function getPerformance(days = 7): Promise<PerformanceData> {
           (p.sourceConfig as { fastMode?: boolean } | null)?.fastMode === true,
       ).length,
       intervalSeconds: cfg.scheduler.fast.intervalSeconds,
+      recentWindowMinutes: cfg.scheduler.fast.recentWindowMinutes,
     },
     queue: {
       pending: jobMap.PENDING ?? 0,

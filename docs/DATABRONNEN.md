@@ -1,5 +1,12 @@
 # Databronnen en Marktplaats-integratie
 
+## Recente advertenties (nieuwe openbare route)
+
+De centrale radar gebruikt standaard een geteste openbare HTML-route met een
+exact `offeredSince`-tijdvenster. Dit lost het telkens ophalen van oude betaalde
+resultaten op voor de recente zoekslag. Er wordt geen datum-sortering verzonnen.
+Zie [de bronmetingen en implementatie](RECENTE-DETECTIE.md).
+
 ## Actuele API-rechten (18 oktober 2026)
 
 Zie [het onderzoek met echte read-only resultaten](OFFICIELE-API-ONDERZOEK.md).
@@ -21,7 +28,7 @@ zoektoegang niet beschikbaar aangetoond. De nieuwe adapter blijft standaard uit.
 
 1. Je geeft **zoektermen** (bijv. `iphone 15 pro`), optioneel een **categorie** en het aantal **pagina's** (30 resultaten per pagina).
 2. De app haalt de zoekpagina's op (robots.txt-controle, SSRF-bescherming, vertraging) en leest alle advertenties uit.
-3. **Jouw filters** (maximale prijs, model, afstand, winst, risico, …) worden door de app zelf toegepast — Marktplaats' eigen filters zijn niet via toegestane URL's beschikbaar. Prijs- en modelfilters werken al als voorselectie vóór het opslaan; koopadvertenties ("gezocht") en losse accessoires worden altijd weggefilterd.
+3. **Jouw filters** (maximale prijs, model, afstand, winst, risico, …) worden door de app zelf toegepast — Publieke model-/opslag- en recente datumfilterpaden worden gebruikt waar de bron ze aantoonbaar toepast. Prijs- en modelfilters werken al als voorselectie vóór het opslaan; koopadvertenties ("gezocht") en losse accessoires worden altijd weggefilterd.
 4. Van advertenties waarvan we de detailpagina nog niet hebben wordt die opgehaald (nieuwste eerst, max. `maxDetailsPerRun` = 40 per run): de zoekresultaten bevatten maar 1–3 foto's en een tekst die op 200 tekens is afgekapt, terwijl risico's (bijv. iCloud) vaak verderop staan. Bij het openen van een advertentie in de app wordt dit zo nodig direct nog eens gedaan. Volledige tekst en fotoset worden daarna nooit meer door een kortere samenvatting overschreven.
 5. Snelle modus: per pagina opslaan → voorselectie → voorlopige push; detailpagina/AI en volledige waardering lopen onafhankelijk op de achtergrond. Normale modus kan wachten op volledige beoordeling.
 

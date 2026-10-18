@@ -48,8 +48,14 @@ export interface FetchContext {
   /** Wordt aangeroepen zodra een smalle lijst of zoekterm is doorlopen (voor de rondlopende planning) */
   onUnit?: (
     key: string,
-    info: { pages: number; total: number | null; covered: number },
-  ) => void;
+    info: { pages: number; total: number | null; covered: number; complete?: boolean;
+      recentSinceMs?: number; nextPage?: number; headLast?: boolean },
+  ) => void | Promise<void>;
+  /** Server-applied public HTML date window, with bounded continuation after bursts. */
+  recent?: {
+    windows: Record<string, { sinceMs: number; nextPage?: number; headLast?: boolean }>;
+    pageBudget: number;
+  };
   /** Zoektermen voor modellen zonder filterpagina; lopen naast de slices mee */
   extraQueries?: string[];
   /** Snelle modus: minder pagina's en een korte cache zodat de pagina vers is */

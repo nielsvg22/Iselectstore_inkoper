@@ -1,3 +1,5 @@
+> Aanvulling 18 oktober 2026: een openbare `ta/offeredSince/{Unix-ms}`-route werkt wél voor recente tijdvensters. De eerdere pagina-dekkingsbeperking is daardoor sterk verkleind. Zie [RECENTE-DETECTIE.md](RECENTE-DETECTIE.md). Exacte nieuwste-eerst-sortering is nog steeds niet bewezen.
+
 # Fase 1 – Analyse van de bestaande Apple Deal Hunter (stand 2026-10-11)
 
 ## Werkt

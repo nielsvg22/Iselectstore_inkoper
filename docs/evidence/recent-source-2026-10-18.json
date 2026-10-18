@@ -1,0 +1,176 @@
+{
+  "source": "real read-only public HTML requests; no phone push sent",
+  "command": "npm run verify:recent -- iphone --compare --watch=65",
+  "samples": [
+    {
+      "kind": "broad-control",
+      "checkedAt": "2026-10-18T07:36:14.577Z",
+      "windowStart": null,
+      "filterConfirmed": null,
+      "total": 48297,
+      "pageResults": 30,
+      "promoted": 30,
+      "organic": 0,
+      "ids": [
+        "m2451058682",
+        "m2452726727",
+        "a1531765311",
+        "m2454568703",
+        "m2454065694",
+        "a1517154641",
+        "m2449784111",
+        "m2454457584",
+        "a1449085172",
+        "m2454379848",
+        "m2454182056",
+        "a1517154561",
+        "m2454458548",
+        "m2454845752",
+        "a1521788144",
+        "m2454189922",
+        "m2453571130",
+        "a1517154586",
+        "m2452749991",
+        "m2453432988",
+        "a1530979728",
+        "m2452791517",
+        "m2454086556",
+        "a1519094122",
+        "m2454417218",
+        "m2454317123",
+        "a1517239646",
+        "m2436327029",
+        "m2451410376",
+        "a1525769883"
+      ],
+      "targetFound": null
+    },
+    {
+      "kind": "recent-control",
+      "checkedAt": "2026-10-18T07:36:19.225Z",
+      "windowStart": "2026-10-18T07:31:14.000Z",
+      "filterConfirmed": true,
+      "total": 7,
+      "pageResults": 7,
+      "promoted": 0,
+      "organic": 7,
+      "ids": [
+        "m2454936989",
+        "m2454935850",
+        "m2454936457",
+        "m2454936471",
+        "m2454936880",
+        "m2454935804",
+        "m2454937043"
+      ],
+      "targetFound": null
+    },
+    {
+      "kind": "future-negative-control",
+      "checkedAt": "2026-10-18T07:36:24.261Z",
+      "windowStart": "2026-10-18T07:41:19.000Z",
+      "filterConfirmed": true,
+      "total": 0,
+      "pageResults": 0,
+      "promoted": 0,
+      "organic": 0,
+      "ids": [],
+      "targetFound": null
+    },
+    {
+      "kind": "recent",
+      "checkedAt": "2026-10-18T07:36:29.166Z",
+      "windowStart": "2026-10-18T07:31:24.000Z",
+      "filterConfirmed": true,
+      "total": 7,
+      "pageResults": 7,
+      "promoted": 0,
+      "organic": 7,
+      "ids": [
+        "m2454936989",
+        "m2454935850",
+        "m2454936457",
+        "m2454936471",
+        "m2454936880",
+        "m2454935804",
+        "m2454937043"
+      ],
+      "targetFound": null
+    },
+    {
+      "kind": "first-observations",
+      "secondsSinceWatchStarted": 4.905,
+      "initialSample": true,
+      "ids": [
+        "m2454936989",
+        "m2454935850",
+        "m2454936457",
+        "m2454936471",
+        "m2454936880",
+        "m2454935804",
+        "m2454937043"
+      ],
+      "publicationLatencyVerified": false
+    },
+    {
+      "kind": "recent",
+      "checkedAt": "2026-10-18T07:37:00.084Z",
+      "windowStart": "2026-10-18T07:31:59.000Z",
+      "filterConfirmed": true,
+      "total": 8,
+      "pageResults": 8,
+      "promoted": 0,
+      "organic": 8,
+      "ids": [
+        "m2454936989",
+        "m2454935850",
+        "m2454936457",
+        "m2454936471",
+        "m2454936880",
+        "m2454937263",
+        "m2454935804",
+        "m2454937043"
+      ],
+      "targetFound": null
+    },
+    {
+      "kind": "first-observations",
+      "secondsSinceWatchStarted": 35.824,
+      "initialSample": false,
+      "ids": [
+        "m2454937263"
+      ],
+      "publicationLatencyVerified": false
+    },
+    {
+      "kind": "recent",
+      "checkedAt": "2026-10-18T07:37:30.749Z",
+      "windowStart": "2026-10-18T07:32:30.000Z",
+      "filterConfirmed": true,
+      "total": 8,
+      "pageResults": 8,
+      "promoted": 0,
+      "organic": 8,
+      "ids": [
+        "m2454936989",
+        "m2454935850",
+        "m2454936457",
+        "m2454937365",
+        "m2454936471",
+        "m2454936880",
+        "m2454937263",
+        "m2454937043"
+      ],
+      "targetFound": null
+    },
+    {
+      "kind": "first-observations",
+      "secondsSinceWatchStarted": 66.488,
+      "initialSample": false,
+      "ids": [
+        "m2454937365"
+      ],
+      "publicationLatencyVerified": false
+    }
+  ]
+}

@@ -12,6 +12,12 @@ export interface SliceRun {
   at: string;
   pages: number;
   total: number | null;
+  covered?: number;
+  complete?: boolean;
+  completeAt?: string;
+  recentSinceMs?: number;
+  nextPage?: number;
+  headLast?: boolean;
 }
 export type SliceState = Record<string, SliceRun>;
 

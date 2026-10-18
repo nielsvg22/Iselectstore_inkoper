@@ -15,7 +15,9 @@ vi.mock("node:dns/promises", () => ({
   default: { lookup: async () => [{ address: "93.184.216.34", family: 4 }] },
   lookup: async () => [{ address: "93.184.216.34", family: 4 }],
 }));
-beforeEach(async () => { await resetDb(); clearPageCache(); vi.unstubAllGlobals(); });
+// These cases retain explicit coverage of the legacy route; recent source has its own end-to-end suite.
+beforeEach(async () => { await resetDb(); clearPageCache(); vi.unstubAllGlobals();
+  await saveConfig({ scheduler: { fast: { recentWindowMinutes: 0 } } }); });
 const barrier = () => {
   let resolve!: () => void;
   const promise = new Promise<void>((r) => { resolve = r; });

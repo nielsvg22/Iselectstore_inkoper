@@ -1,3 +1,5 @@
+> Actuele aanvulling: [RECENTE-DETECTIE.md](RECENTE-DETECTIE.md) beschrijft de nu werkende openbare tijdvensterroute. Eerdere uitspraken hieronder over alleen brede historische pagina’s zijn voor de centrale recente radar achterhaald.
+
 # Apple Deal Hunter 2.0 — oplevering
 
 Opgeleverd op branch `claude/apple-deal-hunter` (lokaal gecommit; **niet gepusht en niet uitgerold** — wacht op jouw toestemming).

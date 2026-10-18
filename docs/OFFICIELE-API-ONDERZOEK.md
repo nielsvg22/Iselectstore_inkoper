@@ -1,5 +1,8 @@
 # Marktplaats / GoedGeplaatst: onderzoek en implementatie
 
+**Aanvulling 18 oktober 2026:** er is inmiddels een werkende publieke HTML-
+datumroute gevonden en ingebouwd, zonder interne API. Zie [RECENTE-DETECTIE.md](RECENTE-DETECTIE.md). De API-rechtenbevindingen hieronder blijven geldig.
+
 Gecontroleerd op 18 oktober 2026. Branch: `feature/official-api-realtime-radar`.
 Deze wijzigingen zijn niet naar productie gedeployed. Bestaande advertenties,
 inkopen, instellingen en gearchiveerde profielen blijven behouden.

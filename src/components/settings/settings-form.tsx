@@ -1071,11 +1071,10 @@ export function SettingsForm({
                 label="Snelle modus toestaan (per zoekprofiel in te schakelen)"
               />
               <p className="text-xs text-muted">
-                Profielen in snelle modus worden elke ±minuut gecontroleerd
-                (alleen de eerste pagina’s) en sturen direct een voorlopige
-                push; de definitieve volgt na de volledige beoordeling. Dit is{" "}
-                <strong>geen realtime</strong> en geeft meer verkeer naar
-                Marktplaats. Krijgt de app een blokkade (HTTP 403/429), dan
+                De centrale radar doorzoekt een overlappend recent tijdvenster
+                en stuurt meteen een voorlopige push. Uitgebreide beoordeling
+                volgt op de achtergrond. De bron bepaalt wanneer advertenties
+                vindbaar worden. Krijgt de app een blokkade (HTTP 403/429), dan
                 pauzeert hij automatisch (15 min, oplopend tot 2 uur) en omzeilt
                 dat niet. Gebruik smalle zoektermen en houd het aantal snelle
                 profielen laag.
@@ -1102,6 +1101,12 @@ export function SettingsForm({
                         })
                       }
                     />
+                  </Field>
+                  <Field label="Recent zoekvenster (minuten)" htmlFor="sf-window"
+                    hint="Centrale radar: begin met 5 minuten overlap. 0 gebruikt de oude brede route.">
+                    <Input id="sf-window" type="number" min="0" max="60"
+                      value={c.scheduler.fast.recentWindowMinutes}
+                      onChange={e => set("scheduler", { fast: { ...c.scheduler.fast, recentWindowMinutes: Number(e.target.value) } })} />
                   </Field>
                   <Field
                     label="Max. pagina’s per zoekterm"

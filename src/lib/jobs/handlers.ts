@@ -13,7 +13,8 @@ import { loadTree } from "../pipeline/tree";
 import { buildPrefilter } from "../sources/prefilter";
 import { fetchListingUrl } from "../sources/adapters-shared";
 import { mergeDetail } from "../sources/marktplaats-search";
-import { SourceError, type RawAd } from "../sources/types";
+import { SourceError, type RawAd, type FetchContext } from "../sources/types";
+import { recentSince } from "../sources/recent-search";
 import { getCooldown, setCooldown } from "./cooldown";
 import { modelByKey } from "../catalog/apple";
 import {
@@ -21,6 +22,7 @@ import {
   selectSlices,
   setSliceState,
   specsFromConfig,
+  type SliceState,
 } from "../sources/slice-plan";
 import {
   buildSlices,
@@ -127,16 +129,25 @@ export async function runProfileCheck(
     let slices: Slice[] | undefined;
     let fullSearch = false;
     let extraQueries: string[] | undefined;
-    let sliceStateBefore: Record<
-      string,
-      { at: string; pages: number; total: number | null }
-    > | null = null;
-    const unitResults: Record<
-      string,
-      { at: string; pages: number; total: number | null }
-    > = {};
+    let recent: FetchContext["recent"];
+    let sliceStateBefore: SliceState | null = null;
+    const unitResults: SliceState = {};
     let searchConfig = (profile.sourceConfig ?? {}) as Record<string, unknown>;
-    if (fast && sc.smartRadar) {
+    if (fast && sc.smartRadar && cfg.scheduler.fast.recentWindowMinutes > 0) {
+      sliceStateBefore = await getSliceState(profileId);
+      const configured = (searchConfig.queries as string[] | undefined) ?? ["iphone"];
+      const budget = smartPageBudget(cfg.scheduler.fast.intervalSeconds,
+        cfg.scheduler.fast.maxRequestsPerMinute, cfg.limits.minSecondsBetweenRequests,
+        cfg.scheduler.fast.pagesPerRun);
+      const units = planSmartUnits(configured, [], sliceStateBefore, budget);
+      extraQueries = units.map(u => u.query!);
+      searchConfig = { ...searchConfig, queries: extraQueries, maxPages: 1 };
+      recent = { pageBudget: budget, windows: Object.fromEntries(units.map(u => {
+        const previous = sliceStateBefore![u.key];
+        return [u.key, { sinceMs: recentSince(t0, cfg.scheduler.fast.recentWindowMinutes, previous),
+          nextPage: previous?.nextPage, headLast: previous?.headLast }];
+      })) };
+    } else if (fast && sc.smartRadar) {
       const configured = (searchConfig.queries as string[] | undefined) ?? ["iphone"];
       sliceStateBefore = await getSliceState(profileId);
       const specs = specsFromConfig(searchConfig as Parameters<typeof specsFromConfig>[0]);
@@ -224,24 +235,33 @@ export async function runProfileCheck(
     const ads = await adapter.fetchProfile({
       profileId,
       slices,
+      recent,
       onAds: ingestPage,
       query: profile.query,
       config: searchConfig,
       maxAds: fast
-        ? Math.max(cfg.limits.maxAdsPerRun, cfg.scheduler.fast.pages * 30 * 4)
+        ? Math.max(cfg.limits.maxAdsPerRun, recent ? recent.pageBudget * 30 : cfg.scheduler.fast.pages * 30 * 4)
         : cfg.limits.maxAdsPerRun,
       prefilter,
       deferDetails: adapter.origin === "SEARCH",
       stats,
       extraQueries,
-      onUnit: (key, i) => {
+      onUnit: async (key, i) => {
         unitResults[key] = {
           at: new Date().toISOString(),
           pages: i.pages,
           total: i.total,
+          covered: i.covered,
+          ...(i.recentSinceMs == null ? {} : { recentSinceMs: i.recentSinceMs, nextPage: i.nextPage,
+            headLast: i.headLast, complete: i.complete,
+            ...(i.complete ? { completeAt: new Date().toISOString() } :
+              sliceStateBefore?.[key]?.completeAt ? { completeAt: sliceStateBefore[key].completeAt } : {}) }),
         };
+        // A later failing query must not erase progress already made by earlier queries.
+        if (recent && sliceStateBefore)
+          await setSliceState(profileId, { ...sliceStateBefore, ...unitResults });
       },
-      fast: fast ? { pages: sc.smartRadar ? 1 : cfg.scheduler.fast.pages } : undefined,
+      fast: fast ? { pages: recent ? recent.pageBudget : sc.smartRadar ? 1 : cfg.scheduler.fast.pages } : undefined,
       cacheSeconds: fast
         ? Math.min(cfg.scheduler.pageCacheSeconds, 15)
         : Math.min(

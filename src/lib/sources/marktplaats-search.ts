@@ -1,5 +1,6 @@
 import { distanceFromApeldoorn } from "../radar/safety";
 import { shippingFromDelivery } from "./delivery";
+import { publicRecentUrl } from "./recent-search";
 import { z } from "zod";
 import { hiRes, mergeImages } from "../images";
 import { prisma } from "../db/client";
@@ -203,6 +204,9 @@ export interface SearchPage {
   total: number | null;
   maxPage: number | null;
   rawCount: number;
+  appliedSinceMs: number | null;
+  promotedCount: number;
+  organicCount: number;
 }
 
 export function parseSearchPage(html: string, now = new Date()): SearchPage {
@@ -238,6 +242,13 @@ export function parseSearchPage(html: string, now = new Date()): SearchPage {
         ? sr.maxAllowedPageNumber
         : null,
     rawCount: (sr.listings as unknown[]).length,
+    appliedSinceMs: (() => {
+      const attrs = (sr.searchRequest as Obj | undefined)?.attributesByKey;
+      const value = Array.isArray(attrs) ? (attrs as Obj[]).find(a => a.attributeKey === "offeredSince")?.attributeValueKey : null;
+      return typeof value === "string" && /^\d{12,13}$/.test(value) ? Number(value) : null;
+    })(),
+    promotedCount: (sr.listings as Obj[]).filter(a => a.priorityProduct === "DAGTOPPER" || str(a.itemId)?.startsWith("a")).length,
+    organicCount: (sr.listings as Obj[]).filter(a => a.priorityProduct !== "DAGTOPPER" && str(a.itemId)?.startsWith("m")).length,
   };
 }
 
@@ -331,7 +342,9 @@ export const searchAdapter: SourceAdapter = {
     // Eenheden: smalle filterpagina's (indien meegegeven) of de zoektermen
     const queryUnit = (q: string, category?: string) => ({
       key: `q:${q}`,
-      urlFor: (page: number) => buildSearchUrl(q, category, page),
+      urlFor: (page: number) => ctx.recent?.windows[`q:${q}`]
+        ? publicRecentUrl(buildSearchUrl(q, category, 1), ctx.recent.windows[`q:${q}`].sinceMs, page)
+        : buildSearchUrl(q, category, page),
     });
     const units: Array<{ key: string; urlFor: (page: number) => string }> = ctx
       .slices?.length
@@ -346,15 +359,20 @@ export const searchAdapter: SourceAdapter = {
           })),
         ]
       : sc.queries.map((q) => queryUnit(q, sc.category || undefined));
-    outer: for (const unit of units) {
-      const info = { pages: 0, total: null as number | null, covered: 0 };
+    outer: for (const [unitIndex, unit] of units.entries()) {
+      if (ctx.recent && pagesFetched >= ctx.recent.pageBudget) break;
+      const recent = ctx.recent?.windows[unit.key];
+      const remaining = ctx.recent ? ctx.recent.pageBudget - pagesFetched : Infinity;
+      // Leave one slot for another family when the primary search has a burst.
+      const cap = Math.min(ctx.fast?.pages ?? sc.maxPages,
+        recent ? Math.max(1, remaining - Number(unitIndex < units.length - 1 && remaining > 1)) : Infinity);
+      const resume = Math.max(2, recent?.nextPage ?? 2);
+      let page = recent && cap === 1 && recent.nextPage != null && recent.nextPage > 1 && recent.headLast ? resume : 1;
+      const info = { pages: 0, total: null as number | null, covered: 0,
+        ...(recent ? { recentSinceMs: recent.sinceMs, nextPage: resume, headLast: page === 1, complete: false } : {}) };
       const done = () => ctx.onUnit?.(unit.key, info);
       // Snelle modus: zoveel pagina's als nodig om álle resultaten van de (smalle) zoekopdracht te zien, tot de ingestelde bovengrens
-      for (
-        let page = 1;
-        page <= (ctx.fast ? ctx.fast.pages : sc.maxPages);
-        page++
-      ) {
+      for (let used = 0; used < cap; used++) {
         const url = unit.urlFor(page);
         const res = await cachedPage(
           url,
@@ -384,10 +402,14 @@ export const searchAdapter: SourceAdapter = {
         if (res.status >= 400)
           throw new SourceError(`Marktplaats gaf HTTP ${res.status}`);
         const p = parseSearchPage(res.text);
-        if (page === 1) info.total = p.total;
+        if (recent && p.appliedSinceMs !== recent.sinceMs)
+          throw new SourceError("Marktplaats past het recente tijdvenster niet aantoonbaar toe; detectie gestopt in plaats van oude resultaten als vers te behandelen", false);
+        if (recent) p.ads = p.ads.map(a => ({ ...a, attributes: { ...a.attributes,
+          discoveryWindowSinceMs: recent.sinceMs, discoveryWindowVerified: 1 } }));
+        if (info.total == null) info.total = p.total;
         info.covered += p.rawCount;
         if (ctx.stats) {
-          if (page === 1 && p.total != null)
+          if (used === 0 && p.total != null)
             ctx.stats.total = (ctx.stats.total ?? 0) + p.total;
           ctx.stats.covered = (ctx.stats.covered ?? 0) + p.rawCount;
         }
@@ -405,14 +427,25 @@ export const searchAdapter: SourceAdapter = {
           if (ctx.prefilter && !ctx.prefilter(ad)) continue;
           if (!seen.has(ad.externalId)) seen.set(ad.externalId, ad);
           if (seen.size >= ctx.maxAds) {
-            done();
+            if (recent) {
+              const consumed = p.ads.every(a => (ctx.prefilter && !ctx.prefilter(a)) || seen.has(a.externalId));
+              info.complete = consumed && (p.rawCount < PAGE_SIZE
+                || p.total != null && page * PAGE_SIZE >= p.total || p.maxPage != null && page >= p.maxPage);
+              info.nextPage = info.complete ? 1 : consumed ? page === 1 ? resume : page + 1 : page;
+            }
+            await done();
             break outer;
           }
         }
-        if (p.rawCount < PAGE_SIZE || (p.maxPage != null && page >= p.maxPage))
+        if (p.rawCount < PAGE_SIZE || (p.maxPage != null && page >= p.maxPage)
+          || (p.total != null && page * PAGE_SIZE >= p.total)) {
+          if (recent) { info.complete = true; info.nextPage = 1; }
           break;
+        }
+        page = recent && page === 1 ? resume : page + 1;
+        if (recent) info.nextPage = page;
       }
-      done();
+      await done();
     }
     let ads = [...seen.values()];
 

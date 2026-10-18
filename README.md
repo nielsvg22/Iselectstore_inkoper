@@ -5,6 +5,8 @@ De huidige implementatie, bronbeperkingen, herstelprocedure en verificatie staan
 
 De nieuwe branch `feature/official-api-realtime-radar` voegt een standaard uitgeschakelde officiële Search-adapter, eerlijke zoekverdeling en bronmetingen toe. **Deze branch is niet naar productie gedeployed.** Echte API-rechten, gemeten snelheid en resterende verificatie: [OFFICIELE-API-ONDERZOEK.md](docs/OFFICIELE-API-ONDERZOEK.md).
 
+Een werkende openbare **recente zoekroute** is nu gevonden en ingebouwd: tijdvensters vervangen het steeds ophalen van oude, betaalde resultaten. Echte bronvergelijking, controles en demonstratieprocedure: [RECENTE-DETECTIE.md](docs/RECENTE-DETECTIE.md). Ook deze nieuwe wijziging is nog niet naar productie gedeployed.
+
 ## Bestaande applicatie
 
 Webapp voor handelaren in tweedehands Apple-producten: advertenties verzamelen, producten herkennen, marktwaarde schatten, winst berekenen, risico's detecteren, scoren (0–100) en de beste inkoopdeals melden via Telegram.

@@ -18,7 +18,8 @@
     "postinstall": "prisma generate",
     "test:e2e": "playwright test",
     "verify:source": "tsx scripts/verify-source.ts",
-    "verify:official": "tsx scripts/verify-official-api.ts"
+    "verify:official": "tsx scripts/verify-official-api.ts",
+    "verify:recent": "tsx scripts/verify-recent-source.ts"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",
