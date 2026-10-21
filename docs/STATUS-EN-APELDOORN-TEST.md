@@ -117,6 +117,11 @@ geslaagd, met actuele heartbeat en bronstatus `Zoeken werkt`. Tijdens de
 eerste twee afgeronde rondes werden elk twintig bronresultaten verwerkt;
 er werden **geen nieuwe advertenties toegevoegd**. Dit is een beperkte echte
 nameting, geen geïmporteerde demonstratie of bewezen iPhone-ontvangst.
+In de latere vijf-rondesteekproef is wel één nieuwe advertentie door de
+Apeldoorn-teststand gekomen: `m2456286390`, gedetecteerd om 16:24:01,167 lokale
+tijd. De pushdienst accepteerde de melding om 16:24:02,381, **1,214 seconde na
+detectie**. Dit bevestigt de echte meldingsketen met de beperking aan; zichtbare
+ontvangst op de telefoon is hiermee nog niet bevestigd.
 
 De tijdelijke deploymenthooks zijn verwijderd en automatische deployments
 blijven uit. De app is vastgezet op de geteste codecommit; het pushen van

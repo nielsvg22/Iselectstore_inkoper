@@ -107,5 +107,16 @@
       "id": "m2456286390",
       "detectedAt": "2026-10-21T14:24:01.167Z"
     }
-  ]
+  ],
+  "newScopeNotifications": [
+    {
+      "externalId": "m2456286390",
+      "detectedAt": "2026-10-21T14:24:01.167Z",
+      "notificationCreatedAt": "2026-10-21T14:24:01.701Z",
+      "pushAcceptedAt": "2026-10-21T14:24:02.381Z",
+      "status": "SENT",
+      "detectionToPushAcceptedSeconds": 1.214
+    }
+  ],
+  "notificationVerifiedAt": "2026-10-21T14:26:05.780Z"
 }
