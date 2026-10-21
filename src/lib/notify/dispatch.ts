@@ -1,6 +1,7 @@
 import { prisma } from "../db/client";
 import { PermanentJobError } from "../jobs/queue";
 import { getConfig, getSecret } from "../settings/store";
+import { inCityScope } from "../radar/locality";
 import type { DealBandKey, RiskLevelKey } from "../types";
 import {
   buildDealMessage,
@@ -90,6 +91,16 @@ export async function deliverNotification(
   });
   if (!n) throw new PermanentJobError("Melding bestaat niet");
   if (n.status === "SENT" || n.status === "SKIPPED") return;
+  const cfg = await getConfig(true);
+  if (cfg.radar.cityOnly) {
+    const ad = await prisma.advertisement.findUnique({ where: { id: n.adId }, select: { location: true } });
+    if (!ad || !inCityScope(ad.location, cfg.radar.cityOnly)) {
+      await prisma.notification.update({ where: { id: n.id }, data: {
+        status: "SKIPPED", error: `Teststand: uitsluitend plaats ${cfg.radar.cityOnly}`,
+      } });
+      return;
+    }
+  }
   const risk = await prisma.riskAssessment.findUnique({
     where: { adId: n.adId },
     select: { blocked: true },

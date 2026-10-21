@@ -48,6 +48,11 @@ const dispatcher = new Agent({
 
 const robotsCache = new Map<string, { at: number; disallow: string[] }>();
 
+export function isBotChallenge(text: string): boolean {
+  return /captcha|robot check|bevestig dat je geen robot/i.test(text.slice(0, 20000)) &&
+    !/application\/ld\+json|__NEXT_DATA__/.test(text);
+}
+
 export function parseRobots(txt: string, agent = "applealhunter"): string[] {
   const lines = txt.split(/\r?\n/).map((l) => l.replace(/#.*/, "").trim());
   const groups: Array<{ agents: string[]; disallow: string[] }> = [];
@@ -141,6 +146,8 @@ export async function safeFetch(
             headers: { "user-agent": USER_AGENT },
             signal: AbortSignal.timeout(5000),
           });
+          if (marktplaats && [403, 429].includes(r.status))
+            await setCooldown("marktplaats-search", `robots.txt HTTP ${r.status}`);
           if (!r.ok && r.status !== 404)
             throw new Error(`robots.txt HTTP ${r.status}`);
           disallow = r.ok ? parseRobots(await r.text()) : [];
@@ -177,6 +184,10 @@ export async function safeFetch(
       continue;
     }
     const text = await readLimited(res, opts.maxBytes ?? 2_500_000);
+    if (marktplaats && res.status === 200 && isBotChallenge(text)) {
+      await setCooldown("marktplaats-search", "Botcontrole (CAPTCHA)");
+      throw new Error("Marktplaats toont een CAPTCHA/botcontrole; bron gepauzeerd");
+    }
     return {
       status: res.status,
       url: u.toString(),

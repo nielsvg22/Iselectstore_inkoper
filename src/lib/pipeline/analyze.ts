@@ -1,4 +1,5 @@
 import { purchaseStatus } from "../radar/safety";
+import { inCityScope } from "../radar/locality";
 import type { Prisma } from "@prisma/client";
 import { createProvider, type AiProvider } from "../ai/provider";
 import { enrichWithAi } from "../ai/extract";
@@ -698,7 +699,7 @@ export async function matchProfiles(
   for (const p of profiles) {
     try {
       const tree = await loadTree(p.id);
-      const matched = evaluate(tree, ctx);
+      const matched = inCityScope(ctx.location, cfg.radar.cityOnly) && evaluate(tree, ctx);
       await prisma.profileMatch.upsert({
         where: { profileId_adId: { profileId: p.id, adId } },
         create: { profileId: p.id, adId, matched },

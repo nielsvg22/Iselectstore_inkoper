@@ -1,14 +1,17 @@
 import { route } from "@/lib/api";
 import { prisma } from "@/lib/db/client";
 import { dealMessageForAd } from "@/lib/notify/dispatch";
+import { getConfig } from "@/lib/settings/store";
+import { cityScopeWhere } from "@/lib/radar/locality";
 
 /** Nieuwe pop-ups voor de geopende app: alles wat na `after` voor deze gebruiker is aangemaakt (maximaal 10, oudste eerst). */
 export const GET = route(async (req, { user }) => {
   const u = new URL(req.url);
   const afterRaw = u.searchParams.get("after");
   const after = afterRaw && !Number.isNaN(Date.parse(afterRaw)) ? new Date(afterRaw) : new Date();
+  const cfg = await getConfig();
   const rows = await prisma.notification.findMany({
-    where: { userId: user.id, channel: "INAPP", createdAt: { gt: after } },
+    where: { userId: user.id, channel: "INAPP", status: { not: "SKIPPED" }, createdAt: { gt: after }, ad: cityScopeWhere(cfg.radar.cityOnly) },
     orderBy: { createdAt: "asc" },
     take: 10,
     include: { ad: { select: { isDemo: true, images: { take: 1, orderBy: { position: "asc" }, select: { url: true } } } } },

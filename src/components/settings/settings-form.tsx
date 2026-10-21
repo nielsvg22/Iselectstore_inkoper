@@ -1342,6 +1342,12 @@ export function SettingsForm({
                   }
                 />
               </Field>
+              <Switch
+                label="Teststand: alleen plaats Apeldoorn"
+                checked={c.radar.cityOnly === "Apeldoorn"}
+                onChange={(v) => set("radar", { cityOnly: v ? "Apeldoorn" : "" })}
+              />
+              <p className="text-sm text-muted">In deze teststand komen alleen advertenties met plaatsnaam Apeldoorn door. Andere plaatsen, verzending van buiten en een onbekende plaats worden uitgesloten.</p>
               <Field label="Ophalen acceptabel tot (km)" htmlFor="po-km">
                 <Input
                   id="po-km"

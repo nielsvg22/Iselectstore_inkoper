@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDate, timeAgo } from "@/lib/format";
 import { getStatus } from "@/lib/status";
+import { SourceAccess } from "@/components/status/source-access";
+import { AutoRefresh } from "@/components/radar-refresh";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Status" };
@@ -16,6 +18,7 @@ export default async function StatusPage() {
   const failed = (jobs.FAILED ?? 0) + (jobs.DEAD ?? 0);
   return (
     <div className="space-y-6">
+      <AutoRefresh intervalMs={15000} />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-[32px] font-semibold tracking-tight">Status</h1>
@@ -23,6 +26,8 @@ export default async function StatusPage() {
         </div>
         <RunNow />
       </div>
+
+      <SourceAccess monitor={s.access} />
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Samenvatting">
         {[
@@ -37,13 +42,13 @@ export default async function StatusPage() {
       {pending > 0 && !s.lastJobFinishedAt && <p className="text-sm text-muted">Er staan jobs in de wachtrij. Draait de worker (<code>npm run worker</code>) of is de cron-aanroep ingesteld? Gebruik anders ‘Nu verwerken’.</p>}
 
       <Card>
-        <CardHeader><div><CardTitle>Databronnen</CardTitle><CardDescription>Of de bron bereikbaar is, en hoeveel requests er vandaag zijn gedaan (geen limiet).</CardDescription></div></CardHeader>
+        <CardHeader><div><CardTitle>Databronnen</CardTitle><CardDescription>Geregistreerde broncontroles. De actuele Marktplaats-toegang en het requestbudget staan hierboven.</CardDescription></div></CardHeader>
         <CardContent className="space-y-3">
           {s.sources.map((src) => (
             <div key={src.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-muted-bg px-4 py-3 text-sm">
               <div className="flex min-w-0 items-center gap-3">
                 {!src.enabled ? <CircleDashed className="h-5 w-5 text-muted" /> : src.ok === false ? <CircleAlert className="h-5 w-5 text-danger" /> : src.ok ? <CheckCircle2 className="h-5 w-5 text-success" /> : <CircleDashed className="h-5 w-5 text-muted" />}
-                <div className="min-w-0"><p className="font-medium">{src.label}</p><p className="truncate text-xs text-muted">{!src.enabled ? "Uitgeschakeld in instellingen" : src.ok === false ? `Fout: ${src.lastError}` : src.ok ? `Laatst gelukt ${timeAgo(src.lastOkAt)}` : "Nog niet gebruikt"} · min. interval {src.minIntervalMinutes} min</p></div>
+                <div className="min-w-0"><p className="font-medium">{src.label}</p><p className="truncate text-xs text-muted">{!src.enabled ? "Uitgeschakeld in instellingen" : src.ok === false ? `Fout: ${src.lastError}` : src.ok ? `Laatst gelukt ${timeAgo(src.lastOkAt)}` : "Nog niet gebruikt"}</p></div>
               </div>
               <span className="tabular text-xs text-muted">{src.requestsToday} requests vandaag</span>
             </div>

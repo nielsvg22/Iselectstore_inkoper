@@ -6,6 +6,7 @@ import { getConfig } from "@/lib/settings/store";
 import { purchaseStatus } from "@/lib/radar/safety";
 import { SaveOpportunity } from "@/components/deal/save-opportunity";
 import { AutoRefresh } from "@/components/radar-refresh";
+import { cityScopeWhere } from "@/lib/radar/locality";
 
 export const dynamic = "force-dynamic";
 export default async function DashboardPage({
@@ -20,6 +21,7 @@ export default async function DashboardPage({
     isDemo: cfg.demoMode,
     duplicateOfId: null,
     userState: { not: "IGNORED" },
+    ...cityScopeWhere(cfg.radar.cityOnly),
   };
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
@@ -77,11 +79,12 @@ export default async function DashboardPage({
           iSelectStore — Inkoopradar
         </h1>
         <p className="mt-2 text-sm text-muted">
-          Apeldoorn · {cfg.policies.distance.pickupMaxKm} km ·{" "}
+          {cfg.radar.cityOnly ? "Alleen Apeldoorn · geen verzending van buiten" : `Apeldoorn · ${cfg.policies.distance.pickupMaxKm} km`} ·{" "}
           {last?.lastSuccessAt
             ? `Laatste succesvolle controle ${timeAgo(last.lastSuccessAt)}`
             : "Wacht op eerste succesvolle controle"}
         </p>
+        <Link href="/status" className="mt-2 inline-block text-sm font-medium text-muted underline underline-offset-4">Bronstatus bekijken</Link>
       </header>
       <section aria-label="Kerncijfers" className="grid grid-cols-3 gap-3">
         {[

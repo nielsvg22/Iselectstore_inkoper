@@ -231,15 +231,15 @@ export default async function PerformancePage() {
           className="rounded-2xl bg-danger-soft px-5 py-4 text-sm"
         >
           <strong>
-            Gepauzeerd door Marktplaats-blokkade tot{" "}
+            Marktplaats-bron tijdelijk gepauzeerd tot{" "}
             {new Date(d.cooldown.until).toLocaleTimeString("nl-NL", {
               hour: "2-digit",
               minute: "2-digit",
             })}
             .
           </strong>{" "}
-          {d.cooldown.reason} De app probeert het daarna rustig opnieuw en
-          omzeilt de blokkade niet.
+          {d.cooldown.reason} De app probeert het daarna rustig opnieuw.
+          Een IP-ban is hiermee niet bewezen. Bekijk de toegangsstatus op de pagina Status.
         </div>
       )}
       {d.fast.enabled && (

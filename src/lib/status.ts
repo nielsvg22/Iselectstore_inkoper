@@ -1,6 +1,7 @@
 import { prisma } from "./db/client";
 import { getConfig, secretStatus } from "./settings/store";
 import { listAdapters } from "./sources/adapters";
+import { getSourceMonitor } from "./source-monitor";
 
 export async function getStatus() {
   const cfg = await getConfig();
@@ -14,8 +15,9 @@ export async function getStatus() {
     prisma.advertisement.count({ where: { status: "FAILED" } }),
     prisma.backgroundJob.findFirst({ where: { status: "DONE" }, orderBy: { finishedAt: "desc" }, select: { finishedAt: true } }),
   ]);
-  const secrets = await secretStatus();
+  const [secrets, access] = await Promise.all([secretStatus(), getSourceMonitor()]);
   return {
+    access,
     profiles: profiles.map((p) => ({ id: p.id, name: p.name, active: p.active, sourceKind: p.sourceKind, intervalMinutes: p.intervalMinutes, lastCheckedAt: p.lastCheckedAt, lastSuccessAt: p.lastSuccessAt, lastError: p.lastError, discoveredCount: p.discoveredCount, interestingCount: p.interestingCount })),
     sources: listAdapters().map((a) => {
       const h = health.find((x) => x.id === a.id);

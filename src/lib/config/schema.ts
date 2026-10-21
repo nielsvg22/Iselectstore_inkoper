@@ -16,6 +16,8 @@ export const configSchema = z.object({
   }).default({}),
   radar: z
     .object({
+      /** Temporary exact-city scope; empty restores the broader radar. */
+      cityOnly: z.enum(["", "Apeldoorn"]).default(""),
       topMinProfitCents: z.number().int().min(0).default(7500),
       topMinScore: z.number().int().min(0).max(100).default(80),
     })

@@ -15,6 +15,7 @@ import { fetchListingUrl } from "../sources/adapters-shared";
 import { mergeDetail } from "../sources/marktplaats-search";
 import { SourceError, type RawAd, type FetchContext } from "../sources/types";
 import { recentSince } from "../sources/recent-search";
+import { inCityScope } from "../radar/locality";
 import { getCooldown, setCooldown } from "./cooldown";
 import { modelByKey } from "../catalog/apple";
 import {
@@ -219,6 +220,7 @@ export async function runProfileCheck(
         .fetchDetails !== false;
     const ingestPage = async (page: RawAd[]) => {
       for (const raw of page) {
+        if (!inCityScope(raw.location, cfg.radar.cityOnly)) continue;
         if (processed.has(raw.externalId)) continue;
         processed.add(raw.externalId);
         const r = await ingestAd({ ...raw, attributes: { ...raw.attributes, detectionSource: adapter.id } }, {

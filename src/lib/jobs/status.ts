@@ -1,6 +1,7 @@
 import { prisma } from "../db/client";
 import { getConfig } from "../settings/store";
 import { notifyPrefsSchema, quietEndsAt } from "../notify/prefs";
+import { getSourceMonitor } from "../source-monitor";
 
 const notificationFields = {
   channel: true, status: true, error: true, createdAt: true, sentAt: true,
@@ -36,6 +37,7 @@ export async function getJobStatus(externalId?: string) {
   const at = (heartbeat?.value as { at?: string } | null)?.at ?? null;
   return {
     generatedAt: new Date().toISOString(),
+    sourceAccess: await getSourceMonitor(),
     worker: { at, healthy: !!at && Date.now() - Date.parse(at) < 90_000 },
     config: { notificationsEnabled: cfg.notifications.enabled,
       requireFullAnalysis: cfg.notifications.requireFullAnalysis,
