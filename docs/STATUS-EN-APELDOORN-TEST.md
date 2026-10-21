@@ -64,8 +64,8 @@ PostgreSQL-dump gemaakt en met `pg_restore --list` gecontroleerd:
 `/var/lib/postgresql/data/iselect-backups/pre-apeldoorn-only-20261021.dump`.
 
 De tijdelijke extra regel heeft een herkenbare
-`temporary-apeldoorn-only-`-ID. Bij de volgende release mag uitsluitend deze
-door ons toegevoegde regel worden verwijderd, nadat de nieuwe code en
+`temporary-apeldoorn-only-`-ID. Bij de release is uitsluitend deze door ons
+toegevoegde regel verwijderd, nadat de nieuwe code en
 `radar.cityOnly = "Apeldoorn"` zijn bevestigd. De oorspronkelijke profielregels
 blijven staan. Zo kan de schakelaar later de teststand weer werkelijk uitzetten.
 Voor deze release is geen database-schemamigratie nodig.
@@ -93,3 +93,35 @@ verversingscomponent met opruimen van timers en listeners.
 Alle nagebootste blokkades en advertenties bevinden zich uitsluitend in de
 afzonderlijke lokale testdatabases. Een echte IP-ban wordt niet uitgelokt en
 deze tests bewijzen geen ontvangst op een fysieke iPhone.
+
+## Gecontroleerde productie-uitrol
+
+Codecommit `e0697979108af70a58dc446dd02fd508c2d6189b` is gepusht naar
+`feature/source-access-status` en op **21 oktober 2026 om 16:22:16
+Europe/Amsterdam** uitgerold op https://deals.85.190.105.138.nip.io.
+Coolify-deployment: `yn5l8jrvg6lgm5gbo40p81lh`.
+
+Vooraf is opnieuw een volledige, met `pg_restore --list` gecontroleerde dump
+gemaakt: **20.672.617 bytes**, op
+`/var/lib/postgresql/data/iselect-backups/pre-status-city-e0697979108a.dump`.
+De databasevolume-identiteit en alle omgevingsvariabelen zijn behouden.
+De vroege nameting toont 9.748 advertenties tegenover 9.734 vóór de build:
+de oude worker heeft tijdens het bouwen nog verwerkt. Het bestaande
+inkooprecord, 35 profielen en de 73 oorspronkelijke regels bleven behouden.
+De tijdelijke Apeldoorn-regel is verwijderd; de expliciete configuratie
+`radar.cityOnly = "Apeldoorn"` is bevestigd en de configuratieback-up bestaat.
+
+De nieuwe webcode geeft de toegangsmonitor terug via de afgeschermde
+operationele route. Na de containerwissel zijn nieuwe echte zoekrondes
+geslaagd, met actuele heartbeat en bronstatus `Zoeken werkt`. Tijdens de
+eerste twee afgeronde rondes werden elk twintig bronresultaten verwerkt;
+er werden **geen nieuwe advertenties toegevoegd**. Dit is een beperkte echte
+nameting, geen geïmporteerde demonstratie of bewezen iPhone-ontvangst.
+
+De tijdelijke deploymenthooks zijn verwijderd en automatische deployments
+blijven uit. De app is vastgezet op de geteste codecommit; het pushen van
+latere meetdocumentatie rolt geen nieuwe versie uit. Voor terugrollen naar de
+oude code moet de tijdelijke plaatsregel opnieuw worden toegevoegd: de oude
+code kent de nieuwe `cityOnly`-instelling niet.
+
+Zie [de beperkte live meetgegevens](evidence/source-status-production-2026-10-21.json).

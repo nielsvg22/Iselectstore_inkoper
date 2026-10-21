@@ -1,0 +1,111 @@
+{
+  "application": "https://deals.85.190.105.138.nip.io",
+  "commit": "e0697979108af70a58dc446dd02fd508c2d6189b",
+  "deployment": "yn5l8jrvg6lgm5gbo40p81lh",
+  "finishedAt": "2026-10-21T14:22:15.000000Z",
+  "verifiedAt": "2026-10-21T14:25:06.751Z",
+  "backupPath": "/var/lib/postgresql/data/iselect-backups/pre-status-city-e0697979108a.dump",
+  "backupBytes": 20672617,
+  "backupListVerified": true,
+  "preservedEnvValues": true,
+  "preservedDatabaseVolume": true,
+  "postcheck": {
+    "ads": 9748,
+    "purchases": 1,
+    "profiles": 35,
+    "rules": 73,
+    "cityOnly": "Apeldoorn",
+    "removedTemporaryRules": 1,
+    "cityBackupExists": true
+  },
+  "sourceAccess": {
+    "generatedAt": "2026-10-21T14:25:06.755Z",
+    "worker": {
+      "at": "2026-10-21T14:25:00.181Z",
+      "healthy": true
+    },
+    "sources": [
+      {
+        "id": "marktplaats-search",
+        "label": "Marktplaats-zoekpagina’s",
+        "requestLimit": 12,
+        "intervalSeconds": 30,
+        "lastSuccessAt": "2026-10-21T14:25:02.736Z",
+        "lastIncidentAt": "2026-10-21T10:34:12.511Z",
+        "pauseUntil": null,
+        "httpStatus": null,
+        "state": "healthy",
+        "tone": "success",
+        "title": "Zoeken werkt",
+        "detail": "De laatste zoekcontrole is geslaagd. Er is geen actieve bronpauze; dit garandeert geen toekomstige toegang."
+      },
+      {
+        "id": "marktplaats-official",
+        "label": "Officiële Search API",
+        "requestLimit": 2,
+        "intervalSeconds": 60,
+        "lastSuccessAt": null,
+        "lastIncidentAt": null,
+        "pauseUntil": null,
+        "httpStatus": null,
+        "state": "disabled",
+        "tone": "neutral",
+        "title": "Uitgeschakeld",
+        "detail": "Deze bron is niet ingeschakeld. Er worden geen zoekrequests uitgevoerd."
+      }
+    ]
+  },
+  "health": {
+    "ok": true,
+    "db": true
+  },
+  "newPhoneReceiptVerified": false,
+  "newWorkerRounds": [
+    {
+      "startedAt": "2026-10-21T14:22:28.256Z",
+      "durationMs": 25851,
+      "pages": 5,
+      "fetched": 20,
+      "created": 0,
+      "changed": 1
+    },
+    {
+      "startedAt": "2026-10-21T14:22:59.161Z",
+      "durationMs": 20698,
+      "pages": 5,
+      "fetched": 20,
+      "created": 0,
+      "changed": 0
+    },
+    {
+      "startedAt": "2026-10-21T14:23:30.444Z",
+      "durationMs": 25208,
+      "pages": 5,
+      "fetched": 26,
+      "created": 0,
+      "changed": 0
+    },
+    {
+      "startedAt": "2026-10-21T14:24:00.697Z",
+      "durationMs": 20542,
+      "pages": 5,
+      "fetched": 27,
+      "created": 1,
+      "changed": 1
+    },
+    {
+      "startedAt": "2026-10-21T14:24:31.337Z",
+      "durationMs": 31403,
+      "pages": 5,
+      "fetched": 24,
+      "created": 0,
+      "changed": 0
+    }
+  ],
+  "newlyDetectedAdsInSample": [
+    {
+      "id": "m2456286390",
+      "detectedAt": "2026-10-21T14:24:01.167Z"
+    }
+  ]
+}
