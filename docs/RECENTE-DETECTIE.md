@@ -150,3 +150,67 @@ bewezen publicatie→iPhone binnen 60 seconden.
   toekomstcontrole; twee nieuwe echte advertenties in opvolgende controles.
 - Geen advertentie via doel-URL geïmporteerd, geen testpush naar de echte iPhone
   verstuurd en geen productiedeployment uitgevoerd voor deze verificatie.
+
+## Hertest en geautoriseerde productie-uitrol — 21 oktober 2026
+
+De eigenaar gaf daarna expliciet opdracht om opnieuw te testen en vervolgens live
+te zetten. Op de ongewijzigde code zijn opnieuw **474 unit-/integratietests** en
+**16 browsertests** geslaagd, evenals TypeScript en de productiebuild. De tests
+gebruikten afzonderlijke lokale databases, niet de productiedatabase.
+
+De actuele openbare bronproef bevestigde opnieuw het numerieke tijdvenster:
+de brede pagina had 48.562 resultaten en 30 betaalde plaatsen; het recente
+venster had 14 resultaten en geen betaalde plaatsen. De toekomstcontrole was
+leeg. Bij vervolgcontroles met 30,754 en 30,736 seconden tussenruimte verschenen
+drie nieuwe echte advertentie-ID's. Zie
+[bronbewijs](evidence/recent-source-2026-10-21.json).
+
+### Release en behoud van gegevens
+
+- Codecommit `a6ae00318946b4c4f67449ff933ca436f1326099`, branch
+  `feature/official-api-realtime-radar`.
+- Alleen de bestaande Coolify-app `apple-deal-hunter` is uitgerold:
+  https://deals.85.190.105.138.nip.io.
+- Deployment `nwxjq5ixg7n1phiamji404lr` is op 21 oktober om **15:36:52
+  Europe/Amsterdam** afgerond (13:36:52 UTC).
+- Vooraf: volledige PostgreSQL-dump van **20.436.650 bytes**, met een geslaagde
+  `pg_restore --list`, op
+  `/var/lib/postgresql/data/iselect-backups/pre-recent-a6ae003-20261021.dump`.
+  Dit is een herstelkopie op dezelfde VPS, geen externe back-up.
+- De bestaande databasevolume-identiteit is behouden. Alle bestaande
+  omgevingsvariabelen, inclusief sessie-, database- en pushsleutels, zijn
+  bytegelijk gebleven. Voor/na: 9.601/9.604 advertenties in de vroege nameting;
+  1 inkooprecord, 35 profielen, 73 regels en 1 profielback-up bleven behouden.
+- De vroege posthook liep vóór het migratieproces klaar was. De daaropvolgende
+  webcontainerlogs bevestigen expliciet de succesvolle toepassing van
+  `20261018070000_check_run_source`; de worker meldt geen openstaande migraties
+  en voert succesvolle controles met het nieuwe schema uit.
+- De tijdelijke deploymenthooks zijn verwijderd. De productieapp is vastgezet
+  op de geteste codecommit; automatische deployments staan uit. De latere
+  documentatiecommit veroorzaakt daardoor geen nieuwe uitrol.
+- De officiële API-adapter is niet geactiveerd; er zijn geen nieuwe API-rechten
+  verkregen of verondersteld. De snellere detectie gebruikt de openbare HTML.
+
+### Echte nameting op de productieapp
+
+Vier afgeronde rondes vanaf 13:36:55 UTC gebruikten elk vijf zoekpagina's en
+vonden samen **15 nieuwe advertenties**. De tussenpozen tussen de rondestarts
+waren **30,979 / 30,804 / 31,167 seconden**. Eén ronde duurde 30,652 seconden;
+30 seconden is een doelinterval, geen harde uitvoeringsgarantie.
+
+De vastgelegde echte pushmeldingen werden in **0,364–1,851 seconden na detectie**
+door de pushdienst geaccepteerd. Een bestaand iOS-apparaat is actief, de
+heartbeat is gezond en de publieke healthcheck bevestigt web/database.
+Het actieve profiel had geen bronfout. De aantallen historische mislukte
+controle- en notificatiejobs bleven in deze korte nameting ongewijzigd; die
+historie is niet verwijderd. Detailverrijking blijft onafhankelijk in de rij.
+
+Het beperkte [productiebewijs](evidence/recent-production-2026-10-21.json)
+bevat de echte rondes, advertentie-ID's en detectie-/pushtijdstempels, zonder
+credentials, pushendpoints of gebruikersidentiteiten. Er is geen advertentie
+geïmporteerd om de keten te demonstreren.
+
+**Niet bewezen:** exacte publicatie→detectie en zichtbare ontvangst op de
+iPhone. Daarvoor is nog een gecontroleerde nieuwe plaatsing met werkelijk
+bevestigingstijdstip en een ontvangstbevestiging op het toestel nodig. De
+`publishedAt`-kolom alleen is geen bewijs van een exact bronpublicatietijdstip.

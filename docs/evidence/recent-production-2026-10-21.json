@@ -1,0 +1,195 @@
+{
+  "verifiedAt": "2026-10-21T13:39:02.492Z",
+  "application": "https://deals.85.190.105.138.nip.io",
+  "codeCommit": "a6ae00318946b4c4f67449ff933ca436f1326099",
+  "deploymentId": "nwxjq5ixg7n1phiamji404lr",
+  "backup": {
+    "path": "/var/lib/postgresql/data/iselect-backups/pre-recent-a6ae003-20261021.dump",
+    "bytes": 20436650,
+    "restoreListVerified": true,
+    "externalOffsiteBackup": false
+  },
+  "recordsBefore": {
+    "ads": 9601,
+    "purchases": 1,
+    "profiles": 35,
+    "rules": 73,
+    "profileBackups": 1
+  },
+  "recordsEarlyAfter": {
+    "ads": 9604,
+    "purchases": 1,
+    "profiles": 35,
+    "rules": 73,
+    "profileBackups": 1
+  },
+  "existingEnvironmentValuesIdentical": true,
+  "existingDatabaseVolumeRetained": true,
+  "temporaryHooksRemoved": true,
+  "automaticDeploymentEnabled": false,
+  "sourceMigrationAppliedFromWebContainerLogs": true,
+  "workerHealthy": true,
+  "activeIosPushDevices": 1,
+  "rounds": [
+    {
+      "startedAt": "2026-10-21T13:36:55.804Z",
+      "durationMs": 26938,
+      "pages": 5,
+      "fetched": 9,
+      "created": 9,
+      "changed": 9
+    },
+    {
+      "startedAt": "2026-10-21T13:37:26.783Z",
+      "durationMs": 25761,
+      "pages": 5,
+      "fetched": 11,
+      "created": 3,
+      "changed": 4
+    },
+    {
+      "startedAt": "2026-10-21T13:37:57.587Z",
+      "durationMs": 30652,
+      "pages": 5,
+      "fetched": 12,
+      "created": 1,
+      "changed": 1
+    },
+    {
+      "startedAt": "2026-10-21T13:38:28.754Z",
+      "durationMs": 26178,
+      "pages": 5,
+      "fetched": 12,
+      "created": 2,
+      "changed": 3
+    }
+  ],
+  "roundIntervalsSeconds": [
+    30.979,
+    30.804,
+    31.167
+  ],
+  "notifications": [
+    {
+      "externalId": "m2456264825",
+      "detectedAt": "2026-10-21T13:37:04.538Z",
+      "notificationCreatedAt": "2026-10-21T13:37:05.226Z",
+      "pushAcceptedAt": "2026-10-21T13:37:06.296Z",
+      "detectionToPushAcceptedSeconds": 1.758
+    },
+    {
+      "externalId": "m2456263966",
+      "detectedAt": "2026-10-21T13:37:04.621Z",
+      "notificationCreatedAt": "2026-10-21T13:37:05.329Z",
+      "pushAcceptedAt": "2026-10-21T13:37:06.472Z",
+      "detectionToPushAcceptedSeconds": 1.851
+    },
+    {
+      "externalId": "m2456265184",
+      "detectedAt": "2026-10-21T13:37:06.766Z",
+      "notificationCreatedAt": "2026-10-21T13:37:06.911Z",
+      "pushAcceptedAt": "2026-10-21T13:37:07.162Z",
+      "detectionToPushAcceptedSeconds": 0.396
+    },
+    {
+      "externalId": "m2456263859",
+      "detectedAt": "2026-10-21T13:37:11.569Z",
+      "notificationCreatedAt": "2026-10-21T13:37:12.076Z",
+      "pushAcceptedAt": "2026-10-21T13:37:12.700Z",
+      "detectionToPushAcceptedSeconds": 1.131
+    },
+    {
+      "externalId": "m2456264973",
+      "detectedAt": "2026-10-21T13:37:17.043Z",
+      "notificationCreatedAt": "2026-10-21T13:37:17.209Z",
+      "pushAcceptedAt": "2026-10-21T13:37:17.407Z",
+      "detectionToPushAcceptedSeconds": 0.364
+    },
+    {
+      "externalId": "m2456265175",
+      "detectedAt": "2026-10-21T13:37:17.118Z",
+      "notificationCreatedAt": "2026-10-21T13:37:17.275Z",
+      "pushAcceptedAt": "2026-10-21T13:37:17.584Z",
+      "detectionToPushAcceptedSeconds": 0.466
+    },
+    {
+      "externalId": "m2456265525",
+      "detectedAt": "2026-10-21T13:37:32.355Z",
+      "notificationCreatedAt": "2026-10-21T13:37:32.526Z",
+      "pushAcceptedAt": "2026-10-21T13:37:33.586Z",
+      "detectionToPushAcceptedSeconds": 1.231
+    },
+    {
+      "externalId": "m2456265497",
+      "detectedAt": "2026-10-21T13:37:32.424Z",
+      "notificationCreatedAt": "2026-10-21T13:37:32.590Z",
+      "pushAcceptedAt": "2026-10-21T13:37:33.734Z",
+      "detectionToPushAcceptedSeconds": 1.31
+    },
+    {
+      "externalId": "m2456265554",
+      "detectedAt": "2026-10-21T13:37:32.482Z",
+      "notificationCreatedAt": "2026-10-21T13:37:32.651Z",
+      "pushAcceptedAt": "2026-10-21T13:37:33.878Z",
+      "detectionToPushAcceptedSeconds": 1.396
+    },
+    {
+      "externalId": "m2456265684",
+      "detectedAt": "2026-10-21T13:38:02.843Z",
+      "notificationCreatedAt": "2026-10-21T13:38:03.431Z",
+      "pushAcceptedAt": "2026-10-21T13:38:04.067Z",
+      "detectionToPushAcceptedSeconds": 1.224
+    },
+    {
+      "externalId": "m2456266207",
+      "detectedAt": "2026-10-21T13:38:48.836Z",
+      "notificationCreatedAt": "2026-10-21T13:38:49.286Z",
+      "pushAcceptedAt": "2026-10-21T13:38:49.756Z",
+      "detectionToPushAcceptedSeconds": 0.92
+    },
+    {
+      "externalId": "m2456266154",
+      "detectedAt": "2026-10-21T13:38:54.870Z",
+      "notificationCreatedAt": "2026-10-21T13:38:55.437Z",
+      "pushAcceptedAt": "2026-10-21T13:38:56.176Z",
+      "detectionToPushAcceptedSeconds": 1.306
+    }
+  ],
+  "recentProfileError": [
+    null
+  ],
+  "historicalFailuresBefore": [
+    {
+      "_count": {
+        "_all": 11
+      },
+      "type": "CHECK_PROFILE",
+      "status": "FAILED"
+    },
+    {
+      "_count": {
+        "_all": 55
+      },
+      "type": "NOTIFY",
+      "status": "FAILED"
+    }
+  ],
+  "historicalFailuresAfter": [
+    {
+      "_count": {
+        "_all": 11
+      },
+      "type": "CHECK_PROFILE",
+      "status": "FAILED"
+    },
+    {
+      "_count": {
+        "_all": 55
+      },
+      "type": "NOTIFY",
+      "status": "FAILED"
+    }
+  ],
+  "publicationToPhoneLatencyVerified": false,
+  "phoneReceiptVerified": false
+}
