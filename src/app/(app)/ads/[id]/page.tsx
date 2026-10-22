@@ -1,3 +1,4 @@
+import { rulesEmoji, rulesLines, type RulesSummary } from "@/lib/notify/message";
 import { ArrowLeft, ArrowUpRight, Check, CircleHelp, ShieldAlert, ShieldCheck, TriangleAlert } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -61,7 +62,7 @@ export default async function AdDetailPage({ params }: { params: Promise<{ id: s
   if (!d) notFound();
   const cfg = await getConfig();
   const { ad, current: a, valuations, comparables, similar } = d;
-  const costs = a?.costs as unknown as { expected: ProfitBreakdown; conservative: ProfitBreakdown; optimistic: ProfitBreakdown; valuationSteps: string[]; repairCents: number; maxBidConservativeCents: number; seller?: SellerAssessment; distance?: { note: string }; battery?: { notes: string[] } } | undefined;
+  const costs = a?.costs as unknown as { expected: ProfitBreakdown; conservative: ProfitBreakdown; optimistic: ProfitBreakdown; valuationSteps: string[]; repairCents: number; maxBidConservativeCents: number; seller?: SellerAssessment; distance?: { note: string }; battery?: { notes: string[] }; rules?: RulesSummary } | undefined;
   const flags = (ad.risk?.flags ?? []) as unknown as RiskFlag[];
   const breakdown = a?.scoreBreakdown as unknown as { factors: ScoreFactor[]; adjustments: Array<{ label: string; delta?: number; cap?: number }> } | undefined;
   const priceKnown = ad.askingPriceCents != null && ad.askingPriceCents > 0;
@@ -149,6 +150,17 @@ export default async function AdDetailPage({ params }: { params: Promise<{ id: s
             </CardContent>
           </Card>
 
+          {a && costs?.rules && costs.rules.status !== "skip" && (
+            <Card>
+              <CardHeader><div><CardTitle>Inkoopregels {rulesEmoji(costs.rules)}</CardTitle><CardDescription>Maximale prijs volgens de Best Buy Phone-regels.</CardDescription></div><Badge tone={costs.rules.status === "reject" ? "danger" : costs.rules.status === "review" ? "warning" : "success"}>{{ high: "💰 Hoge marge", match: "Voldoet", review: "Handmatig controleren", reject: "Afgewezen" }[costs.rules.status as string]}</Badge></CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                {costs.rules.reasons.length > 0 && <ul className="list-disc pl-5">{costs.rules.reasons.map((r) => <li key={r}>{r}</li>)}</ul>}
+                {costs.rules.lines.length > 0 && <table className="w-full max-w-md"><tbody>{costs.rules.lines.map((l, i) => <tr key={i}><td className="py-0.5 pr-3">{i === 0 ? "" : l.euro < 0 ? "− " : "+ "}{l.label}</td><td className="text-right tabular-nums">€{Math.abs(l.euro)}</td></tr>)}</tbody></table>}
+                {rulesLines(costs.rules).map((l) => <p key={l}>{l}</p>)}
+                {costs.rules.notes.length > 0 && <ul className="list-disc pl-5 text-muted">{costs.rules.notes.map((n) => <li key={n}>{n}</li>)}</ul>}
+              </CardContent>
+            </Card>
+          )}
           {a && costs && (
             <Card>
               <CardHeader><div><CardTitle>Winstberekening</CardTitle><CardDescription>Transparant: elke post die meetelt. Alle bedragen zijn schattingen, geen garantie.</CardDescription></div></CardHeader>

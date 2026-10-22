@@ -1,4 +1,4 @@
-import { Activity, BarChart3, Gauge, Smartphone, Bell, Download, LayoutGrid, LineChart, Search, Settings, ShoppingBag, Tag } from "lucide-react";
+import { Activity, BarChart3, Gauge, Smartphone, Bell, Download, LayoutGrid, LineChart, Scale, Search, Settings, ShoppingBag, Tag } from "lucide-react";
 
 export const MAIN_NAV = [
   { href: "/", label: "Dashboard", icon: LayoutGrid },
@@ -11,6 +11,7 @@ export const MAIN_NAV = [
 
 export const MORE_NAV = [
   { href: "/purchases", label: "Mijn inkopen", icon: ShoppingBag },
+  { href: "/rules", label: "Inkoopregels", icon: Scale },
   { href: "/market", label: "Marktdata", icon: LineChart },
   { href: "/import", label: "Importeren", icon: Download },
   { href: "/performance", label: "Prestaties", icon: Gauge },
