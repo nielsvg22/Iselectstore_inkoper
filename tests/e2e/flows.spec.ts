@@ -614,6 +614,8 @@ test("mobiel: geen horizontale scroll en bottom-navigatie zichtbaar", async ({
     "/import",
     "/status",
     "/settings",
+    "/rules",
+    "/funnel",
   ]) {
     await page.goto(path);
     await page.waitForLoadState("networkidle");
@@ -668,6 +670,38 @@ test("echte advertentie: knop 'Ga naar advertentie' rechtsboven en scherpe foto'
     /rule=ecg_mp_eps\$_86\.jpg$/,
   );
   await page.screenshot({ path: "tests/e2e/shots/08-echte-advertentie.png" });
+});
+
+test("inkoopregels: basisprijs invullen, regels testen, gebruiker aanmaken als beheerder", async ({ page }) => {
+  await login(page);
+  await page.goto("/rules");
+  await expect(page.getByRole("heading", { name: "Inkoopregels", level: 1 })).toBeVisible();
+  // lijst plakken en opslaan
+  await page.getByLabel("Lijst plakken").fill("iPhone 15 Pro;256;700");
+  await page.getByRole("button", { name: "Toevoegen aan lijst" }).click();
+  await page.getByRole("button", { name: "Opslaan" }).first().click();
+  await expect(page.getByText(/basisprijzen opgeslagen/)).toBeVisible();
+  // tester: 90% batterij (−75), krasvrij, 10 km rijfilter (verkoper onbekend, −10) → 615
+  await page.getByLabel("Opslag (GB)").fill("256");
+  await page.getByLabel("Batterij %").fill("90");
+  await page.getByLabel("Vraagprijs €").fill("300");
+  await page.getByLabel("Afstand km").fill("10");
+  await page.getByLabel("Titel + omschrijving").fill("Krasvrij, altijd in hoesje");
+  await page.getByRole("button", { name: "Beoordeel" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Toegestane vraagprijs" })).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: "€615" }).first()).toBeVisible();
+  // controle op bestaande advertenties
+  await page.getByRole("button", { name: "Controleren" }).click();
+  await expect(page.getByText(/advertenties$/).first()).toBeVisible();
+  // gebruikersbeheer in Instellingen
+  await page.goto("/settings");
+  await page.getByLabel("E-mailadres nieuwe gebruiker").fill("info@bestbuyphone.nl");
+  await page.getByLabel("Rol", { exact: true }).selectOption("ADMIN");
+  await page.getByRole("button", { name: "Account maken" }).click();
+  await expect(page.getByTestId("temp-password")).toHaveText(/^[A-Za-z0-9]{16}$/);
+  await expect(page.getByText("info@bestbuyphone.nl").first()).toBeVisible();
+  await page.goto("/funnel");
+  await expect(page.getByRole("heading", { name: /Funnel/, level: 1 })).toBeVisible();
 });
 
 test("uitloggen", async ({ page }) => {

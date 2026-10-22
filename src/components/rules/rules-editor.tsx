@@ -6,7 +6,7 @@ import { useToast } from "@/components/toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field, Input, Select, Switch, Textarea } from "@/components/ui/form";
+import { Input, Select, Switch, Textarea } from "@/components/ui/form";
 import { Notice } from "@/components/ui/states";
 import { APPLE_MODELS } from "@/lib/catalog/apple";
 import { api } from "@/lib/client-api";
@@ -19,6 +19,16 @@ const STATUS: Record<string, { label: string; tone: "success" | "danger" | "warn
   reject: { label: "Afgewezen", tone: "danger" }, skip: { label: "Geen oordeel (basisprijs ontbreekt)", tone: "neutral" },
 };
 const euro = (n: number | null | undefined) => (n == null ? "—" : `€${Math.round(n * 100) / 100}`);
+/** Veld met een echt gekoppeld label (het label omsluit het invoerveld), zodat schermlezers en tests het veld vinden. */
+function Fld({ label, hint, children, className }: { label: string; hint?: string; children: React.ReactNode; className?: string }) {
+  return (
+    <label className={`block ${className ?? ""}`}>
+      <span className="mb-1.5 block text-[13px] font-medium text-foreground/80">{label}</span>
+      {children}
+      {hint && <span className="mt-1 block text-xs text-muted">{hint}</span>}
+    </label>
+  );
+}
 const num = (v: string) => (v.trim() === "" ? null : Number(v.replace(",", ".")));
 
 export function RulesEditor({ initialRules, initialPrices, isAdmin }: { initialRules: RulesConfig; initialPrices: BasePrice[]; isAdmin: boolean }) {
@@ -50,7 +60,7 @@ export function RulesEditor({ initialRules, initialPrices, isAdmin }: { initialR
   const runReplay = () => wrap("replay", async () => setReplay(await api("/api/rules/replay", { body: { limit: 400, rules } })));
 
   const numField = (label: string, get: () => number, set: (v: number) => void, hint?: string, step = "1") => (
-    <Field label={label} hint={hint}><Input type="number" step={step} value={get()} disabled={!isAdmin} onChange={(e) => set(Number(e.target.value))} /></Field>
+    <Fld label={label} hint={hint}><Input type="number" step={step} value={get()} disabled={!isAdmin} onChange={(e) => set(Number(e.target.value))} /></Fld>
   );
 
   return (
@@ -85,7 +95,7 @@ export function RulesEditor({ initialRules, initialPrices, isAdmin }: { initialR
           {isAdmin && (
             <>
               <Button variant="outline" size="sm" onClick={() => setPrices((l) => [...l, { modelKey: "iphone-15-pro", storageGb: 256, variant: "", priceEuro: 0, kind: "sell" }])}><Plus className="h-4 w-4" />Regel toevoegen</Button>
-              <Field label="Lijst plakken" hint="Eén regel per prijs: model;opslag;prijs of model;opslag;maat;prijs — optioneel ;inkoop erachter. Model mag de naam zijn (iPhone 15 Pro) of de sleutel."><Textarea value={paste} onChange={(e) => setPaste(e.target.value)} placeholder={"iPhone 15 Pro;256;700\niPhone 14;128;300"} /></Field>
+              <Fld label="Lijst plakken" hint="Eén regel per prijs: model;opslag;prijs of model;opslag;maat;prijs — optioneel ;inkoop erachter. Model mag de naam zijn (iPhone 15 Pro) of de sleutel."><Textarea value={paste} onChange={(e) => setPaste(e.target.value)} placeholder={"iPhone 15 Pro;256;700\niPhone 14;128;300"} /></Fld>
               <Button variant="secondary" size="sm" onClick={importCsv} disabled={!paste.trim()}><Upload className="h-4 w-4" />Toevoegen aan lijst</Button>
             </>
           )}
@@ -103,10 +113,10 @@ export function RulesEditor({ initialRules, initialPrices, isAdmin }: { initialR
             <Switch checked={rules.replaceDistancePolicy} onChange={(v) => setR((r) => ({ ...r, replaceDistancePolicy: v }))} label="Regels vervangen het eerdere afstandsbeleid" disabled={!isAdmin} />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Zoekprijs betekent"><Select value={rules.priceBase} disabled={!isAdmin} onChange={(e) => setR((r) => ({ ...r, priceBase: e.target.value as "sell" | "buy85" }))}><option value="sell">Verkoopprijs in perfecte staat (nieuwe manier)</option><option value="buy85">Max inkoop bij 85% batterij (oude vuistregel)</option></Select></Field>
-            <Field label="Margetabel" hint="A = tabel uit de mail; B = tabel van de 💰-indicator"><Select value={rules.marginTable} disabled={!isAdmin} onChange={(e) => setR((r) => ({ ...r, marginTable: e.target.value as "A" | "B" }))}><option value="A">A</option><option value="B">B</option></Select></Field>
-            <Field label="Zonder basisprijs"><Select value={rules.unknownBase} disabled={!isAdmin} onChange={(e) => setR((r) => ({ ...r, unknownBase: e.target.value as "fallback" | "skip" }))}><option value="fallback">Bestaande waardering gebruiken</option><option value="skip">Afwijzen</option></Select></Field>
-            <Field label="Hoge marge: extra voor bieden vanaf"><Select value={rules.highMarginBidMode} disabled={!isAdmin} onChange={(e) => setR((r) => ({ ...r, highMarginBidMode: e.target.value as "same" | "table" }))}><option value="same">Zelfde als vraagprijs (zoals in het voorbeeld)</option><option value="table">Eigen kolom uit de tabel</option></Select></Field>
+            <Fld label="Zoekprijs betekent"><Select value={rules.priceBase} disabled={!isAdmin} onChange={(e) => setR((r) => ({ ...r, priceBase: e.target.value as "sell" | "buy85" }))}><option value="sell">Verkoopprijs in perfecte staat (nieuwe manier)</option><option value="buy85">Max inkoop bij 85% batterij (oude vuistregel)</option></Select></Fld>
+            <Fld label="Margetabel" hint="A = tabel uit de mail; B = tabel van de 💰-indicator"><Select value={rules.marginTable} disabled={!isAdmin} onChange={(e) => setR((r) => ({ ...r, marginTable: e.target.value as "A" | "B" }))}><option value="A">A</option><option value="B">B</option></Select></Fld>
+            <Fld label="Zonder basisprijs"><Select value={rules.unknownBase} disabled={!isAdmin} onChange={(e) => setR((r) => ({ ...r, unknownBase: e.target.value as "fallback" | "skip" }))}><option value="fallback">Bestaande waardering gebruiken</option><option value="skip">Afwijzen</option></Select></Fld>
+            <Fld label="Hoge marge: extra voor bieden vanaf"><Select value={rules.highMarginBidMode} disabled={!isAdmin} onChange={(e) => setR((r) => ({ ...r, highMarginBidMode: e.target.value as "same" | "table" }))}><option value="same">Zelfde als vraagprijs (zoals in het voorbeeld)</option><option value="table">Eigen kolom uit de tabel</option></Select></Fld>
           </div>
           <div className="grid gap-4 sm:grid-cols-3">
             {numField("Batterij: nooit kopen onder %", () => rules.battery.excludeBelowPct, (v) => setR((r) => ({ ...r, battery: { ...r.battery, excludeBelowPct: v } })))}
@@ -130,7 +140,7 @@ export function RulesEditor({ initialRules, initialPrices, isAdmin }: { initialR
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2"><Switch checked={rules.stock.enabled} onChange={(v) => setR((r) => ({ ...r, stock: { ...r.stock, enabled: v } }))} label="Voorraadregel" disabled={!isAdmin} />{numField("Vanaf zoveel op voorraad: alleen 💰", () => rules.stock.baseThreshold, (v) => setR((r) => ({ ...r, stock: { ...r.stock, baseThreshold: v } })), "Gekocht en nog niet verkocht, per model. Hogere omloopsnelheid verhoogt de grens.")}</div>
             <div className="space-y-2"><Switch checked={rules.monthly.enabled} onChange={(v) => setR((r) => ({ ...r, monthly: { ...r.monthly, enabled: v } }))} label="Maandelijkse prijsaanpassing" disabled={!isAdmin} />{numField("Percentage per maand (−5 = 5% lager)", () => rules.monthly.percent, (v) => setR((r) => ({ ...r, monthly: { ...r.monthly, percent: v } })), "Alle basisprijzen, eenmaal per kalendermaand; elke wijziging staat in het logboek.", "0.5")}</div>
-            <div className="space-y-2"><Switch checked={rules.telegramPurchases.enabled} onChange={(v) => setR((r) => ({ ...r, telegramPurchases: { ...r.telegramPurchases, enabled: v } }))} label="M-nummers uit Telegram-kanaal" disabled={!isAdmin} /><Field label="Kanaal-ID" hint="Chat-ID van het kanaal waarin gekochte advertenties worden doorgestuurd (bot moet lid zijn). Herinnering na 3 dagen zonder aankoop."><Input value={rules.telegramPurchases.chatId} disabled={!isAdmin} onChange={(e) => setR((r) => ({ ...r, telegramPurchases: { ...r.telegramPurchases, chatId: e.target.value } }))} /></Field></div>
+            <div className="space-y-2"><Switch checked={rules.telegramPurchases.enabled} onChange={(v) => setR((r) => ({ ...r, telegramPurchases: { ...r.telegramPurchases, enabled: v } }))} label="M-nummers uit Telegram-kanaal" disabled={!isAdmin} /><Fld label="Kanaal-ID" hint="Chat-ID van het kanaal waarin gekochte advertenties worden doorgestuurd (bot moet lid zijn). Herinnering na 3 dagen zonder aankoop."><Input value={rules.telegramPurchases.chatId} disabled={!isAdmin} onChange={(e) => setR((r) => ({ ...r, telegramPurchases: { ...r.telegramPurchases, chatId: e.target.value } }))} /></Fld></div>
           </div>
           <div>
             <p className="mb-2 text-sm font-semibold">Verzendfilter naar accountleeftijd</p>
@@ -155,18 +165,18 @@ export function RulesEditor({ initialRules, initialPrices, isAdmin }: { initialR
         <CardHeader><div><CardTitle className="flex items-center gap-2"><FlaskConical className="h-4 w-4 text-accent" />Regels testen</CardTitle><CardDescription>Vul een advertentie in en zie precies hoe de maximale prijs wordt opgebouwd. Er wordt niets opgeslagen of gemeld.</CardDescription></div></CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-3">
-            <Field label="Model"><Select value={t.modelKey} onChange={(e) => setT({ ...t, modelKey: e.target.value })}>{APPLE_MODELS.filter((m) => ["iphone", "ipad", "macbook_air", "macbook_pro", "mac_mini", "imac"].includes(m.family)).map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}</Select></Field>
-            <Field label="Opslag (GB)"><Input value={t.storageGb} onChange={(e) => setT({ ...t, storageGb: e.target.value })} placeholder="leeg = onbekend" /></Field>
-            <Field label="Batterij %"><Input value={t.battery} onChange={(e) => setT({ ...t, battery: e.target.value })} placeholder="leeg = onbekend" /></Field>
-            <Field label="Vraagprijs €"><Input value={t.ask} onChange={(e) => setT({ ...t, ask: e.target.value })} /></Field>
-            <Field label="Bieden vanaf €"><Input value={t.bid} onChange={(e) => setT({ ...t, bid: e.target.value })} /></Field>
-            <Field label="Afstand km"><Input value={t.km} onChange={(e) => setT({ ...t, km: e.target.value })} /></Field>
-            <Field label="Account (maanden)"><Input value={t.age} onChange={(e) => setT({ ...t, age: e.target.value })} /></Field>
-            <Field label="Reviews"><Input value={t.reviews} onChange={(e) => setT({ ...t, reviews: e.target.value })} /></Field>
-            <Field label="Sterren"><Input value={t.rating} onChange={(e) => setT({ ...t, rating: e.target.value })} /></Field>
+            <Fld label="Model"><Select value={t.modelKey} onChange={(e) => setT({ ...t, modelKey: e.target.value })}>{APPLE_MODELS.filter((m) => ["iphone", "ipad", "macbook_air", "macbook_pro", "mac_mini", "imac"].includes(m.family)).map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}</Select></Fld>
+            <Fld label="Opslag (GB)"><Input value={t.storageGb} onChange={(e) => setT({ ...t, storageGb: e.target.value })} placeholder="leeg = onbekend" /></Fld>
+            <Fld label="Batterij %"><Input value={t.battery} onChange={(e) => setT({ ...t, battery: e.target.value })} placeholder="leeg = onbekend" /></Fld>
+            <Fld label="Vraagprijs €"><Input value={t.ask} onChange={(e) => setT({ ...t, ask: e.target.value })} /></Fld>
+            <Fld label="Bieden vanaf €"><Input value={t.bid} onChange={(e) => setT({ ...t, bid: e.target.value })} /></Fld>
+            <Fld label="Afstand km"><Input value={t.km} onChange={(e) => setT({ ...t, km: e.target.value })} /></Fld>
+            <Fld label="Account (maanden)"><Input value={t.age} onChange={(e) => setT({ ...t, age: e.target.value })} /></Fld>
+            <Fld label="Reviews"><Input value={t.reviews} onChange={(e) => setT({ ...t, reviews: e.target.value })} /></Fld>
+            <Fld label="Sterren"><Input value={t.rating} onChange={(e) => setT({ ...t, rating: e.target.value })} /></Fld>
           </div>
-          <Field label="Titel + omschrijving" hint="Hieruit komen krassen, krasvrij en — als er geen prijs is — de prijs"><Textarea value={t.text} onChange={(e) => setT({ ...t, text: e.target.value })} /></Field>
-          <div className="flex flex-wrap items-center gap-5"><Switch checked={t.ship} onChange={(v) => setT({ ...t, ship: v })} label="Verzending mogelijk" /><Field label="ID geverifieerd"><Select value={t.verified} onChange={(e) => setT({ ...t, verified: e.target.value })}><option value="">onbekend</option><option value="ja">ja</option><option value="nee">nee</option></Select></Field><Button onClick={runTest} loading={busy === "test"}>Beoordeel</Button></div>
+          <Fld label="Titel + omschrijving" hint="Hieruit komen krassen, krasvrij en — als er geen prijs is — de prijs"><Textarea value={t.text} onChange={(e) => setT({ ...t, text: e.target.value })} /></Fld>
+          <div className="flex flex-wrap items-center gap-5"><Switch checked={t.ship} onChange={(v) => setT({ ...t, ship: v })} label="Verzending mogelijk" /><Fld label="ID geverifieerd"><Select value={t.verified} onChange={(e) => setT({ ...t, verified: e.target.value })}><option value="">onbekend</option><option value="ja">ja</option><option value="nee">nee</option></Select></Fld><Button onClick={runTest} loading={busy === "test"}>Beoordeel</Button></div>
           {res && <VerdictView v={res.verdict} fromText={res.priceFromText} />}
         </CardContent>
       </Card>
