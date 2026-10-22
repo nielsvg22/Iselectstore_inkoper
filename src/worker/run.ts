@@ -132,7 +132,8 @@ async function main() {
   let heartbeatAt = 0;
   while (!stop) {
     try {
-      const scheduled = await scheduleDueProfiles();
+      // WORKER_SCRAPING=off: testomgeving verwerkt alleen wat er al is (geen extra verzoeken naar Marktplaats)
+      const scheduled = process.env.WORKER_SCRAPING === "off" ? 0 : await scheduleDueProfiles();
       if (Date.now() - heartbeatAt >= 10_000) {
         await prisma.appSettings.upsert({
           where: { key: "worker:heartbeat" },
