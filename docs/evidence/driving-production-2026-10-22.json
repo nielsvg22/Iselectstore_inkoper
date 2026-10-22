@@ -1,0 +1,158 @@
+{
+  "checkedAt": "2026-10-22T07:59:17.450577+00:00",
+  "commit": "6485e2f261c2c399cb6aae1404bbed6447ddeff7",
+  "branch": "feature/travel-time-purchase-policy",
+  "health": {
+    "ok": true,
+    "db": true
+  },
+  "worker": {
+    "at": "2026-10-22T07:59:13.171Z",
+    "healthy": true
+  },
+  "routing": {
+    "ok": true,
+    "lastSuccessAt": "2026-10-22T07:59:14.884Z"
+  },
+  "purchasePolicy": {
+    "cityOnly": "",
+    "distance": {
+      "mode": "driving",
+      "pickupMaxMinutes": 30,
+      "pickupMaxKm": 40,
+      "transportPerKmCents": 0,
+      "shippingCostCents": 0
+    },
+    "seller": {
+      "minRating": 5,
+      "minReviews": 50,
+      "minAgeMonths": 24
+    }
+  },
+  "environmentPreserved": true,
+  "originalDatabaseVolumePreserved": true,
+  "routerPublicPorts": false,
+  "sources": [
+    {
+      "id": "marktplaats-search",
+      "state": "healthy",
+      "lastSuccessAt": "2026-10-22T07:58:49.196Z",
+      "intervalSeconds": 30,
+      "recentErrors": null
+    },
+    {
+      "id": "marktplaats-official",
+      "state": "disabled",
+      "lastSuccessAt": null,
+      "intervalSeconds": 60,
+      "recentErrors": null
+    }
+  ],
+  "latestRealAds": [
+    {
+      "externalId": "m2456474676",
+      "location": "Denekamp",
+      "firstSeenAt": "2026-10-22T07:59:14.522Z",
+      "driveSeconds": 4247.1,
+      "driveCalculatedAt": "2026-10-22T07:59:14.875Z",
+      "driveError": null,
+      "stage": "not_matched"
+    },
+    {
+      "externalId": "m2456474362",
+      "location": "'s-Gravenhage",
+      "firstSeenAt": "2026-10-22T07:58:08.156Z",
+      "driveSeconds": 6291.4,
+      "driveCalculatedAt": "2026-10-22T07:58:08.422Z",
+      "driveError": null,
+      "stage": "not_matched"
+    },
+    {
+      "externalId": "m2456473347",
+      "location": "Uden",
+      "firstSeenAt": "2026-10-22T07:57:58.798Z",
+      "driveSeconds": 4112.8,
+      "driveCalculatedAt": "2026-10-22T07:57:59.272Z",
+      "driveError": null,
+      "stage": "not_matched"
+    },
+    {
+      "externalId": "m2456474211",
+      "location": "Roosendaal",
+      "firstSeenAt": "2026-10-22T07:57:58.744Z",
+      "driveSeconds": 7615.5,
+      "driveCalculatedAt": "2026-10-22T07:57:59.195Z",
+      "driveError": null,
+      "stage": "not_matched"
+    },
+    {
+      "externalId": "m2456473568",
+      "location": "Roosendaal",
+      "firstSeenAt": "2026-10-22T07:57:58.677Z",
+      "driveSeconds": 7615.5,
+      "driveCalculatedAt": "2026-10-22T07:57:59.195Z",
+      "driveError": null,
+      "stage": "not_matched"
+    },
+    {
+      "externalId": "m2456472698",
+      "location": "Nieuwveen",
+      "firstSeenAt": "2026-10-22T07:57:58.624Z",
+      "driveSeconds": 5326.9,
+      "driveCalculatedAt": "2026-10-22T07:57:59.120Z",
+      "driveError": null,
+      "stage": "not_matched"
+    },
+    {
+      "externalId": "m2456472910",
+      "location": "Alphen aan den Rijn",
+      "firstSeenAt": "2026-10-22T07:57:58.553Z",
+      "driveSeconds": 5359.8,
+      "driveCalculatedAt": "2026-10-22T07:57:59.053Z",
+      "driveError": null,
+      "stage": "not_matched"
+    },
+    {
+      "externalId": "m2456474080",
+      "location": "Nieuwegein",
+      "firstSeenAt": "2026-10-22T07:57:58.493Z",
+      "driveSeconds": 3840.8,
+      "driveCalculatedAt": "2026-10-22T07:57:58.986Z",
+      "driveError": null,
+      "stage": "not_matched"
+    },
+    {
+      "externalId": "m2456473688",
+      "location": "Dongen",
+      "firstSeenAt": "2026-10-22T07:57:58.432Z",
+      "driveSeconds": 6097.4,
+      "driveCalculatedAt": "2026-10-22T07:57:58.921Z",
+      "driveError": null,
+      "stage": "not_matched"
+    },
+    {
+      "externalId": "m2456473105",
+      "location": "Aagtekerke",
+      "firstSeenAt": "2026-10-22T07:57:58.369Z",
+      "driveSeconds": 10982.5,
+      "driveCalculatedAt": "2026-10-22T07:57:58.856Z",
+      "driveError": null,
+      "stage": "not_matched"
+    }
+  ],
+  "physicalIphoneReceiptVerified": false,
+  "deploymentUuid": "9r2kcxstxbhioeorr0co3cld",
+  "automaticDeploymentEnabled": false,
+  "temporaryDeploymentHooksCleared": true,
+  "backup": {
+    "path": "/var/lib/postgresql/data/iselect-backups/pre-driving-6485e2f261c2.dump",
+    "restoreTableOfContentsVerified": true,
+    "configurationKey": "backup:driving-policy:20261022"
+  },
+  "activationCounts": {
+    "ads": 9765,
+    "purchases": 1,
+    "profiles": 35,
+    "rules": 73
+  }
+}
