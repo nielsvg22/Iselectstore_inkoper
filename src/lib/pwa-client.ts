@@ -28,3 +28,31 @@ export async function currentSubscription(): Promise<PushSubscription | null> {
   const reg = await navigator.serviceWorker.getRegistration("/");
   return (await reg?.pushManager.getSubscription()) ?? null;
 }
+
+export interface Platform { os: "mac" | "windows" | "ios" | "android" | "other"; browser: "safari" | "chrome" | "edge" | "firefox" | "other" }
+
+/** Grove herkenning van besturingssysteem en browser, alleen voor gerichte uitleg bij meldingen. */
+export function platformOf(ua: string): Platform {
+  const os: Platform["os"] = /iPhone|iPad|iPod/.test(ua) ? "ios" : /Android/.test(ua) ? "android" : /Macintosh|Mac OS X/.test(ua) ? "mac" : /Windows/.test(ua) ? "windows" : "other";
+  const browser: Platform["browser"] = /Edg\//.test(ua) ? "edge" : /Firefox\//.test(ua) ? "firefox" : /Chrome\/|CriOS\//.test(ua) ? "chrome" : /Safari\//.test(ua) ? "safari" : "other";
+  return { os, browser };
+}
+
+/** Wat te controleren als een testpush verstuurd is maar niets verschijnt. */
+export function deliveryHint(p: Platform): string {
+  const browser = { safari: "Safari", chrome: "Google Chrome", edge: "Microsoft Edge", firefox: "Firefox", other: "je browser" }[p.browser];
+  if (p.os === "mac") return `Zie je niets op deze Mac? Controleer: Systeeminstellingen → Meldingen → ${browser} (Meldingen toestaan, stijl Banners of Meldingen), zet Focus/Niet storen uit en laat ${browser} open staan (ook op de achtergrond). In ${browser} moet meldingen voor deze site op Toestaan staan.`;
+  if (p.os === "windows") return `Zie je niets? Controleer Instellingen → Systeem → Meldingen (${browser} aan, Focusassistent uit) en laat ${browser} open staan.`;
+  if (p.os === "ios") return "Zie je niets? Open de app via het beginscherm-icoon, controleer Instellingen → Meldingen → deze app en zet Focus uit.";
+  return `Zie je niets? Controleer de meldingsinstellingen van ${browser} en van je systeem, en zet Niet storen uit.`;
+}
+
+/** Vertaalt technische aanmeldfouten naar iets waar de gebruiker iets mee kan. */
+export function friendlyPushError(e: unknown, p: Platform): string {
+  const name = (e as { name?: string })?.name ?? "";
+  const msg = (e as Error)?.message ?? "";
+  if (name === "NotAllowedError" || /permission/i.test(msg)) return "Meldingen zijn geblokkeerd voor deze site. Zet ze op Toestaan in de site-instellingen van de browser en probeer opnieuw.";
+  if (name === "AbortError" || /push service|registration failed/i.test(msg)) return p.browser === "safari" ? "Safari kon zich niet aanmelden bij de pushdienst. Werk macOS/Safari bij, of gebruik Google Chrome." : "De pushdienst van de browser weigerde de aanmelding. Controleer je internetverbinding en schakel een VPN of adblocker uit, of probeer een andere browser.";
+  if (name === "InvalidStateError") return "De browser heeft al een oude aanmelding. Klik op 'Uitschakelen op dit apparaat' en schakel daarna opnieuw in.";
+  return msg || "Aanmelden voor pushmeldingen is mislukt.";
+}

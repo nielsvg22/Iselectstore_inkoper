@@ -10,7 +10,7 @@ import { Field, Input, Select } from "@/components/ui/form";
 import { Notice } from "@/components/ui/states";
 import { api } from "@/lib/client-api";
 import type { NotifyPrefs } from "@/lib/notify/prefs";
-import { currentSubscription, pushSupport, urlBase64ToUint8Array, type PushSupport } from "@/lib/pwa-client";
+import { currentSubscription, deliveryHint, friendlyPushError, platformOf, pushSupport, urlBase64ToUint8Array, type PushSupport } from "@/lib/pwa-client";
 import { timeAgo } from "@/lib/format";
 
 interface Device { id: string; label: string; enabled: boolean; failures: number; lastSuccessAt: string | null; lastError: string | null }
@@ -22,6 +22,8 @@ export function PushSettings({ initialPrefs, profiles }: { initialPrefs: NotifyP
   const [devices, setDevices] = React.useState<Device[]>([]);
   const [prefs, setPrefs] = React.useState<NotifyPrefs>(initialPrefs);
   const [busy, setBusy] = React.useState<string | null>(null);
+  const [hint, setHint] = React.useState<string | null>(null);
+  const platform = React.useMemo(() => platformOf(typeof navigator === "undefined" ? "" : navigator.userAgent), []);
 
   const refresh = React.useCallback(async () => {
     setSupport(pushSupport());
@@ -46,9 +48,10 @@ export function PushSettings({ initialPrefs, profiles }: { initialPrefs: NotifyP
       const j = sub.toJSON();
       await api("/api/push/subscribe", { body: { endpoint: sub.endpoint, keys: j.keys } });
       toast("Pushmeldingen ingeschakeld op dit apparaat");
+      setHint(deliveryHint(platform));
       await refresh();
     } catch (e) {
-      toast((e as Error).message, "err");
+      toast(friendlyPushError(e, platform), "err");
     } finally {
       setBusy(null);
     }
@@ -76,6 +79,7 @@ export function PushSettings({ initialPrefs, profiles }: { initialPrefs: NotifyP
     try {
       const r = await api<{ sent: number; failed: number; removed: number }>("/api/push/test", { body: {} });
       toast(r.sent ? `Testpush verstuurd naar ${r.sent} apparaat${r.sent > 1 ? "en" : ""}` : "Testpush mislukte op alle apparaten", r.sent ? "ok" : "err");
+      setHint(deliveryHint(platform));
       await refresh();
     } catch (e) {
       toast((e as Error).message, "err");
@@ -110,7 +114,8 @@ export function PushSettings({ initialPrefs, profiles }: { initialPrefs: NotifyP
       <CardContent className="space-y-6">
         {support === "needs-install" && <Notice tone="warning">Op iPhone/iPad werken pushmeldingen alleen als je de app eerst op je beginscherm zet (Safari → Deel-knop → “Zet op beginscherm”) en hem daar opent. <Link href="/install" className="font-semibold underline">Zie de handleiding</Link>.</Notice>}
         {support === "unsupported" && <Notice tone="warning">Deze browser ondersteunt geen Web Push. Gebruik Chrome, Edge, Firefox of Safari (iOS 16.4+ als geïnstalleerde app), of kies Telegram als alternatief.</Notice>}
-        {support === "denied" && <Notice tone="danger">Meldingen zijn voor deze site geblokkeerd. Sta ze toe in de instellingen van je browser of toestel en kom terug.</Notice>}
+        {support === "denied" && <Notice tone="danger">Meldingen zijn voor deze site geblokkeerd. {platform.browser === "safari" ? "Safari → Instellingen → Websites → Meldingen: zet deze site op Toestaan." : "Klik op het slotje links in de adresbalk → Meldingen → Toestaan."} Herlaad daarna de pagina.</Notice>}
+        {hint && <Notice tone="warning">{hint}</Notice>}
 
         <div className="flex flex-wrap items-center gap-3">
           {support === "ready" && !here && <Button onClick={enable} loading={busy === "enable"}><BellRing className="h-4 w-4" />Pushmeldingen inschakelen</Button>}
