@@ -1,3 +1,4 @@
+import { flagsEmoji } from "@/lib/notify/message";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { formatEuro, formatPct, timeAgo } from "@/lib/format";
@@ -21,7 +22,7 @@ export function DealTable({ rows }: { rows: DealRow[] }) {
               <td className="px-4 py-3"><ScoreRing score={d.score} size={40} blocked={d.blocked} /></td>
               <td className="max-w-[260px] px-4 py-3">
                 <Link href={`/ads/${d.adId}`} className="block font-medium hover:text-accent">
-                  <span className="line-clamp-1">{d.model ?? d.title}</span>
+                  <span className={`line-clamp-1 ${d.flags?.includes("hot") ? "text-danger" : ""}`}>{d.flags?.includes("hot") ? "❗ " : ""}{d.model ?? d.title}{flagsEmoji(d.flags) ? ` ${flagsEmoji(d.flags)}` : ""}</span>
                 </Link>
                 <div className="mt-1 flex gap-1.5"><BandBadge band={d.band} blocked={d.blocked} />{d.isDemo && <Badge tone="warning">Voorbeeld</Badge>}</div>
               </td>

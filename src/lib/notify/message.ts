@@ -54,12 +54,12 @@ export interface DealMessageInput {
 const eur0 = (n: number | null | undefined) => (n == null ? "?" : `€${Math.round(n)}`);
 
 /** Emoji-samenvatting voor onderwerp/titel, bijv. "📍✨💰". */
-export function rulesEmoji(r: RulesSummary | null | undefined): string {
-  if (!r) return "";
+export function flagsEmoji(flags: string[] | null | undefined): string {
+  if (!flags?.length) return "";
   const order = ["hot", "near", "scratchFree", "scratched", "high", "directBuy", "sellerCheck", "bid0"];
-  const parts = order.filter((f) => r.flags.includes(f) && !(f === "near" && r.flags.includes("hot"))).map((f) => FLAG_EMOJI[f]);
-  return parts.join("");
+  return order.filter((f) => flags.includes(f) && !(f === "near" && flags.includes("hot"))).map((f) => FLAG_EMOJI[f]).join("");
 }
+export const rulesEmoji = (r: RulesSummary | null | undefined): string => flagsEmoji(r?.flags);
 
 /** Uitleg zoals in de meldingen van Best Buy Phone: max verkoopprijs, toegestane prijzen, hoge marge. */
 export function rulesLines(r: RulesSummary): string[] {

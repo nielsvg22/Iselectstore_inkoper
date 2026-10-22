@@ -60,6 +60,7 @@ async function Deals({ sp, userId }: { sp: Awaited<SP>; userId: string }) {
     isDemo: a.ad.isDemo,
     url: a.ad.url,
     priceKnown: a.ad.askingPriceCents != null && a.ad.askingPriceCents > 0,
+    flags: ((a.costs as { rules?: { flags?: string[] } } | null)?.rules?.flags) ?? [],
   }));
   const filtered = Boolean(one(sp.q) || one(sp.band) || one(sp.family) || one(sp.dist) || one(sp.profile) || one(sp.review) || saved);
   if (!data.length) {

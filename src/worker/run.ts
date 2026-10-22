@@ -1,4 +1,5 @@
 import "./env";
+import { runRulesMaintenance } from "../lib/rules/maintenance";
 import { scheduleDueProfiles, handlers } from "../lib/jobs/handlers";
 import { processJobs } from "../lib/jobs/queue";
 import { prisma } from "../lib/db/client";
@@ -59,9 +60,18 @@ async function mailLoop() {
   }
 }
 
+/** Inkoopregels-onderhoud: maandelijkse prijsaanpassing en M-nummers uit Telegram (elke 5 minuten). */
+async function rulesLoop() {
+  while (!stop) {
+    await runRulesMaintenance();
+    await new Promise((r) => setTimeout(r, 300_000).unref());
+  }
+}
+
 async function main() {
   console.log(`[worker] gestart, wachttijd bij leegloop ${idleMs / 1000}s`);
   void mailLoop();
+  void rulesLoop();
   // Standaardprofielen (iPhone-melder) automatisch aanmaken zodra er een beheerder is; controleert periodiek tot dat gelukt is
   const provision = async () => {
     try {

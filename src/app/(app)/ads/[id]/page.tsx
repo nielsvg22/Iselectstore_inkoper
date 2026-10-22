@@ -1,3 +1,4 @@
+import { FunnelOpenBeacon, GoToAdButton } from "@/components/tracked-ad-link";
 import { rulesEmoji, rulesLines, type RulesSummary } from "@/lib/notify/message";
 import { ArrowLeft, ArrowUpRight, Check, CircleHelp, ShieldAlert, ShieldCheck, TriangleAlert } from "lucide-react";
 import type { Metadata } from "next";
@@ -96,12 +97,11 @@ export default async function AdDetailPage({ params }: { params: Promise<{ id: s
         {ad.isDemo ? (
           <Button variant="outline" disabled className="shrink-0 self-start" title="Voorbeelddata heeft geen echte advertentie">Geen echte advertentie</Button>
         ) : (
-          <a href={ad.url} target="_blank" rel="noopener noreferrer" className="shrink-0 self-start" aria-label="Ga naar advertentie op Marktplaats (opent in nieuw tabblad)">
-            <Button size="lg">Ga naar advertentie <ArrowUpRight className="h-4 w-4" /></Button>
-          </a>
+          <GoToAdButton adId={ad.id} url={ad.url} />
         )}
       </div>
 
+      {!ad.isDemo && <FunnelOpenBeacon adId={ad.id} />}
       {!ad.isDemo && ad.origin === "SEARCH" && !ad.detailFetchedAt && <AutoEnrich adId={ad.id} />}
 
       {ad.needsManualReview && ad.risk && (

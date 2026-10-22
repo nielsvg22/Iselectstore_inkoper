@@ -1,3 +1,4 @@
+import { flagsEmoji } from "@/lib/notify/message";
 import { ArrowUpRight, Clock, MapPin } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +30,8 @@ export interface DealRow {
   isDemo: boolean;
   url: string;
   priceKnown: boolean;
+  /** vlaggen van de inkoopregels (📍 dichtbij, 🔴 onder 20 km, ✨ krasvrij, 💰 hoge marge …) */
+  flags?: string[];
 }
 
 export function MaxBid({ d }: { d: Pick<DealRow, "askingCents" | "maxBidCents" | "priceKnown"> }) {
@@ -60,7 +63,7 @@ export function DealCard({ d }: { d: DealRow }) {
           <div className="absolute right-3 top-3 rounded-full bg-card/90 p-0.5 shadow backdrop-blur"><ScoreRing score={d.score} size={48} blocked={d.blocked} /></div>
         </div>
         <div className="p-4 sm:p-5">
-          <h3 className="line-clamp-1 text-[17px] font-semibold tracking-tight">{d.model ?? d.title}</h3>
+          <h3 className={`line-clamp-1 text-[17px] font-semibold tracking-tight ${d.flags?.includes("hot") ? "text-danger" : ""}`}>{d.flags?.includes("hot") ? "❗ " : ""}{d.model ?? d.title}{flagsEmoji(d.flags) ? ` ${flagsEmoji(d.flags)}` : ""}</h3>
           <p className="line-clamp-1 text-[13px] text-muted">{d.title}</p>
           <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3">
             <Stat label="Vraagprijs" value={d.priceKnown ? formatEuro(d.askingCents) : "Bieden"} />
