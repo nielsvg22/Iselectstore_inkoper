@@ -199,6 +199,8 @@ model Advertisement {
   needsManualReview Boolean         @default(false)
   notes            String           @default("")
   contentHash      String           @default("")
+  // Hoe vaak deze advertentie in zoekresultaten is teruggezien
+  seenCount        Int              @default(1)
   // Handmatige kostenaanpassingen: {repairCents, shippingCents, transportCents, otherCents, marginSchemeEligible, targetBuyCents}
   overrides        Json             @default("{}")
   duplicateOfId    String?
@@ -394,6 +396,9 @@ model Notification {
   error     String?
   sentAt    DateTime?
   createdAt DateTime            @default(now())
+  // Funnel: pushmelding geopend in de app, link naar Marktplaats aangeklikt
+  openedAt  DateTime?
+  clickedAt DateTime?
 
   @@index([adId])
 }
@@ -418,6 +423,8 @@ model Purchase {
   title              String
   modelKey           String?
   storageGb          Int?
+  // Marktplaats-advertentienummer (bijv. m2158666552) zoals doorgestuurd na een aankoop
+  mNumber            String?
   status             PurchaseStatus @default(INTERESTING)
   askingCents        Int?
   buyPriceCents      Int?
@@ -431,6 +438,7 @@ model Purchase {
   sale               Sale?
 
   @@index([userId, status])
+  @@unique([userId, mNumber])
 }
 
 model Sale {

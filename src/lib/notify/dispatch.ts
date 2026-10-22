@@ -4,6 +4,7 @@ import { getConfig, getSecret } from "../settings/store";
 import { allowsPurchase, validDriveSeconds } from "../radar/driving";
 import { inCityScope } from "../radar/locality";
 import type { DealBandKey, RiskLevelKey } from "../types";
+import type { RulesSummary } from "./message";
 import {
   buildDealMessage,
   buildPushPayload,
@@ -80,6 +81,7 @@ export async function dealMessageForAd(
       ad.needsManualReview,
     ),
     url: ad.isDemo ? "https://demo.invalid (voorbeelddata)" : ad.url,
+    rules: ((a.costs as { rules?: RulesSummary } | null)?.rules ?? null),
   };
 }
 
@@ -94,7 +96,14 @@ export async function deliverNotification(
   if (!n) throw new PermanentJobError("Melding bestaat niet");
   if (n.status === "SENT" || n.status === "SKIPPED") return;
   const cfg = await getConfig(true);
-  if (cfg.radar.cityOnly || cfg.policies.distance.mode === "driving") {
+  const rulesNow = await prisma.dealAnalysis.findFirst({ where: { adId: n.adId, isCurrent: true }, select: { costs: true } });
+  const rv = (rulesNow?.costs as { rules?: { status?: string; replaceDistancePolicy?: boolean } } | null)?.rules;
+  const rulesDecided = Boolean(rv && rv.status && rv.status !== "skip" && rv.replaceDistancePolicy !== false);
+  if (rulesDecided && rv!.status === "reject") {
+    await prisma.notification.update({ where: { id: n.id }, data: { status: "SKIPPED", error: "Inkoopregels: advertentie voldoet niet meer" } });
+    return;
+  }
+  if (!rulesDecided && (cfg.radar.cityOnly || cfg.policies.distance.mode === "driving")) {
     const ad = await prisma.advertisement.findUnique({ where: { id: n.adId }, include: { risk: true } });
     const seller = ad?.sellerSignals as { rating?: number; reviewCount?: number; accountAgeMonths?: number } | null;
     if (!ad || !inCityScope(ad.location, cfg.radar.cityOnly) || !allowsPurchase({

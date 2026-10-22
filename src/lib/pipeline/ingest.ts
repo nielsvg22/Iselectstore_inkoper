@@ -198,7 +198,7 @@ async function ingestLocked(db: Prisma.TransactionClient, raw: RawAd, opts: Inge
     priceChanged = existing.askingPriceCents !== askingCents;
     await db.advertisement.update({
       where: { id: adId },
-      data: { ...data, ...routeReset, status: changed ? "NEW" : undefined },
+      data: { ...data, ...routeReset, status: changed ? "NEW" : undefined, ...(partial ? { seenCount: { increment: 1 } } : {}) },
     });
     if (changed) {
       await db.advertisementImage.deleteMany({ where: { adId } });

@@ -1,6 +1,26 @@
 import { formatEuro } from "../format";
 import { BAND_LABEL } from "../engines/scoring";
 import type { DealBandKey, RiskLevelKey } from "../types";
+import { FLAG_EMOJI } from "../rules/verdict";
+
+/** Samenvatting van het oordeel van de inkoopregels, zoals opgeslagen bij de analyse. */
+export interface RulesSummary {
+  status: "reject" | "review" | "match" | "high" | "skip";
+  flags: string[];
+  maxSellEuro: number | null;
+  allowedAsk: number | null;
+  allowedBid: number | null;
+  highAsk: number | null;
+  highBid: number | null;
+  effectiveEuro: number | null;
+  marginEuro: number | null;
+  priceKind: string;
+  lines: Array<{ label: string; euro: number }>;
+  notes: string[];
+  reasons: string[];
+  battery: { pct: number | null; assumed: boolean };
+  baseKind: "sell" | "buy" | null;
+}
 
 export interface DealMessageInput {
   title: string;
@@ -28,6 +48,35 @@ export interface DealMessageInput {
   /** false = voorlopig: essentiële gegevens ontbreken of vragen controle; dan nooit als "topdeal" gemeld */
   definitive?: boolean;
   provisionalReasons?: string[];
+  rules?: RulesSummary | null;
+}
+
+const eur0 = (n: number | null | undefined) => (n == null ? "?" : `€${Math.round(n)}`);
+
+/** Emoji-samenvatting voor onderwerp/titel, bijv. "📍✨💰". */
+export function rulesEmoji(r: RulesSummary | null | undefined): string {
+  if (!r) return "";
+  const order = ["hot", "near", "scratchFree", "scratched", "high", "directBuy", "sellerCheck", "bid0"];
+  const parts = order.filter((f) => r.flags.includes(f) && !(f === "near" && r.flags.includes("hot"))).map((f) => FLAG_EMOJI[f]);
+  return parts.join("");
+}
+
+/** Uitleg zoals in de meldingen van Best Buy Phone: max verkoopprijs, toegestane prijzen, hoge marge. */
+export function rulesLines(r: RulesSummary): string[] {
+  if (r.maxSellEuro == null) return r.notes.slice(0, 2);
+  const out: string[] = [];
+  const base = r.lines[0];
+  const rest = r.lines.slice(1).map((l) => `${l.euro < 0 ? "−" : "+"} ${eur0(Math.abs(l.euro))} ${l.label.toLowerCase()}`);
+  out.push(`${r.baseKind === "buy" ? "Max inkoopprijs" : "Max verkoopprijs"}: ${eur0(r.maxSellEuro)}${base ? ` = ${eur0(base.euro)}${rest.length ? " " + rest.join(" ") : ""}` : ""}`);
+  if (r.baseKind === "sell") {
+    out.push(`Toegestane vraagprijs: ${eur0(r.allowedAsk)} · bieden vanaf: ${eur0(r.allowedBid)}`);
+    if (r.highAsk != null) out.push(`Hoge marge 💰: vraag ≤ ${eur0(r.highAsk)} · bieden ≤ ${eur0(r.highBid)}`);
+  } else out.push(`Toegestane prijs: ${eur0(r.allowedAsk)}`);
+  if (r.marginEuro != null) out.push(`Marge op deze prijs: ${eur0(r.marginEuro)}`);
+  if (r.battery.assumed && r.battery.pct != null) out.push(`Batterij onbekend: ${r.battery.pct}% aangenomen`);
+  if (r.flags.includes("storageUnknown")) out.push("Opslag onbekend (?): gemiddelde prijs gebruikt");
+  if (r.flags.includes("sellerCheck")) out.push("Verkoper handmatig controleren");
+  return out;
 }
 
 const RISK_NL: Record<RiskLevelKey, string> = {
@@ -93,6 +142,10 @@ export function buildDealMessage(m: DealMessageInput): {
   lines.push("");
   lines.push(`Risico: ${RISK_NL[m.riskLevel]}`);
   lines.push(`iCloud-status: ${icloudLabel(m.activationLock)}`);
+  if (m.rules && m.rules.status !== "skip") {
+    lines.push("");
+    for (const l of rulesLines(m.rules)) lines.push(l);
+  }
   lines.push("");
   lines.push("Bekijk advertentie:");
   lines.push(m.url);
@@ -136,8 +189,11 @@ export function buildPushPayload(
   ];
   if (provisional && m.provisionalReasons?.length)
     lines.push(`Controleer: ${m.provisionalReasons.join(", ")}`);
+  if (m.rules && m.rules.status !== "skip" && m.rules.maxSellEuro != null) {
+    lines.splice(1, 1, `Max ${eur0(m.rules.maxSellEuro)} · toegestaan vraag ${eur0(m.rules.allowedAsk)} / bieden ${eur0(m.rules.allowedBid)}${m.rules.marginEuro != null ? ` · marge ${eur0(m.rules.marginEuro)}` : ""}`);
+  }
   return {
-    title: `${prefix}${name}`,
+    title: `${prefix}${name}${m.rules?.flags.includes("storageUnknown") ? "?" : ""}${rulesEmoji(m.rules) ? " " + rulesEmoji(m.rules) : ""}`,
     body: lines.join("\n"),
     url: portalPath,
     tag: m.adId ? `ad-${m.adId}` : "deal",

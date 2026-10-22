@@ -1,3 +1,5 @@
+import { evaluateForAd } from "@/lib/rules/apply";
+import type { Verdict } from "@/lib/rules/verdict";
 import { allowsPurchase, purchasePolicy, validDriveSeconds } from "../radar/driving";
 import { purchaseStatus } from "../radar/safety";
 import { inCityScope } from "../radar/locality";
@@ -475,6 +477,15 @@ export async function analyzeAd(
     explanation +=
       " Let op: de marktwaarde is onzeker (te weinig of te wisselende vergelijkingsdata); behandel de winstverwachting niet als zeker.";
 
+  // 5b) Inkoopregels Best Buy Phone (alleen als er een basisprijs is; anders blijft de bestaande waardering leidend)
+  let rulesVerdict: (Verdict & { textPrices?: { ask: number | null; bid: number | null } | null; replaceDistancePolicy?: boolean }) | null = null;
+  try {
+    const r = await evaluateForAd({ ad, rec, shipping: shippingList });
+    rulesVerdict = { ...r.verdict, textPrices: r.textPrices, replaceDistancePolicy: r.cfg.replaceDistancePolicy };
+  } catch (e) {
+    log("error", "Inkoopregels mislukt", { adId, error: errMsg(e) });
+  }
+
   // 6) Opslaan
   await prisma.$transaction(async (tx) => {
     await tx.dealAnalysis.updateMany({
@@ -502,6 +513,7 @@ export async function analyzeAd(
           battery: bat,
           seller,
           procurement,
+          rules: rulesVerdict,
         } as unknown as Prisma.InputJsonValue,
         netProfitCents: pExp.netProfitCents,
         conservativeProfitCents: pLow.netProfitCents,
@@ -665,6 +677,7 @@ export async function analyzeAd(
         firstSeenAt: ad.firstSeenAt,
         publishedAt: ad.publishedAt,
         origin: ad.origin,
+        rules: rulesVerdict ? { status: rulesVerdict.status, replaceDistancePolicy: rulesVerdict.replaceDistancePolicy !== false } : null,
         complete:
           !["SEARCH", "PARTNER_API"].includes(ad.origin) ||
           Boolean(ad.detailFetchedAt) ||
@@ -692,6 +705,8 @@ export async function matchProfiles(
     publishedAt: Date | null;
     origin: string;
     /** volledige advertentie beoordeeld (detailpagina) */ complete: boolean;
+    /** oordeel van de inkoopregels; "skip" of null = bestaande logica */
+    rules?: { status: string; replaceDistancePolicy: boolean } | null;
   },
   cfg: AppConfig,
 ) {
@@ -702,11 +717,13 @@ export async function matchProfiles(
   for (const p of profiles) {
     try {
       const tree = await loadTree(p.id);
-      const matched = inCityScope(ctx.location, cfg.radar.cityOnly) && allowsPurchase({
+      const rulesOn = Boolean(meta.rules && meta.rules.status !== "skip");
+      const bypassPolicy = rulesOn && meta.rules!.replaceDistancePolicy;
+      const matched = (bypassPolicy || (inCityScope(ctx.location, cfg.radar.cityOnly) && allowsPurchase({
         distanceKm: ctx.distanceKm, driveSeconds: ctx.driveSeconds, shipping: ctx.shippingAvailable,
         rating: ctx.sellerRating, reviews: ctx.sellerReviewCount, ageMonths: ctx.sellerAgeMonths,
         blocked: ctx.blocked, suspicious: ctx.riskLevel === "HIGH" || ctx.riskLevel === "BLOCKED",
-      }, cfg) && evaluate(tree, ctx);
+      }, cfg))) && evaluate(tree, ctx);
       await prisma.profileMatch.upsert({
         where: { profileId_adId: { profileId: p.id, adId } },
         create: { profileId: p.id, adId, matched },
@@ -767,7 +784,7 @@ export async function matchProfiles(
         !meta.blocked &&
         !meta.userIgnored &&
         !meta.isDemo &&
-        meta.score >= p.notifyMinScore;
+        (rulesOn ? meta.rules!.status !== "reject" : meta.score >= p.notifyMinScore);
       // Snelle modus: direct een voorlopige push op basis van de lijstgegevens; de definitieve volgt na de detailpagina
       const fastProfile =
         cfg.scheduler.fast.enabled &&

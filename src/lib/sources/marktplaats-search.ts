@@ -145,6 +145,8 @@ export function mapSearchListing(o: Obj, now = new Date()): RawAd | null {
   for (const [k, v] of Object.entries(attrs))
     if (k !== "delivery") structured[k] = v;
   if (priceType) structured.priceType = priceType;
+  // Marktplaats-kenmerken van de advertentie (o.a. SHOPPING_CART = direct kopen) voor de inkoopregels
+  if (Array.isArray(o.traits) && o.traits.length) structured.traits = (o.traits as unknown[]).filter((t): t is string => typeof t === "string").join(",");
   structured.publicationPrecision = "day";
   structured.distanceReference = "Apeldoorn";
   if (coordinates(loc.latitude, loc.longitude)) {
