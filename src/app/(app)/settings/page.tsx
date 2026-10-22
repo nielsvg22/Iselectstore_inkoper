@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { CategoriesCard } from "@/components/catalog/categories-card";
 import { SavedFiltersManager } from "@/components/filters/saved-filters-manager";
 import { PushSettings } from "@/components/notify/push-settings";
+import { UsersCard } from "@/components/settings/users-card";
 import { SettingsForm } from "@/components/settings/settings-form";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
@@ -16,6 +17,7 @@ export const metadata: Metadata = { title: "Instellingen" };
 export default async function SettingsPage() {
   const [user, cfg, secrets, cats] = await Promise.all([getCurrentUser(), getConfig(true), secretStatus(), getAppleCategories()]);
   const [prefs, profiles] = await Promise.all([getPrefs(user!.id), prisma.searchProfile.findMany({ where: { userId: user!.id }, select: { id: true, name: true }, orderBy: { name: "asc" } })]);
+  const users = user!.role === "ADMIN" ? await prisma.user.findMany({ orderBy: { createdAt: "asc" }, select: { id: true, email: true, name: true, role: true } }) : [];
   const filters = await prisma.savedFilter.findMany({ where: { userId: user!.id }, orderBy: { name: "asc" } });
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -25,6 +27,7 @@ export default async function SettingsPage() {
       </div>
       <PushSettings initialPrefs={prefs} profiles={profiles} />
       <SavedFiltersManager filters={filters.map((f) => ({ id: f.id, name: f.name, tree: f.tree as unknown as Group }))} />
+      {user!.role === "ADMIN" && <UsersCard users={users} />}
       <CategoriesCard data={cats} isAdmin={user!.role === "ADMIN"} />
       <SettingsForm initial={cfg} secrets={Object.fromEntries(secrets.map((s) => [s.key, s.isSet]))} isAdmin={user!.role === "ADMIN"} />
     </div>
