@@ -1,3 +1,4 @@
+import { coordinateKey } from "../../src/lib/radar/driving";
 import { expect, test } from "@playwright/test";
 import { PrismaClient } from "@prisma/client";
 const db = new PrismaClient({
@@ -58,6 +59,17 @@ test("radar: echte data, bewaren, filters, herstel en mobiel", async ({
   ).toBeVisible();
   await page.getByRole("link", { name: "Opgeslagen", exact: true }).click();
   await expect(page.getByText("E2E iPhone 16 Pro")).toBeVisible();
+  await db.advertisement.update({ where: { id: ad.id }, data: {
+    rawPayload: { attributes: { locationLatitude: 52.255, locationLongitude: 6.16 } },
+    driveSeconds: 1319.2, driveMeters: 16389.9, driveCalculatedAt: new Date(),
+    driveCoordinatesKey: coordinateKey({ latitude: 52.255, longitude: 6.16 }),
+  } });
+  expect((await page.request.put("/api/settings", { data: { config: {
+    policies: { distance: { mode: "driving", pickupMaxMinutes: 30 }, seller: { minRating: 5, minReviews: 50, minAgeMonths: 24 } },
+  } } })).ok()).toBe(true);
+  await page.reload();
+  await expect(page.getByText(/maximaal 30 min rijden/)).toBeVisible();
+  await expect(page.getByText(/±22 min rijden/)).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
     await page.evaluate(

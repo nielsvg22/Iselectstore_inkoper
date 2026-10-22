@@ -7,6 +7,7 @@ export function jobLanes(concurrency: number): Array<{
   return [
     { name: "officieel", types: ["CHECK_OFFICIAL_PROFILE"], concurrency: 1 },
     { name: "detectie", types: ["CHECK_PROFILE"], concurrency: 1 },
+    { name: "rijtijd", types: ["ROUTE_AD"], concurrency: 1 },
     { name: "details", types: ["FETCH_DETAIL", "REFRESH_FACETS"], concurrency: 1 },
     { name: "snel", types: ["ANALYZE_AD"], concurrency: 1, analysisMode: "quick" },
     { name: "analyse", types: ["ANALYZE_AD", "CLEANUP"], concurrency: Math.max(1, concurrency - 1), analysisMode: "full" },

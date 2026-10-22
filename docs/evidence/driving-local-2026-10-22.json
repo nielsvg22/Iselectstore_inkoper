@@ -1,0 +1,87 @@
+{
+  "checkedAt": "2026-10-22",
+  "kind": "local-routing-and-tests",
+  "routing": {
+    "engine": "OSRM v6.0.0",
+    "source": "Geofabrik Netherlands / OpenStreetMap",
+    "sourcePbfMd5": "6b00208f3ba1c8a33363735cebd9769b",
+    "traffic": false,
+    "origin": {
+      "latitude": 52.2112,
+      "longitude": 5.9699
+    },
+    "measurements": [
+      {
+        "city": "Apeldoorn",
+        "seconds": 0,
+        "meters": 0,
+        "requestMs": 15,
+        "snapMeters": [
+          35.82972366,
+          35.82972366
+        ]
+      },
+      {
+        "city": "Deventer",
+        "seconds": 1319.2,
+        "meters": 16389.9,
+        "requestMs": 5,
+        "snapMeters": [
+          35.82972366,
+          17.69302538
+        ]
+      },
+      {
+        "city": "Zutphen",
+        "seconds": 1697.1,
+        "meters": 23550.7,
+        "requestMs": 4,
+        "snapMeters": [
+          35.82972366,
+          13.81743371
+        ]
+      },
+      {
+        "city": "Zwolle",
+        "seconds": 2028.7,
+        "meters": 38941,
+        "requestMs": 3,
+        "snapMeters": [
+          35.82972366,
+          4.00633457
+        ]
+      },
+      {
+        "city": "Amersfoort",
+        "seconds": 2592.8,
+        "meters": 46119.9,
+        "requestMs": 4,
+        "snapMeters": [
+          35.82972366,
+          3.273368337
+        ]
+      },
+      {
+        "city": "Rotterdam",
+        "seconds": 6153.3,
+        "meters": 125503.9,
+        "requestMs": 5,
+        "snapMeters": [
+          35.82972366,
+          17.42380649
+        ]
+      }
+    ]
+  },
+  "checks": {
+    "typescript": "passed",
+    "unitAndIntegration": {
+      "passed": 519,
+      "files": 36
+    },
+    "build": "passed",
+    "browserScenarios": 17,
+    "physicalIphoneReceiptVerified": false,
+    "productionDeployed": false
+  }
+}

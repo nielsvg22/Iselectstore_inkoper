@@ -12,6 +12,13 @@ services:
       interval: 5s
       retries: 10
 
+  routing:
+    build: ./routing
+    restart: unless-stopped
+    mem_limit: 1536m
+    cpus: 1.0
+    expose: ["5000"]
+
   web:
     build: .
     restart: unless-stopped
@@ -24,6 +31,7 @@ services:
       VAPID_SUBJECT: ${VAPID_SUBJECT:-}
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      ROUTING_URL: http://routing:5000
       WORKER_INTERVAL_SECONDS: ${WORKER_INTERVAL_SECONDS:-5}
     expose: ["3000"]
 

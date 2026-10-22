@@ -1,4 +1,5 @@
 import { distanceFromApeldoorn } from "../radar/safety";
+import { coordinates } from "../radar/driving";
 import { shippingFromDelivery } from "./delivery";
 import { publicRecentUrl } from "./recent-search";
 import { z } from "zod";
@@ -146,6 +147,10 @@ export function mapSearchListing(o: Obj, now = new Date()): RawAd | null {
   if (priceType) structured.priceType = priceType;
   structured.publicationPrecision = "day";
   structured.distanceReference = "Apeldoorn";
+  if (coordinates(loc.latitude, loc.longitude)) {
+    structured.locationLatitude = loc.latitude as number;
+    structured.locationLongitude = loc.longitude as number;
+  }
   const imgs = Array.isArray(o.imageUrls)
     ? (o.imageUrls as unknown[])
         .filter((u): u is string => typeof u === "string")

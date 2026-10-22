@@ -190,7 +190,7 @@ describe("automatisch zoeken op Marktplaats", () => {
     const p = await searchProfile({ op: "AND", children: [] }, { fetchDetails: true });
     await runProfileCheck(p.id);
     await drainDetails();
-    const ad = await prisma.advertisement.findFirstOrThrow({ include: { images: { orderBy: { position: "asc" } } } });
+    const ad = await prisma.advertisement.findFirstOrThrow({ where: { externalId: "m2451691443" }, include: { images: { orderBy: { position: "asc" } } } });
     expect(ad.images.length).toBeGreaterThanOrEqual(4);
     expect(ad.detailFetchedAt).toBeTruthy();
     expect(ad.images.every((i) => /\$_86/.test(i.url))).toBe(true);

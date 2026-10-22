@@ -1,3 +1,4 @@
+import { allowsPurchase, purchasePolicy, validDriveSeconds } from "../radar/driving";
 import { purchaseStatus } from "../radar/safety";
 import { inCityScope } from "../radar/locality";
 import type { Prisma } from "@prisma/client";
@@ -283,7 +284,7 @@ export async function analyzeAd(
   });
   const bat = batteryOutcome(rec.family, battery, cfg);
   const shippingList = (ad.shippingOptions as string[]) ?? [];
-  const dist = distanceCosts(ad.distanceKm, shippingList, cfg);
+  const dist = distanceCosts(ad.distanceKm, shippingList, cfg, validDriveSeconds(ad), ad.driveMeters);
   const repairCents =
     overrides.costs?.repairCents ??
     repairCostFor(rec.signals, cfg) + bat.replacementCents;
@@ -416,6 +417,7 @@ export async function analyzeAd(
   const procurement = purchaseStatus(
     {
       distanceKm: ad.distanceKm,
+      driveSeconds: validDriveSeconds(ad),
       shipping: shippingList.includes("shipping"),
       rating: signals?.rating,
       reviews: signals?.reviewCount,
@@ -425,7 +427,7 @@ export async function analyzeAd(
         risk.level === "HIGH" ||
         risk.flags.some((f) => f.severity === "high" || f.severity === "block"),
     },
-    { radiusKm: cfg.policies.distance.pickupMaxKm, ...cfg.policies.seller },
+    purchasePolicy(cfg),
   );
   const needsReview =
     risk.needsManualReview || !priceKnown || procurement.key === "review";
@@ -600,6 +602,7 @@ export async function analyzeAd(
       roiPct: priceKnown ? pExp.roiPct : null,
       maxBidCents: maxBid,
       distanceKm: ad.distanceKm,
+      driveSeconds: validDriveSeconds(ad),
       ageHours: ad.publishedAt
         ? (Date.now() - ad.publishedAt.getTime()) / 3600_000
         : (Date.now() - ad.firstSeenAt.getTime()) / 3600_000,
@@ -699,7 +702,11 @@ export async function matchProfiles(
   for (const p of profiles) {
     try {
       const tree = await loadTree(p.id);
-      const matched = inCityScope(ctx.location, cfg.radar.cityOnly) && evaluate(tree, ctx);
+      const matched = inCityScope(ctx.location, cfg.radar.cityOnly) && allowsPurchase({
+        distanceKm: ctx.distanceKm, driveSeconds: ctx.driveSeconds, shipping: ctx.shippingAvailable,
+        rating: ctx.sellerRating, reviews: ctx.sellerReviewCount, ageMonths: ctx.sellerAgeMonths,
+        blocked: ctx.blocked, suspicious: ctx.riskLevel === "HIGH" || ctx.riskLevel === "BLOCKED",
+      }, cfg) && evaluate(tree, ctx);
       await prisma.profileMatch.upsert({
         where: { profileId_adId: { profileId: p.id, adId } },
         create: { profileId: p.id, adId, matched },

@@ -6,6 +6,7 @@ import { getConfig } from "@/lib/settings/store";
 import { purchaseStatus } from "@/lib/radar/safety";
 import { SaveOpportunity } from "@/components/deal/save-opportunity";
 import { AutoRefresh } from "@/components/radar-refresh";
+import { drivingWhere, validDriveSeconds, purchasePolicy } from "@/lib/radar/driving";
 import { cityScopeWhere } from "@/lib/radar/locality";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +22,7 @@ export default async function DashboardPage({
     isDemo: cfg.demoMode,
     duplicateOfId: null,
     userState: { not: "IGNORED" },
-    ...cityScopeWhere(cfg.radar.cityOnly),
+    AND: [cityScopeWhere(cfg.radar.cityOnly), drivingWhere(cfg)],
   };
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
@@ -79,7 +80,7 @@ export default async function DashboardPage({
           iSelectStore — Inkoopradar
         </h1>
         <p className="mt-2 text-sm text-muted">
-          {cfg.radar.cityOnly ? "Alleen Apeldoorn · geen verzending van buiten" : `Apeldoorn · ${cfg.policies.distance.pickupMaxKm} km`} ·{" "}
+          {cfg.radar.cityOnly ? "Alleen Apeldoorn · geen verzending van buiten" : cfg.policies.distance.mode === "driving" ? `Apeldoorn · maximaal ${cfg.policies.distance.pickupMaxMinutes} min rijden · gecontroleerde verzending erbuiten` : `Apeldoorn · ${cfg.policies.distance.pickupMaxKm} km`} ·{" "}
           {last?.lastSuccessAt
             ? `Laatste succesvolle controle ${timeAgo(last.lastSuccessAt)}`
             : "Wacht op eerste succesvolle controle"}
@@ -126,6 +127,7 @@ export default async function DashboardPage({
           Filters
         </Link>
       </div>
+      {cfg.policies.distance.mode === "driving" && <details className="text-xs text-muted"><summary className="cursor-pointer">Rijtijd en verzendvoorwaarden</summary><p className="mt-2">Rijtijd over de weg vanaf centrum Apeldoorn, zonder actuele verkeersinformatie. Advertentielocaties kunnen een plaatscentrum zijn. Buiten het rijgebied: verzending, minimaal {cfg.policies.seller.minReviews} reviews met gemiddeld {cfg.policies.seller.minRating}/5 en een account van {cfg.policies.seller.minAgeMonths} maanden. Onbekende gegevens krijgen geen automatische goedkeuring. Routegegevens: © OpenStreetMap contributors / Geofabrik, OSRM.</p></details>}
       <section aria-label="Live dealfeed" className="space-y-3">
         {!ads.length && (
           <div className="rounded-2xl bg-card p-8 text-center">
@@ -152,6 +154,7 @@ export default async function DashboardPage({
           const status = purchaseStatus(
             {
               distanceKm: ad.distanceKm,
+              driveSeconds: validDriveSeconds(ad),
               shipping:
                 Boolean(ad.risk) &&
                 (ad.shippingOptions as string[]).includes("shipping"),
@@ -170,10 +173,7 @@ export default async function DashboardPage({
                       (f.severity === "high" || f.severity === "block"),
                   )),
             },
-            {
-              radiusKm: cfg.policies.distance.pickupMaxKm,
-              ...cfg.policies.seller,
-            },
+            purchasePolicy(cfg),
           );
           const storage = ad.product?.specs.find(
             (s) => s.key === "storageGb" && s.source !== "UNKNOWN",
@@ -217,9 +217,7 @@ export default async function DashboardPage({
                 </div>
                 <p className="mt-1 text-xs text-muted">
                   {ad.location ?? "Plaats onbekend"} ·{" "}
-                  {ad.distanceKm == null
-                    ? "Afstand onbekend"
-                    : `${ad.distanceKm} km`}{" "}
+                  {cfg.policies.distance.mode === "driving" ? (validDriveSeconds(ad) == null ? "Rijtijd onbekend" : `±${Math.ceil(validDriveSeconds(ad)! / 60)} min rijden`) : ad.distanceKm == null ? "Afstand onbekend" : `${ad.distanceKm} km`}{" "}
                   · ontdekt {timeAgo(ad.firstSeenAt)}
                 </p>
                 <p className="mt-3 text-sm">

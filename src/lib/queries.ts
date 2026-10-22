@@ -1,3 +1,5 @@
+import { drivingWhere } from "./radar/driving";
+import { cityScopeWhere } from "./radar/locality";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./db/client";
 import { evaluate, type Group } from "./engines/filters";
@@ -33,6 +35,7 @@ export async function listDeals(f: DealFilters) {
     ...(f.showBlocked ? {} : { blocked: false }),
     ad: {
       isDemo: cfg.demoMode,
+      AND: [cityScopeWhere(cfg.radar.cityOnly), ...(f.review ? [] : [drivingWhere(cfg)])],
       duplicateOfId: null,
       userState: f.userState ? (f.userState as never) : { not: "IGNORED" },
       ...(f.q ? { title: { contains: f.q, mode: "insensitive" } } : {}),

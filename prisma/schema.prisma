@@ -176,6 +176,11 @@ model Advertisement {
   location         String?
   postalCode       String?
   distanceKm       Float?
+  driveSeconds     Float?
+  driveMeters      Float?
+  driveCalculatedAt DateTime?
+  driveCoordinatesKey String?
+  driveError       String?
   category         String?
   sellerType       String?
   shippingOptions  Json             @default("[]")
@@ -222,6 +227,7 @@ model Advertisement {
   @@index([fingerprint])
   @@index([status])
   @@index([firstSeenAt])
+  @@index([driveSeconds])
   @@index([userState])
   @@index([isDemo])
 }

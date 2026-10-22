@@ -10,9 +10,18 @@ export interface DistanceCosts {
 }
 
 /** Bepaalt ophaal-/verzendscenario en de bijbehorende extra kosten (alleen als die in het beleid zijn ingesteld). */
-export function distanceCosts(distanceKm: number | null, shipping: string[], cfg: AppConfig): DistanceCosts {
+export function distanceCosts(distanceKm: number | null, shipping: string[], cfg: AppConfig, driveSeconds: number | null = null, driveMeters: number | null = null): DistanceCosts {
   const p = cfg.policies.distance;
   const canShip = shipping.includes("shipping");
+  if (p.mode === "driving") {
+    if (driveSeconds == null) return { mode: "unknown", transportCents: null, shippingCents: null, note: "Rijtijd onbekend: route nog niet berekend." };
+    const near = driveSeconds <= p.pickupMaxMinutes * 60;
+    const transport = driveMeters != null && p.transportPerKmCents > 0 ? Math.round(driveMeters / 1000 * 2 * p.transportPerKmCents) : null;
+    return { mode: near ? "near" : canShip ? "far_shipping" : "far_pickup_only",
+      transportCents: near || !canShip ? transport : null,
+      shippingCents: !near && canShip && p.shippingCostCents > 0 ? p.shippingCostCents : null,
+      note: `Geschatte autorijtijd ${Math.ceil(driveSeconds / 60)} minuten vanaf Apeldoorn, zonder actuele verkeersinformatie. Verkoperscontrole blijft afzonderlijk verplicht.` };
+  }
   if (distanceKm == null) return { mode: "unknown", transportCents: null, shippingCents: null, note: "Afstand onbekend: geen automatische transport-/verzendkosten toegepast." };
   if (distanceKm <= p.pickupMaxKm) {
     const t = p.transportPerKmCents > 0 ? Math.round(distanceKm * 2 * p.transportPerKmCents) : null;

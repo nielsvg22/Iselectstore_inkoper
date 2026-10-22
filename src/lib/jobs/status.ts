@@ -25,6 +25,7 @@ export async function getJobStatus(externalId?: string) {
     prisma.advertisement.findMany({ where: { isDemo: false, ...(externalId ? { source: "marktplaats", externalId } : {}) },
       orderBy: { firstSeenAt: "desc" }, take: externalId ? 1 : 10, select: {
         externalId: true, title: true, url: true, firstSeenAt: true, lastSeenAt: true,
+        location: true, distanceKm: true, driveSeconds: true, driveMeters: true, driveCalculatedAt: true, driveError: true, sellerSignals: true, shippingOptions: true,
         publishedAt: true, prefilteredAt: true, analyzedAt: true, detailFetchedAt: true,
         status: true, statusError: true, userState: true, duplicateOfId: true,
         risk: { select: { blocked: true, flags: true } },
@@ -39,6 +40,8 @@ export async function getJobStatus(externalId?: string) {
     generatedAt: new Date().toISOString(),
     sourceAccess: await getSourceMonitor(),
     worker: { at, healthy: !!at && Date.now() - Date.parse(at) < 90_000 },
+    purchasePolicy: { cityOnly: cfg.radar.cityOnly, distance: cfg.policies.distance, seller: cfg.policies.seller },
+    routing: (await prisma.appSettings.findUnique({ where: { key: "routing:health" } }))?.value ?? null,
     config: { notificationsEnabled: cfg.notifications.enabled,
       requireFullAnalysis: cfg.notifications.requireFullAnalysis,
       fastEnabled: cfg.scheduler.fast.enabled, intervalSeconds: cfg.scheduler.fast.intervalSeconds },

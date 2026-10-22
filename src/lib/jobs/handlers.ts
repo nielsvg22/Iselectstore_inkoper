@@ -15,6 +15,7 @@ import { fetchListingUrl } from "../sources/adapters-shared";
 import { mergeDetail } from "../sources/marktplaats-search";
 import { SourceError, type RawAd, type FetchContext } from "../sources/types";
 import { recentSince } from "../sources/recent-search";
+import { routeAd } from "../radar/routing";
 import { inCityScope } from "../radar/locality";
 import { getCooldown, setCooldown } from "./cooldown";
 import { modelByKey } from "../catalog/apple";
@@ -445,6 +446,7 @@ export async function runDetailFetch(
 }
 
 export const handlers: Partial<Record<JobType, Handler>> = {
+  async ROUTE_AD(job) { await routeAd((job.payload as { adId: string }).adId); },
   async REFRESH_FACETS(job: BackgroundJob) {
     await getFacets((job.payload as { category: string }).category, { requestPriority: "background" });
   },

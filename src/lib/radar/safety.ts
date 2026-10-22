@@ -25,6 +25,7 @@ export function distanceFromApeldoorn(
 
 export interface PurchasePolicy {
   radiusKm: number;
+  maxDriveMinutes?: number;
   minRating: number;
   minReviews: number;
   minAgeMonths: number;
@@ -38,6 +39,7 @@ export const defaultPurchasePolicy: PurchasePolicy = {
 export function purchaseStatus(
   i: {
     distanceKm: number | null;
+    driveSeconds?: number | null;
     shipping: boolean;
     rating?: number | null;
     reviews?: number | null;
@@ -49,24 +51,22 @@ export function purchaseStatus(
 ) {
   if (i.blocked || i.suspicious)
     return { key: "excluded", label: "Risico — uitsluiten" } as const;
-  if (
-    i.distanceKm != null &&
-    Number.isFinite(i.distanceKm) &&
-    i.distanceKm >= 0 &&
-    i.distanceKm <= p.radiusKm
-  )
+  const driving = p.maxDriveMinutes != null;
+  const value = driving ? i.driveSeconds : i.distanceKm;
+  const limit = driving ? p.maxDriveMinutes! * 60 : p.radiusKm;
+  const known = typeof value === "number" && Number.isFinite(value) && value >= 0;
+  if (known && value <= limit)
     return { key: "local", label: "Lokaal ophalen" } as const;
   if (
-    i.distanceKm != null &&
-    i.distanceKm > p.radiusKm &&
+    known && value > limit &&
     i.shipping &&
     i.rating != null &&
-    i.rating >= p.minRating &&
+    Number.isFinite(i.rating) && i.rating >= p.minRating &&
     i.rating <= 5 &&
     i.reviews != null &&
-    i.reviews >= p.minReviews &&
+    Number.isInteger(i.reviews) && i.reviews >= p.minReviews &&
     i.ageMonths != null &&
-    i.ageMonths >= p.minAgeMonths
+    Number.isFinite(i.ageMonths) && i.ageMonths >= p.minAgeMonths
   )
     return { key: "shipping", label: "Betrouwbare verzending" } as const;
   return { key: "review", label: "Verkoper controleren" } as const;

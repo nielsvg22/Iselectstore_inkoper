@@ -1,6 +1,7 @@
 import { prisma } from "../db/client";
 import { PermanentJobError } from "../jobs/queue";
 import { getConfig, getSecret } from "../settings/store";
+import { allowsPurchase, validDriveSeconds } from "../radar/driving";
 import { inCityScope } from "../radar/locality";
 import type { DealBandKey, RiskLevelKey } from "../types";
 import {
@@ -63,6 +64,7 @@ export async function dealMessageForAd(
     batterySource:
       battery?.source === "CONFIRMED" ? "(bevestigd)" : "volgens verkoper",
     distanceKm: ad.distanceKm,
+    driveSeconds: validDriveSeconds(ad),
     location: ad.location,
     riskLevel: (ad.risk?.level ?? "LOW") as RiskLevelKey,
     activationLock:
@@ -92,11 +94,17 @@ export async function deliverNotification(
   if (!n) throw new PermanentJobError("Melding bestaat niet");
   if (n.status === "SENT" || n.status === "SKIPPED") return;
   const cfg = await getConfig(true);
-  if (cfg.radar.cityOnly) {
-    const ad = await prisma.advertisement.findUnique({ where: { id: n.adId }, select: { location: true } });
-    if (!ad || !inCityScope(ad.location, cfg.radar.cityOnly)) {
+  if (cfg.radar.cityOnly || cfg.policies.distance.mode === "driving") {
+    const ad = await prisma.advertisement.findUnique({ where: { id: n.adId }, include: { risk: true } });
+    const seller = ad?.sellerSignals as { rating?: number; reviewCount?: number; accountAgeMonths?: number } | null;
+    if (!ad || !inCityScope(ad.location, cfg.radar.cityOnly) || !allowsPurchase({
+      distanceKm: ad.distanceKm, driveSeconds: validDriveSeconds(ad),
+      shipping: Boolean(ad.risk) && Array.isArray(ad.shippingOptions) && ad.shippingOptions.includes("shipping"),
+      rating: seller?.rating, reviews: seller?.reviewCount, ageMonths: seller?.accountAgeMonths,
+      blocked: Boolean(ad.risk?.blocked), suspicious: ad.risk?.level === "HIGH" || ad.risk?.level === "BLOCKED",
+    }, cfg)) {
       await prisma.notification.update({ where: { id: n.id }, data: {
-        status: "SKIPPED", error: `Teststand: uitsluitend plaats ${cfg.radar.cityOnly}`,
+        status: "SKIPPED", error: "Buiten huidig inkoopgebied of onvoldoende brongegevens voor veilige verzending",
       } });
       return;
     }

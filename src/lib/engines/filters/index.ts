@@ -14,6 +14,7 @@ export interface FilterContext {
   roiPct: number | null;
   maxBidCents: number | null;
   distanceKm: number | null;
+  driveSeconds?: number | null;
   ageHours: number | null;
   text: string;
   photoCount: number;

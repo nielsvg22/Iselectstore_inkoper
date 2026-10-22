@@ -1,3 +1,6 @@
+import { createHash } from "node:crypto";
+import { coordinateKey, coordinatesFromRaw, validDriveSeconds, ROUTE_TTL_MS } from "../radar/driving";
+import { getConfig } from "../settings/store";
 import type { DataOrigin, Prisma } from "@prisma/client";
 import { prisma } from "../db/client";
 import {
@@ -30,14 +33,15 @@ export async function ingestAd(raw: RawAd, opts: IngestOptions): Promise<IngestR
   const source = opts.source ?? (opts.isDemo ? "demo" : "marktplaats");
   const externalId = source === "marktplaats" && /^m\d+$/i.test(raw.externalId.trim())
     ? raw.externalId.trim().toLowerCase() : raw.externalId;
+  const routingEnabled = (await getConfig()).policies.distance.mode === "driving";
   return prisma.$transaction(async tx => {
     // Serialise only the same canonical advertisement, across all ingestion sources/processes.
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`ingest:${source}:${externalId}`}))`;
-    return ingestLocked(tx, { ...raw, externalId }, opts);
+    return ingestLocked(tx, { ...raw, externalId }, opts, routingEnabled);
   }, { timeout: 30000, maxWait: 30000 });
 }
 
-async function ingestLocked(db: Prisma.TransactionClient, raw: RawAd, opts: IngestOptions): Promise<IngestResult> {
+async function ingestLocked(db: Prisma.TransactionClient, raw: RawAd, opts: IngestOptions, routingEnabled: boolean): Promise<IngestResult> {
   const source = opts.source ?? (opts.isDemo ? "demo" : "marktplaats");
   const existing = await db.advertisement.findUnique({
     where: { source_externalId: { source, externalId: raw.externalId } },
@@ -50,7 +54,7 @@ async function ingestLocked(db: Prisma.TransactionClient, raw: RawAd, opts: Inge
       detailFetchedAt: true,
       publishedAt: true,
       distanceKm: true,
-      rawPayload: true,
+      rawPayload: true, driveSeconds: true, driveCalculatedAt: true, driveCoordinatesKey: true,
       sellerSignals: true,
       sellerId: true, sellerName: true, sellerVerified: true,
       location: true, postalCode: true, category: true, sellerType: true,
@@ -147,6 +151,19 @@ async function ingestLocked(db: Prisma.TransactionClient, raw: RawAd, opts: Inge
     } as Prisma.InputJsonValue,
   };
 
+  if (existing && raw.location != null && raw.location !== existing.location && !coordinatesFromRaw({ attributes: raw.attributes })) {
+    const attrs = (data.rawPayload as { attributes: Record<string, unknown> }).attributes;
+    delete attrs.locationLatitude; delete attrs.locationLongitude;
+  }
+  const point = coordinatesFromRaw(data.rawPayload);
+  const oldPoint = coordinatesFromRaw(existing?.rawPayload);
+  const moved = Boolean(existing && (point ? !oldPoint || coordinateKey(point) !== coordinateKey(oldPoint) : oldPoint));
+  const routeReset = moved ? { driveSeconds: null, driveMeters: null, driveCalculatedAt: null, driveCoordinatesKey: null, driveError: null } : {};
+
+  const facts = (seller: unknown, shipping: unknown, point: unknown) => JSON.stringify([seller ?? null, shipping ?? [], point]);
+  const eligibility = facts(data.sellerSignals ?? existing?.sellerSignals, data.shippingOptions, point);
+  const eligibilityChanged = Boolean(existing && eligibility !== facts(existing.sellerSignals, existing.shippingOptions, oldPoint));
+  const factsHash = createHash("sha256").update(eligibility).digest("hex").slice(0, 16);
   let adId: string;
   let created = false;
   let changed = false;
@@ -181,7 +198,7 @@ async function ingestLocked(db: Prisma.TransactionClient, raw: RawAd, opts: Inge
     priceChanged = existing.askingPriceCents !== askingCents;
     await db.advertisement.update({
       where: { id: adId },
-      data: { ...data, status: changed ? "NEW" : undefined },
+      data: { ...data, ...routeReset, status: changed ? "NEW" : undefined },
     });
     if (changed) {
       await db.advertisementImage.deleteMany({ where: { adId } });
@@ -253,16 +270,24 @@ async function ingestLocked(db: Prisma.TransactionClient, raw: RawAd, opts: Inge
     duplicateOfId = cur?.duplicateOfId ?? null;
   }
 
-  if (changed && !duplicateOfId && opts.enqueueAnalysis !== false) {
+  if ((changed || eligibilityChanged) && !duplicateOfId && opts.enqueueAnalysis !== false) {
     await db.advertisement.update({
       where: { id: adId },
       data: { status: "QUEUED" },
     });
-    const uniqueKey = `analyze:${adId}:${hash}`;
+    const uniqueKey = `analyze:${adId}:${hash}:${factsHash}`;
     await db.backgroundJob.upsert({
       where: { uniqueKey }, update: {},
       create: { type: "ANALYZE_AD", payload: { adId, quick: opts.partial === true && !raw.detailLoaded },
         priority: created ? 20 : 12, uniqueKey },
+    });
+  }
+  if (routingEnabled && point && !duplicateOfId && opts.enqueueAnalysis !== false && (!existing || moved || validDriveSeconds(existing) == null)) {
+    const uniqueKey = `route:${adId}:${coordinateKey(point)}:${Math.floor(now.getTime() / ROUTE_TTL_MS)}`;
+    const previous = await db.backgroundJob.findUnique({ where: { uniqueKey }, select: { status: true } });
+    await db.backgroundJob.upsert({ where: { uniqueKey },
+      update: previous && ["DONE", "DEAD", "FAILED"].includes(previous.status) ? { status: "PENDING", attempts: 0, runAt: now, finishedAt: null, lastError: null } : {},
+      create: { type: "ROUTE_AD", payload: { adId }, priority: created ? 25 : 15, uniqueKey },
     });
   }
   return { adId, created, changed, priceChanged, duplicateOfId };

@@ -1348,7 +1348,14 @@ export function SettingsForm({
                 onChange={(v) => set("radar", { cityOnly: v ? "Apeldoorn" : "" })}
               />
               <p className="text-sm text-muted">In deze teststand komen alleen advertenties met plaatsnaam Apeldoorn door. Andere plaatsen, verzending van buiten en een onbekende plaats worden uitgesloten.</p>
-              <Field label="Ophalen acceptabel tot (km)" htmlFor="po-km">
+              <Switch label="Selecteren op autorijtijd over de weg" checked={c.policies.distance.mode === "driving"}
+                onChange={(v) => set("policies", { distance: { ...c.policies.distance, mode: v ? "driving" : "kilometers" } })} />
+              {c.policies.distance.mode === "driving" && <Field label="Maximale autorijtijd vanaf Apeldoorn (minuten)" htmlFor="po-minutes">
+                <Input id="po-minutes" type="number" min="1" max="180" value={c.policies.distance.pickupMaxMinutes}
+                  onChange={(e) => set("policies", { distance: { ...c.policies.distance, pickupMaxMinutes: Number(e.target.value) } })} />
+              </Field>}
+              <p className="text-sm text-muted">Autorijtijd is een schatting zonder actuele verkeersdrukte. Buiten het rijgebied zijn verzending en alle bovenstaande, door de bron geleverde verkopersgegevens verplicht. Onbekend wordt niet automatisch goedgekeurd.</p>
+              <Field label="Ophalen acceptabel tot (km; alleen bij kilometerstand)" htmlFor="po-km">
                 <Input
                   id="po-km"
                   type="number"

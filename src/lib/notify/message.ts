@@ -16,6 +16,7 @@ export interface DealMessageInput {
   batteryHealth?: number | null;
   batterySource?: string;
   distanceKm?: number | null;
+  driveSeconds?: number | null;
   location?: string | null;
   riskLevel: RiskLevelKey;
   activationLock?: "locked" | "clear" | null;
@@ -86,6 +87,7 @@ export function buildDealMessage(m: DealMessageInput): {
     lines.push(
       `Batterij: ${m.batteryHealth}% ${m.batterySource ?? "volgens verkoper"}`,
     );
+  if (m.driveSeconds != null) lines.push(`Geschatte rijtijd: ${Math.ceil(m.driveSeconds / 60)} min vanaf Apeldoorn`);
   if (m.distanceKm != null)
     lines.push(`Afstand: ${Math.round(m.distanceKm)} km`);
   lines.push("");
@@ -127,7 +129,7 @@ export function buildPushPayload(
         ? "Topdeal · "
         : "";
   const lines = [
-    `${formatEuro(m.askingCents)}${m.location ? ` · ${m.location}` : ""}${m.distanceKm != null ? ` · ${Math.round(m.distanceKm)} km` : " · afstand onbekend"}`,
+    `${formatEuro(m.askingCents)}${m.location ? ` · ${m.location}` : ""}${m.driveSeconds != null ? ` · ±${Math.ceil(m.driveSeconds / 60)} min rijden` : m.distanceKm != null ? ` · ${Math.round(m.distanceKm)} km` : " · afstand onbekend"}`,
     m.uncertain
       ? "Winst nog onzeker"
       : `Geschatte winst ${formatEuro(m.netProfitCents)} · Score ${m.score}`,

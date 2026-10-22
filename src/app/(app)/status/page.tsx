@@ -1,3 +1,4 @@
+import { prisma } from "@/lib/db/client";
 import { CheckCircle2, CircleAlert, CircleDashed } from "lucide-react";
 import type { Metadata } from "next";
 import { RunNow } from "@/components/status/run-now";
@@ -13,6 +14,7 @@ export const metadata: Metadata = { title: "Status" };
 
 export default async function StatusPage() {
   const s = await getStatus();
+  const routing = (await prisma.appSettings.findUnique({ where: { key: "routing:health" } }))?.value as { ok?: boolean; lastSuccessAt?: string; lastFailureAt?: string } | undefined;
   const jobs = s.jobs as Record<string, number>;
   const pending = (jobs.PENDING ?? 0) + (jobs.RUNNING ?? 0);
   const failed = (jobs.FAILED ?? 0) + (jobs.DEAD ?? 0);
@@ -28,6 +30,9 @@ export default async function StatusPage() {
       </div>
 
       <SourceAccess monitor={s.access} />
+      <Card className="p-5"><p className="font-medium">Eigen autoroutering</p>
+        <p className="mt-2 text-sm text-muted">{!routing ? "Nog geen route berekend" : routing.ok ? `Laatste route gelukt ${timeAgo(routing.lastSuccessAt ? new Date(routing.lastSuccessAt) : null)}` : `Routering tijdelijk niet beschikbaar · ${timeAgo(routing.lastFailureAt ? new Date(routing.lastFailureAt) : null)}`}. Bij een ontbrekende route volgt geen automatische goedkeuring. Rijtijden bevatten geen actuele verkeersinformatie.</p>
+      </Card>
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Samenvatting">
         {[

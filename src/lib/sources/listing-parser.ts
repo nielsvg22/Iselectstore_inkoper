@@ -1,3 +1,4 @@
+import { coordinates } from "../radar/driving";
 import { distanceFromApeldoorn } from "../radar/safety";
 import type { RawAd } from "./types";
 import { shippingFromDelivery } from "./delivery";
@@ -224,6 +225,7 @@ function fromListingObject(
     attributes: {
       ...attrs,
       distanceReference: "Apeldoorn",
+      ...(coordinates(loc.latitude, loc.longitude) ? { locationLatitude: loc.latitude as number, locationLongitude: loc.longitude as number } : {}),
       publicationPrecision: publicationPrecision(published),
     },
     url: abs,

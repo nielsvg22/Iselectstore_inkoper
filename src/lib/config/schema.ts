@@ -149,6 +149,8 @@ export const configSchema = z.object({
         .default({}),
       distance: z
         .object({
+          mode: z.enum(["kilometers", "driving"]).default("kilometers"),
+          pickupMaxMinutes: z.number().int().min(1).max(180).default(30),
           /** Tot hier is ophalen acceptabel (voorbeeld klant: ±45 km) */
           pickupMaxKm: z.number().min(0).max(1000).default(40),
           /** Reiskosten per kilometer (heen en terug); 0 = niet meenemen */
