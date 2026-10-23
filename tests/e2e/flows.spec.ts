@@ -670,6 +670,29 @@ test("echte advertentie: knop 'Ga naar advertentie' rechtsboven en scherpe foto'
   await page.screenshot({ path: "tests/e2e/shots/08-echte-advertentie.png" });
 });
 
+test("mobiel: advertentie met veel foto's past op het scherm (geen horizontale overflow)", async ({ browser }) => {
+  const db = new PrismaClient({ datasourceUrl: E2E_DB });
+  const ad = await db.advertisement.create({
+    data: {
+      source: "marktplaats", origin: "MANUAL_URL", externalId: "m-overflow-1", url: "https://www.marktplaats.nl/v/x/m-overflow-1", title: "iPhone 12 128GB met veel foto's", description: "Gebruikte maar originele telefoon. ".repeat(20),
+      askingPriceCents: 25000, fingerprint: "fp-overflow", status: "ANALYZED",
+      images: { create: Array.from({ length: 12 }, (_, position) => ({ url: `https://images.marktplaats.com/api/v1/hz-mp-pro-listing/images/overflow${position}?rule=ecg_mp_eps$_82.jpg`, position })) },
+    },
+  });
+  await db.$disconnect();
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const page = await ctx.newPage();
+  await login(page);
+  await page.goto(`/ads/${ad.id}`);
+  await page.waitForLoadState("domcontentloaded");
+  await expect(page.getByRole("button", { name: "Toon foto 12" })).toBeAttached();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow, "horizontale overflow op de advertentiepagina").toBeLessThanOrEqual(1);
+  const card = await page.locator("main img").first().boundingBox();
+  expect(card!.x + card!.width).toBeLessThanOrEqual(391);
+  await ctx.close();
+});
+
 test("uitloggen", async ({ page }) => {
   await login(page);
   await page.getByRole("button", { name: "Accountmenu" }).first().click();

@@ -113,8 +113,8 @@ export default async function AdDetailPage({ params }: { params: Promise<{ id: s
         <Notice tone="warning"><strong>Onzekere waardering.</strong> Er zijn te weinig of te wisselende vergelijkingen ({a.sampleSize}). Behandel de winstverwachting niet als zeker; voeg eventueel eigen verkoopprijzen toe bij <Link href="/market" className="underline">Marktdata</Link>.</Notice>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="space-y-6 lg:order-1">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+        <div className="min-w-0 space-y-6 lg:order-1">
           <Card><CardContent className="pt-5 sm:pt-6"><Gallery images={images} demo={ad.isDemo} /></CardContent></Card>
 
           <Card>
