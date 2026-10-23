@@ -93,3 +93,22 @@ describe("regelmotor met zoekfilters", () => {
     expect(off.decidedBy).not.toBe("filter");
   });
 });
+
+describe("alleen iPhone vanaf generatie 14", () => {
+  const cfg = { ...defaultRules(), minIphoneGeneration: 14 };
+  const base = (o: Partial<VerdictInput>): VerdictInput => ({
+    modelKey: "iphone-14", modelLabel: "iPhone 14", family: "iphone", storageGb: 128, ramGb: null, chip: null, screenInch: null, connectivity: null,
+    batteryPct: 90, text: "krasvrij", mpCondition: null, priceType: "FIXED", askEuro: 200, bidEuro: null, latitude: null, longitude: null,
+    distanceKm: 5, shippingOffered: true, seller: { ageMonths: 60, reviews: 20, rating: 4.9, verified: true }, directBuy: false, now: new Date("2026-10-23T00:00:00Z"), ...o,
+  });
+  it("wijst oudere iPhones af en laat 14 en nieuwer door", () => {
+    for (const [key, label] of [["iphone-13", "iPhone 13"], ["iphone-13-pro-max", "iPhone 13 Pro Max"], ["iphone-12", "iPhone 12"], ["iphone-se-3", "iPhone SE"]])
+      expect(evaluateRules(base({ modelKey: key, modelLabel: label }), [], cfg)).toMatchObject({ status: "reject", decidedBy: "model-min" });
+    for (const [key, label] of [["iphone-14", "iPhone 14"], ["iphone-14-plus", "iPhone 14 Plus"], ["iphone-16e", "iPhone 16e"], ["iphone-air", "iPhone Air"], ["iphone-18-pro", "iPhone 18 Pro"]])
+      expect(evaluateRules(base({ modelKey: key, modelLabel: label }), [], cfg).decidedBy).not.toBe("model-min");
+  });
+  it("laat iPads en Macs ongemoeid en staat standaard uit", () => {
+    expect(evaluateRules(base({ family: "ipad", modelKey: "ipad-9", modelLabel: "iPad 9" }), [], cfg).decidedBy).not.toBe("model-min");
+    expect(evaluateRules(base({ modelKey: "iphone-13", modelLabel: "iPhone 13" }), [], defaultRules()).decidedBy).not.toBe("model-min");
+  });
+});

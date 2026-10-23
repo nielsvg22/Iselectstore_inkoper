@@ -35,6 +35,8 @@ export const rulesSchema = z.object({
   unknownBase: z.enum(["fallback", "skip"]).default("fallback"),
   /** Als de regels een oordeel geven vervangen ze het eerdere afstands-/rijtijdbeleid; standaard uit zodat het bestaande beleid blijft gelden */
   replaceDistancePolicy: z.boolean().default(false),
+  /** alleen iPhones vanaf deze generatie inkopen (14 = iPhone 14 en nieuwer, dus ook 16e en Air; SE en 13 en ouder vallen af). 0 = alle modellen */
+  minIphoneGeneration: num(0),
   marginTable: z.enum(["A", "B"]).default("A"),
   /** hoge-marge extra: "same" = de extra van de vraagprijs-kolom voor beide (zoals in het voorbeeld), "table" = eigen kolom per soort */
   highMarginBidMode: z.enum(["same", "table"]).default("same"),

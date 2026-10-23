@@ -15,6 +15,7 @@ export interface StepDef {
 
 /** Alle stappen in de volgorde waarin de regelmotor ze doorloopt. Waarden komen uit de actuele instellingen. */
 export const STEPS: StepDef[] = [
+  { id: "model-min", title: "Oud iPhone-model?", onFail: "afwijzen", rule: (c) => (c.minIphoneGeneration > 0 ? `Alleen iPhones vanaf generatie ${c.minIphoneGeneration} (inclusief 16e en Air) worden ingekocht; SE en oudere modellen vallen af.` : "Geen ondergrens voor iPhone-modellen.") },
   { id: "intel", title: "Intel-Mac?", onFail: "afwijzen", rule: (c) => (c.macbook.excludeIntel ? "Macs met een Intel-chip worden uitgesloten (alleen Apple-chip, vanaf M1)." : "Intel-Macs worden niet uitgesloten.") },
   { id: "macbook-air", title: "MacBook Air binnen de ingestelde varianten?", onFail: "afwijzen", rule: (c) => `Chips ${c.macbook.airChips.join(", ")}, schermen ${c.macbook.airScreens.join(" en ")}″, RAM ${c.macbook.ramGb.join("/")} GB, SSD ${c.macbook.ssdGb.join("/")} GB. Onbekende waarden worden niet afgewezen.` },
   { id: "battery-min", title: "Batterij onder het minimum?", onFail: "afwijzen", rule: (c) => `Batterij onder ${c.battery.excludeBelowPct}% wordt nooit gekocht.` },

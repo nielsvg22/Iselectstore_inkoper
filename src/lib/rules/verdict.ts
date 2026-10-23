@@ -4,7 +4,7 @@ import { findBasePrice, type BasePrice, type RulesConfig } from "./config";
 import { classifyCondition, evaluateFilters, type SearchFilter } from "./filters";
 import { centerHits } from "./geo";
 import { allowedPrices } from "./margin";
-import { isNewestPro, minPriceEuro } from "./release";
+import { belowMinIphone, isNewestPro, minPriceEuro } from "./release";
 import { analyzeScratch, type ScratchState } from "./scratch";
 import { shippingEligibility, type SellerFacts, type ShipResult } from "./shipping";
 
@@ -41,7 +41,7 @@ export interface VerdictInput {
 
 export type VerdictStatus = "skip" | "reject" | "review" | "match" | "high";
 export type StepId =
-  | "intel" | "macbook-air" | "battery-min" | "distance-pickup-only" | "distance-max" | "distance-no-shipping" | "seller-shipping" | "distance-unknown"
+  | "model-min" | "intel" | "macbook-air" | "battery-min" | "distance-pickup-only" | "distance-max" | "distance-no-shipping" | "seller-shipping" | "distance-unknown"
   | "filter" | "base-price" | "bid-zero" | "price-unknown" | "min-price" | "price-too-high" | "stock";
 export type PriceKind = "ask" | "bid" | "both" | "bid0" | "none";
 export interface Line { label: string; euro: number }
@@ -96,6 +96,7 @@ export function evaluateRules(i: VerdictInput, prices: BasePrice[], cfg: RulesCo
   const batteryFamily = cfg.battery.families.includes(i.family);
 
   // ---- vaste uitsluitingen die niet van een basisprijs afhangen ----
+  if (belowMinIphone(i.modelKey, i.family, cfg.minIphoneGeneration)) return reject(`${i.modelLabel} is ouder dan iPhone ${cfg.minIphoneGeneration} (alleen nog vanaf iPhone ${cfg.minIphoneGeneration} inkopen)`, "model-min");
   if (cfg.macbook.excludeIntel && MAC_FAMILIES.has(i.family) && (/intel/i.test(i.chip ?? "") || /intel/.test(i.modelKey))) return reject("Intel-Mac (alleen Apple-chip, vanaf M1)", "intel");
   if (i.family === "macbook_air") {
     const chip = (i.chip ?? "").toUpperCase().match(/M\d/)?.[0];

@@ -120,6 +120,7 @@ export function RulesEditor({ initialRules, initialPrices, isAdmin }: { initialR
             <Fld label="Hoge marge: extra voor bieden vanaf"><Select value={rules.highMarginBidMode} disabled={!isAdmin} onChange={(e) => setR((r) => ({ ...r, highMarginBidMode: e.target.value as "same" | "table" }))}><option value="same">Zelfde als vraagprijs (zoals in het voorbeeld)</option><option value="table">Eigen kolom uit de tabel</option></Select></Fld>
           </div>
           <div className="grid gap-4 sm:grid-cols-3">
+            {numField("Alleen iPhone vanaf generatie (0 = alle)", () => rules.minIphoneGeneration, (v) => setR((r) => ({ ...r, minIphoneGeneration: v })), "14 = iPhone 14 en nieuwer (incl. 16e en Air); SE en 13 en ouder vallen af")}
             {numField("Batterij: nooit kopen onder %", () => rules.battery.excludeBelowPct, (v) => setR((r) => ({ ...r, battery: { ...r.battery, excludeBelowPct: v } })))}
             {numField("Batterij aangenomen 100% tot (maanden)", () => rules.battery.fullUntilMonths, (v) => setR((r) => ({ ...r, battery: { ...r.battery, fullUntilMonths: v } })))}
             {numField("…daarna daling per maand (%)", () => rules.battery.dropPerMonthPct, (v) => setR((r) => ({ ...r, battery: { ...r.battery, dropPerMonthPct: v } })), undefined, "0.1")}

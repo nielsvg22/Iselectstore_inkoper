@@ -31,3 +31,11 @@ export function minPriceEuro(modelKey: string, family: string, cfg: RulesConfig[
   if (gen == null) return cfg.newerEuro; // SE (2022), 16e, Air: recente modellen
   return gen >= cfg.newerFromGeneration ? cfg.newerEuro : cfg.olderEuro;
 }
+
+/** Valt dit iPhone-model buiten de ondergrens (uitgebracht vóór de gekozen generatie)? Modellen zonder bekende releasedatum worden niet uitgesloten. */
+export function belowMinIphone(modelKey: string, family: string, minGeneration: number): boolean {
+  if (family !== "iphone" || minGeneration <= 0) return false;
+  const cut = IPHONE_RELEASE[`iphone-${minGeneration}`] ?? IPHONE_RELEASE[`iphone-${minGeneration}-pro`];
+  const rel = IPHONE_RELEASE[modelKey];
+  return !!cut && !!rel && rel < cut;
+}
