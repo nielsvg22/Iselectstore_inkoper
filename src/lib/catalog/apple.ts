@@ -43,6 +43,7 @@ function iphones(): CatalogModel[] {
   add("15", [["", ""], ["plus", "Plus"], ["pro", "Pro"], ["pro-max", "Pro Max"]]);
   add("16", [["", ""], ["plus", "Plus"], ["pro", "Pro"], ["pro-max", "Pro Max"]]);
   add("17", [["", ""], ["pro", "Pro"], ["pro-max", "Pro Max"]]);
+  add("18", [["pro", "Pro"], ["pro-max", "Pro Max"]]);
   out.push(m("iphone-16e", "iPhone 16e", "iphone", "iPhone 16", "iphone 16e", CAT.iphone));
   out.push(m("iphone-air", "iPhone Air", "iphone", "iPhone 17", "iphone air", CAT.iphone));
   out.push(m("iphone-se-2", "iPhone SE (2e generatie, 2020)", "iphone", "iPhone SE", "iphone se 2020", CAT.iphone));
@@ -61,8 +62,11 @@ function macs(): CatalogModel[] {
     ["macbook-air-m3-15", "MacBook Air 15″ M3", "macbook air m3 15 inch"],
     ["macbook-air-m4-13", "MacBook Air 13″ M4", "macbook air m4 13 inch"],
     ["macbook-air-m4-15", "MacBook Air 15″ M4", "macbook air m4 15 inch"],
+    ["macbook-air-m5-13", "MacBook Air 13″ M5", "macbook air m5 13 inch"],
+    ["macbook-air-m5-15", "MacBook Air 15″ M5", "macbook air m5 15 inch"],
   ];
   for (const [k, l, t] of air) out.push(m(k, l, "macbook_air", "MacBook Air", t, CAT.macbook));
+  out.push(m("macbook-neo-13", "MacBook Neo 13″", "macbook", "MacBook Neo", "macbook neo 13 inch", CAT.macbook));
   const pro: Array<[string, string, string]> = [
     ["macbook-pro-intel-13", "MacBook Pro 13″ Intel", "macbook pro intel 13 inch"],
     ["macbook-pro-intel-15", "MacBook Pro 15″ Intel", "macbook pro intel 15 inch"],
@@ -96,6 +100,8 @@ function macs(): CatalogModel[] {
     ["mac-mini-m2-pro", "Mac mini M2 Pro", "mac_mini", "Mac mini", "mac mini m2 pro"],
     ["mac-mini-m4", "Mac mini M4", "mac_mini", "Mac mini", "mac mini m4"],
     ["mac-mini-m4-pro", "Mac mini M4 Pro", "mac_mini", "Mac mini", "mac mini m4 pro"],
+    ["mac-mini-m5-pro", "Mac mini M5 Pro", "mac_mini", "Mac mini", "mac mini m5 pro"],
+    ["mac-mini-m6", "Mac mini M6", "mac_mini", "Mac mini", "mac mini m6"],
     ["imac-m1-24", "iMac 24″ M1", "imac", "iMac", "imac m1 24 inch"],
     ["imac-m3-24", "iMac 24″ M3", "imac", "iMac", "imac m3 24 inch"],
     ["imac-m4-24", "iMac 24″ M4", "imac", "iMac", "imac m4 24 inch"],
@@ -121,22 +127,28 @@ function others(): CatalogModel[] {
     ["ipad-pro-12_9-m1", "iPad Pro 12,9″ M1", "iPad Pro", "ipad pro 12.9 inch m1"],
     ["ipad-pro-12_9-m2", "iPad Pro 12,9″ M2", "iPad Pro", "ipad pro 12.9 inch m2"],
     ["ipad-pro-13-m4", "iPad Pro 13″ M4", "iPad Pro", "ipad pro 13 inch m4"],
+    ["ipad-pro-11-m5", "iPad Pro 11″ M5", "iPad Pro", "ipad pro 11 inch m5"],
+    ["ipad-pro-13-m5", "iPad Pro 13″ M5", "iPad Pro", "ipad pro 13 inch m5"],
+    ["ipad-pro-11-2020", "iPad Pro 11″ (2020)", "iPad Pro", "ipad pro 11 inch 2020"],
+    ["ipad-pro-12_9-2020", "iPad Pro 12,9″ (2020)", "iPad Pro", "ipad pro 12.9 inch 2020"],
     ["ipad-air-4", "iPad Air (4e generatie)", "iPad Air", "ipad air 4e generatie"],
     ["ipad-air-5", "iPad Air (5e generatie)", "iPad Air", "ipad air 5e generatie"],
     ["ipad-air-m2", "iPad Air M2", "iPad Air", "ipad air m2"],
     ["ipad-air-m3", "iPad Air M3", "iPad Air", "ipad air m3"],
+    ["ipad-air-m4", "iPad Air M4", "iPad Air", "ipad air m4"],
     ["ipad-mini-5", "iPad mini (5e generatie)", "iPad mini", "ipad mini 5e generatie"],
     ["ipad-mini-6", "iPad mini (6e generatie)", "iPad mini", "ipad mini 6e generatie"],
     ["ipad-mini-7", "iPad mini (7e generatie)", "iPad mini", "ipad mini 7e generatie"],
     ["ipad-8", "iPad (8e generatie)", "iPad", "ipad 8e generatie"],
     ["ipad-9", "iPad (9e generatie)", "iPad", "ipad 9e generatie"],
     ["ipad-10", "iPad (10e generatie)", "iPad", "ipad 10e generatie"],
+    ["ipad-11", "iPad (A16, 2025)", "iPad", "ipad a16"],
   ];
   for (const [k, l, g, t] of ipads) out.push(m(k, l, "ipad", g, t, CAT.ipad));
   for (const n of [6, 7, 8, 9, 10]) out.push(m(`watch-series-${n}`, `Apple Watch Series ${n}`, "watch", "Apple Watch", `apple watch series ${n}`, CAT.watch));
   out.push(m("watch-se-1", "Apple Watch SE (1e generatie)", "watch", "Apple Watch", "apple watch se 1", CAT.watch));
   out.push(m("watch-se-2", "Apple Watch SE (2e generatie)", "watch", "Apple Watch", "apple watch se 2", CAT.watch));
-  for (const n of [1, 2, 3]) out.push(m(`watch-ultra-${n}`, `Apple Watch Ultra ${n}`, "watch", "Apple Watch", `apple watch ultra ${n}`, CAT.watch));
+  for (const n of [1, 2, 3, 4]) out.push(m(`watch-ultra-${n}`, `Apple Watch Ultra ${n}`, "watch", "Apple Watch", `apple watch ultra ${n}`, CAT.watch));
   const pods: Array<[string, string, string]> = [
     ["airpods-2", "AirPods (2e generatie)", "airpods 2"],
     ["airpods-3", "AirPods (3e generatie)", "airpods 3"],

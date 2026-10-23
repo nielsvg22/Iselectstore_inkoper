@@ -27,7 +27,7 @@ const schema = z.object({
 /** Test een denkbeeldige advertentie tegen de huidige regels (niets wordt opgeslagen of gemeld). */
 export const POST = route(async (req) => {
   const b = await readJson(req, schema);
-  const { cfg, prices } = await loadRules(true);
+  const { cfg, prices, filters } = await loadRules(true);
   const model = modelByKey(b.modelKey);
   const family = model?.family ?? "iphone";
   let ask = b.askEuro;
@@ -38,6 +38,6 @@ export const POST = route(async (req) => {
     ask = fromText.ask;
     bid = fromText.bid;
   }
-  const verdict = evaluateRules({ ...b, askEuro: ask, bidEuro: bid, modelLabel: model?.label ?? b.modelKey, family, latitude: null, longitude: null, now: new Date() }, prices, cfg);
+  const verdict = evaluateRules({ ...b, askEuro: ask, bidEuro: bid, modelLabel: model?.label ?? b.modelKey, family, latitude: null, longitude: null, now: new Date() }, prices, cfg, filters);
   return { verdict, priceFromText: fromText };
 });

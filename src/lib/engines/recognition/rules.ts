@@ -64,7 +64,7 @@ const claim = (value: string | number | boolean, evidence: string): Fact => ({ v
 /* ------------------------------ model detectie ----------------------------- */
 
 function chipOf(t: string): { key: string; label: string } | null {
-  const m = /(?<![a-z0-9])m\s?([1-5])\s*(pro|max|ultra)?(?![a-z0-9])/.exec(t);
+  const m = /(?<![a-z0-9])m\s?([1-6])\s*(pro|max|ultra)?(?![a-z0-9])/.exec(t);
   if (!m) return null;
   const variant = m[2];
   return { key: `m${m[1]}${variant ? "-" + variant : ""}`, label: `M${m[1]}${variant ? " " + variant[0].toUpperCase() + variant.slice(1) : ""}` };
@@ -129,6 +129,10 @@ function detectMac(t: string): Partial | null {
     const intel = !chip && isIntel(t);
     const screen = screenOf(t);
     const year = yearOf(t);
+    if (/macbook\s*neo/.test(t)) {
+      const size = screen ?? 13;
+      return { family: "macbook", modelKey: `macbook-neo-${size}`, modelLabel: `MacBook Neo ${size}"`, specificity: 1 };
+    }
     const baseKey = fam === "macbook_air" ? "macbook-air" : fam === "macbook_pro" ? "macbook-pro" : "macbook";
     const parts = [baseKey, chip ? chip.key : intel ? "intel" : null, screen ? String(screen) : null];
     if (intel && year) parts.push(String(year));
@@ -174,13 +178,15 @@ function detectIpad(t: string): Partial | null {
   const sizeM = /(?<![0-9])(8[.,]3|9[.,]7|10[.,][2359]|11|12[.,]9|13)\s*(?:inch|"|''|-inch)?/.exec(after.replace(/\d+\s*(?:gb|tb)/g, ""));
   const size = sizeM ? sizeM[1].replace(",", ".") : null;
   const chip = chipOf(t);
+  if (!variant && /(?<![a-z0-9])a16(?![a-z0-9])/.test(t)) return { family: "ipad", modelKey: "ipad-11", modelLabel: "iPad (A16)", specificity: 1 };
   const parts = ["ipad", variant || null];
   let spec = variant ? 0.5 : 0.3;
   if (variant === "pro") {
     if (size) parts.push(size.replace(".", "_"));
     if (chip) parts.push(chip.key);
     else if (gen) parts.push(`g${gen}`);
-    spec += (size ? 0.25 : 0) + (chip || gen ? 0.25 : 0);
+    else if (yearOf(t) === 2020) parts.push("2020");
+    spec += (size ? 0.25 : 0) + (chip || gen || yearOf(t) === 2020 ? 0.25 : 0);
   } else {
     if (gen) parts.push(String(gen));
     else if (chip) parts.push(chip.key);

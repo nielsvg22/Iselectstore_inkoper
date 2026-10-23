@@ -10,6 +10,8 @@ import { evaluateRules, type VerdictInput } from "@/lib/rules/verdict";
 
 const cfg = defaultRules();
 const NOW = new Date("2026-10-22T10:00:00Z");
+/** vóór de iPhone 18-serie (sept. 2026): dan zijn de 17 Pro-modellen de nieuwste */
+const BEFORE_18 = new Date("2026-06-01T00:00:00Z");
 
 describe("batterij", () => {
   it("volgt de tabel uit het document", () => {
@@ -97,10 +99,12 @@ describe("verzendfilter naar accountleeftijd", () => {
 
 describe("nieuwste Pro/Pro Max en minimumprijs", () => {
   it("herkent de nieuwste Pro-modellen", () => {
-    expect(isNewestPro("iphone-17-pro", NOW, cfg.distance)).toBe(true);
-    expect(isNewestPro("iphone-17-pro-max", NOW, cfg.distance)).toBe(true);
-    expect(isNewestPro("iphone-17", NOW, cfg.distance)).toBe(false);
-    expect(isNewestPro("iphone-16-pro", NOW, cfg.distance)).toBe(false);
+    expect(isNewestPro("iphone-17-pro", BEFORE_18, cfg.distance)).toBe(true);
+    expect(isNewestPro("iphone-17-pro-max", BEFORE_18, cfg.distance)).toBe(true);
+    expect(isNewestPro("iphone-17", BEFORE_18, cfg.distance)).toBe(false);
+    expect(isNewestPro("iphone-16-pro", BEFORE_18, cfg.distance)).toBe(false);
+    expect(isNewestPro("iphone-18-pro", NOW, cfg.distance)).toBe(true);
+    expect(isNewestPro("iphone-17-pro", NOW, cfg.distance)).toBe(false);
     expect(isNewestPro("iphone-17-pro", new Date("2025-06-01T00:00:00Z"), cfg.distance)).toBe(false);
   });
   it("lagere minimumprijs voor oudere modellen", () => {
@@ -192,7 +196,7 @@ describe("totaaloordeel", () => {
   });
   it("nieuwste Pro/Pro Max: nooit verder dan 50 km", () => {
     const p: BasePrice[] = [{ modelKey: "iphone-17-pro", storageGb: 256, variant: "", priceEuro: 900, kind: "sell" }];
-    const v = evaluateRules(input({ modelKey: "iphone-17-pro", modelLabel: "iPhone 17 Pro", storageGb: 256, distanceKm: 80, seller: { ageMonths: 130, reviews: 9, rating: 5, verified: true } }), p, cfg);
+    const v = evaluateRules(input({ modelKey: "iphone-17-pro", modelLabel: "iPhone 17 Pro", storageGb: 256, distanceKm: 80, now: BEFORE_18, seller: { ageMonths: 130, reviews: 9, rating: 5, verified: true } }), p, cfg);
     expect(v.status).toBe("reject");
     expect(v.reasons[0]).toMatch(/nieuwste Pro/);
   });

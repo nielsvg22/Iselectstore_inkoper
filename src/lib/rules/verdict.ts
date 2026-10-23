@@ -1,6 +1,7 @@
 import { assumedBatteryPct, batteryAdjustEuro, batteryDeductionEuro, modelAgeMonths, scratchFactor } from "./battery";
 import { assessBid } from "./bid";
 import { findBasePrice, type BasePrice, type RulesConfig } from "./config";
+import { classifyCondition, evaluateFilters, type SearchFilter } from "./filters";
 import { centerHits } from "./geo";
 import { allowedPrices } from "./margin";
 import { isNewestPro, minPriceEuro } from "./release";
@@ -41,7 +42,7 @@ export interface VerdictInput {
 export type VerdictStatus = "skip" | "reject" | "review" | "match" | "high";
 export type StepId =
   | "intel" | "macbook-air" | "battery-min" | "distance-pickup-only" | "distance-max" | "distance-no-shipping" | "seller-shipping" | "distance-unknown"
-  | "base-price" | "bid-zero" | "price-unknown" | "min-price" | "price-too-high" | "stock";
+  | "filter" | "base-price" | "bid-zero" | "price-unknown" | "min-price" | "price-too-high" | "stock";
 export type PriceKind = "ask" | "bid" | "both" | "bid0" | "none";
 export interface Line { label: string; euro: number }
 
@@ -70,6 +71,8 @@ export interface Verdict {
   storageAssumed: boolean;
   distance: { km: number | null; nearestCenter: string | null; shipping: ShipResult | null; newestPro: boolean };
   mpCondition: string | null;
+  /** zoekfilter van de klant dat bij deze advertentie hoort (alleen als zoekfilters aan staan) */
+  filter: { condition: string; maxEuro: number; minEuro: number; label: string } | null;
 }
 
 const MAC_FAMILIES = new Set(["macbook_air", "macbook_pro", "mac_mini", "imac", "mac_studio"]);
@@ -79,14 +82,14 @@ function emptyVerdict(i: VerdictInput): Verdict {
     status: "skip", decidedBy: null, reasons: [], notes: [], flags: [], priceKind: "none", effectiveEuro: null, askEuro: i.askEuro, bidEuro: i.bidEuro,
     baseEuro: null, baseKind: null, maxSellEuro: null, lines: [], allowedAsk: null, allowedBid: null, highAsk: null, highBid: null, marginEuro: null,
     battery: { pct: i.batteryPct, assumed: false, known: i.batteryPct != null }, scratch: { state: "unknown", evidence: null }, storageAssumed: false,
-    distance: { km: i.distanceKm, nearestCenter: null, shipping: null, newestPro: false }, mpCondition: i.mpCondition,
+    distance: { km: i.distanceKm, nearestCenter: null, shipping: null, newestPro: false }, mpCondition: i.mpCondition, filter: null,
   };
 }
 
 const round = (n: number) => Math.round(n * 100) / 100;
 
 /** Past alle inkoopregels toe op één advertentie. Pure functie: dezelfde invoer geeft altijd dezelfde uitkomst. */
-export function evaluateRules(i: VerdictInput, prices: BasePrice[], cfg: RulesConfig): Verdict {
+export function evaluateRules(i: VerdictInput, prices: BasePrice[], cfg: RulesConfig, filters: SearchFilter[] = []): Verdict {
   const v = emptyVerdict(i);
   if (!cfg.enabled) { v.notes.push("Inkoopregels staan uit"); return v; }
   const reject = (r: string, step: StepId) => { v.status = "reject"; v.decidedBy = step; v.reasons.push(r); return v; };
@@ -157,9 +160,31 @@ export function evaluateRules(i: VerdictInput, prices: BasePrice[], cfg: RulesCo
   v.priceKind = ask != null && bidKnown != null ? "both" : ask != null ? "ask" : bidKnown != null ? "bid" : bidZero ? "bid0" : "none";
   if (i.directBuy) v.flags.push("directBuy");
 
+  // ---- zoekfilters van de klant ----
+  const variant = i.family === "ipad" && /^ipad-air-m\d$/.test(i.modelKey) && i.screenInch != null ? String(Math.round(i.screenInch)) : "";
+  let filterHit: SearchFilter | null = null;
+  let filterStorageAssumed = false;
+  if (cfg.filters.enabled && filters.length) {
+    const cond = classifyCondition(i.text, i.mpCondition);
+    const out = evaluateFilters(filters, { modelKey: i.modelKey, variant, storageGb: i.storageGb, condition: cond, priceKind: v.priceKind, askEuro: ask, bidEuro: bidKnown, km, sellerMonths: i.seller.ageMonths });
+    if (out.status === "no-filters-for-model") {
+      if (cfg.filters.outsideList === "reject") return reject(`${i.modelLabel} staat niet in de zoekfilters`, "filter");
+      v.notes.push("Model staat niet in de zoekfilters: gewone regels gelden");
+    } else if (out.status === "fail") return reject(`Zoekfilter: ${out.reasons.join("; ")}`, "filter");
+    else {
+      filterHit = out.filter;
+      filterStorageAssumed = out.storageAssumed;
+      v.notes.push(...out.notes);
+      v.filter = { condition: cond, maxEuro: out.filter.maxEuro, minEuro: out.filter.minEuro, label: `${i.modelLabel}${out.filter.storageGb ? ` ${out.filter.storageGb} GB` : ""} · ${cond === "normal" ? "normaal" : cond === "broken" ? "kapot" : "sealed"}` };
+      v.notes.push(`Zoekfilter: ${v.filter.label}, maximaal €${out.filter.maxEuro}${out.filter.minEuro ? `, minimaal €${out.filter.minEuro}` : ""}`);
+      if (out.sellerUnknown) { if (!reviewReason) { reviewReason = `Verkoper controleren: zoekfilter vraagt ${out.filter.sellerMinMonths} maanden actief, leeftijd onbekend`; reviewStep = "filter"; } v.flags.push("sellerCheck"); }
+    }
+  }
+
   // ---- basisprijs ----
-  const variant = i.family === "ipad" && i.modelKey === "ipad-air-m2" && i.screenInch != null ? String(Math.round(i.screenInch)) : "";
-  const found = findBasePrice(prices, i.modelKey, i.storageGb, variant);
+  const found = filterHit && cfg.priceBase === "buy85"
+    ? { price: { modelKey: i.modelKey, storageGb: filterHit.storageGb ?? 0, variant, priceEuro: filterHit.maxEuro, kind: "sell" as const }, storageAssumed: filterStorageAssumed }
+    : findBasePrice(prices, i.modelKey, i.storageGb, variant);
   if (!found.price) {
     v.notes.push(`Geen basisprijs voor ${i.modelLabel}${i.storageGb ? ` ${i.storageGb} GB` : ""}`);
     if (cfg.unknownBase === "skip") return reject("Geen basisprijs ingesteld voor dit model/opslag", "base-price");
@@ -214,7 +239,7 @@ export function evaluateRules(i: VerdictInput, prices: BasePrice[], cfg: RulesCo
   }
 
   // ---- beoordeel de prijs ----
-  const minP = minPriceEuro(i.modelKey, i.family, cfg.minPrice);
+  const minP = filterHit && filterHit.minEuro > 0 ? filterHit.minEuro : minPriceEuro(i.modelKey, i.family, cfg.minPrice);
   let eff: number | null = null;
   let pass = false;
   let high = false;

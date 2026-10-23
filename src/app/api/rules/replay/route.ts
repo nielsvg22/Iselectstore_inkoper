@@ -25,7 +25,7 @@ export const POST = route(async (req) => {
   for (const ad of ads) {
     const specs = Object.fromEntries((ad.product?.specs ?? []).filter((s) => s.value !== "onbekend").map((s) => [s.key, { value: /^\d+(\.\d+)?$/.test(s.value) ? Number(s.value) : s.value }]));
     const { input } = buildVerdictInput({ ad, rec: { modelKey: ad.product!.modelKey, modelLabel: ad.product!.modelLabel, family: ad.product!.family, facts: specs }, shipping: (ad.shippingOptions as string[]) ?? [] });
-    const v = evaluateRules(input, loaded.prices, cfg);
+    const v = evaluateRules(input, loaded.prices, cfg, loaded.filters);
     counts[v.status]++;
     const reason = v.reasons[0] ?? v.notes[0] ?? "";
     if (v.status === "reject" && reason) reasons.set(reason.replace(/[\d.,]+/g, "#"), (reasons.get(reason.replace(/[\d.,]+/g, "#")) ?? 0) + 1);

@@ -149,6 +149,12 @@ export const rulesSchema = z.object({
     percent: num(0),
     lastAppliedMonth: z.string().default(""),
   }).default({}),
+  /** zoekfilters van de klant (lijst met model/opslag/conditie/prijs/afstand per regel) */
+  filters: z.object({
+    enabled: z.boolean().default(false),
+    /** model dat niet in de lijst staat: afwijzen of de gewone regels laten beslissen */
+    outsideList: z.enum(["reject", "ignore"]).default("reject"),
+  }).default({}),
   digest: z.object({
     enabled: z.boolean().default(false),
     everyDays: num(14),

@@ -1,16 +1,17 @@
 import { prisma } from "@/lib/db/client";
 import { getBasePrices, getRules, type BasePrice, type RulesConfig } from "./config";
+import { getFilters, type SearchFilter } from "./filters";
 import { getPhotoAnalysis, photoScratchVerdict } from "@/lib/ai/photos";
 import { extractPricesFromText } from "./price-text";
 import { evaluateRules, type Verdict, type VerdictInput } from "./verdict";
 
-let cache: { at: number; cfg: RulesConfig; prices: BasePrice[] } | null = null;
+let cache: { at: number; cfg: RulesConfig; prices: BasePrice[]; filters: SearchFilter[] } | null = null;
 
 /** Regels + basisprijzen, 15 seconden in het geheugen (de worker verwerkt veel advertenties achter elkaar). */
-export async function loadRules(force = false): Promise<{ cfg: RulesConfig; prices: BasePrice[] }> {
+export async function loadRules(force = false): Promise<{ cfg: RulesConfig; prices: BasePrice[]; filters: SearchFilter[] }> {
   if (!force && cache && Date.now() - cache.at < 15_000) return cache;
-  const [cfg, prices] = await Promise.all([getRules(), getBasePrices()]);
-  cache = { at: Date.now(), cfg, prices };
+  const [cfg, prices, filters] = await Promise.all([getRules(), getBasePrices(), getFilters()]);
+  cache = { at: Date.now(), cfg, prices, filters };
   return cache;
 }
 export const clearRulesCache = () => { cache = null; };
@@ -98,11 +99,11 @@ export async function stockFor(modelKey: string): Promise<{ count: number; sold3
 }
 
 export async function evaluateForAd(a: Parameters<typeof buildVerdictInput>[0]): Promise<{ verdict: Verdict; textPrices: { ask: number | null; bid: number | null } | null; cfg: RulesConfig }> {
-  const { cfg, prices } = await loadRules();
+  const { cfg, prices, filters } = await loadRules();
   const stock = cfg.stock.enabled && a.stock === undefined ? await stockFor(a.rec.modelKey) : a.stock;
   const photoScratch = a.photoScratch !== undefined ? a.photoScratch : a.ad.id ? photoScratchVerdict(await getPhotoAnalysis(a.ad.id)) : null;
   const { input, textPrices } = buildVerdictInput({ ...a, stock, photoScratch });
-  return { verdict: evaluateRules(input, prices, cfg), textPrices, cfg };
+  return { verdict: evaluateRules(input, prices, cfg, filters), textPrices, cfg };
 }
 
 /** Als "verzending meenemen" uit staat: tot hoeveel km (hemelsbreed) er maximaal opgehaald wordt; anders null. */
@@ -116,8 +117,8 @@ export async function evaluateAdById(adId: string): Promise<{ title: string; url
   const ad = await prisma.advertisement.findUnique({ where: { id: adId }, include: { product: { include: { specs: true } } } });
   if (!ad?.product) return null;
   const specs = Object.fromEntries(ad.product.specs.filter((s) => s.value !== "onbekend").map((s) => [s.key, { value: /^\d+(\.\d+)?$/.test(s.value) ? Number(s.value) : s.value }]));
-  const { cfg, prices } = await loadRules();
+  const { cfg, prices, filters } = await loadRules();
   const stock = cfg.stock.enabled ? await stockFor(ad.product.modelKey) : null;
   const { input } = buildVerdictInput({ ad, rec: { modelKey: ad.product.modelKey, modelLabel: ad.product.modelLabel, family: ad.product.family, facts: specs }, shipping: (ad.shippingOptions as string[]) ?? [], stock, photoScratch: photoScratchVerdict(await getPhotoAnalysis(ad.id)) });
-  return { title: ad.title, url: ad.url, verdict: evaluateRules(input, prices, cfg) };
+  return { title: ad.title, url: ad.url, verdict: evaluateRules(input, prices, cfg, filters) };
 }

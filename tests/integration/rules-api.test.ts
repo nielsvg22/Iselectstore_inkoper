@@ -51,3 +51,20 @@ describe("inkoopregels-API", () => {
     expect(((await r.json()) as { total: number }).total).toBe(0);
   });
 });
+
+describe("zoekfilters-API", () => {
+  it("importeert een geplakte lijst, bewaart hem en vereist een beheerder", async () => {
+    const { GET, PUT, POST } = await import("@/app/api/rules/filters/route");
+    const admin = await makeUser("ADMIN", "fa@example.com");
+    const user = await makeUser("USER", "fu@example.com");
+    const text = "iPhone 13\t128GB\tNormaal\t50\t320\t300\tVraagprijs\tAlle\t0 maanden\nOnbekend model\t1GB\tNormaal\t1\t2\t3\tAlle\tAlle\t0 maanden";
+    expect((await POST(req("/api/rules/filters", { method: "POST", body: { text }, cookie: user.cookie }))).status).toBe(403);
+    const parsed = (await (await POST(req("/api/rules/filters", { method: "POST", body: { text }, cookie: admin.cookie }))).json()) as { rows: unknown[]; unmatched: string[] };
+    expect(parsed.rows).toHaveLength(1);
+    expect(parsed.unmatched).toEqual(["Onbekend model"]);
+    expect((await PUT(req("/api/rules/filters", { method: "PUT", body: { filters: parsed.rows }, cookie: admin.cookie }))).status).toBe(200);
+    const got = (await (await GET(req("/api/rules/filters", { cookie: user.cookie }))).json()) as { filters: Array<{ modelKey: string; maxEuro: number }> };
+    expect(got.filters).toMatchObject([{ modelKey: "iphone-13", maxEuro: 320 }]);
+    expect((await PUT(req("/api/rules/filters", { method: "PUT", body: { filters: [{ nope: 1 }] }, cookie: admin.cookie }))).status).toBe(400);
+  });
+});
