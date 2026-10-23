@@ -37,11 +37,16 @@ export interface VerdictInput {
 }
 
 export type VerdictStatus = "skip" | "reject" | "review" | "match" | "high";
+export type StepId =
+  | "intel" | "macbook-air" | "battery-min" | "distance-pickup-only" | "distance-max" | "distance-no-shipping" | "seller-shipping" | "distance-unknown"
+  | "base-price" | "bid-zero" | "price-unknown" | "min-price" | "price-too-high" | "stock";
 export type PriceKind = "ask" | "bid" | "both" | "bid0" | "none";
 export interface Line { label: string; euro: number }
 
 export interface Verdict {
   status: VerdictStatus;
+  /** de stap die het oordeel bepaalde (bij afwijzen of handmatig controleren); null bij voldoen */
+  decidedBy: StepId | null;
   reasons: string[];
   notes: string[];
   flags: string[];
@@ -69,7 +74,7 @@ const MAC_FAMILIES = new Set(["macbook_air", "macbook_pro", "mac_mini", "imac", 
 
 function emptyVerdict(i: VerdictInput): Verdict {
   return {
-    status: "skip", reasons: [], notes: [], flags: [], priceKind: "none", effectiveEuro: null, askEuro: i.askEuro, bidEuro: i.bidEuro,
+    status: "skip", decidedBy: null, reasons: [], notes: [], flags: [], priceKind: "none", effectiveEuro: null, askEuro: i.askEuro, bidEuro: i.bidEuro,
     baseEuro: null, baseKind: null, maxSellEuro: null, lines: [], allowedAsk: null, allowedBid: null, highAsk: null, highBid: null, marginEuro: null,
     battery: { pct: i.batteryPct, assumed: false, known: i.batteryPct != null }, scratch: { state: "unknown", evidence: null }, storageAssumed: false,
     distance: { km: i.distanceKm, nearestCenter: null, shipping: null, newestPro: false }, mpCondition: i.mpCondition,
@@ -82,19 +87,19 @@ const round = (n: number) => Math.round(n * 100) / 100;
 export function evaluateRules(i: VerdictInput, prices: BasePrice[], cfg: RulesConfig): Verdict {
   const v = emptyVerdict(i);
   if (!cfg.enabled) { v.notes.push("Inkoopregels staan uit"); return v; }
-  const reject = (r: string) => { v.status = "reject"; v.reasons.push(r); return v; };
+  const reject = (r: string, step: StepId) => { v.status = "reject"; v.decidedBy = step; v.reasons.push(r); return v; };
   const batteryFamily = cfg.battery.families.includes(i.family);
 
   // ---- vaste uitsluitingen die niet van een basisprijs afhangen ----
-  if (cfg.macbook.excludeIntel && MAC_FAMILIES.has(i.family) && (/intel/i.test(i.chip ?? "") || /intel/.test(i.modelKey))) return reject("Intel-Mac (alleen Apple-chip, vanaf M1)");
+  if (cfg.macbook.excludeIntel && MAC_FAMILIES.has(i.family) && (/intel/i.test(i.chip ?? "") || /intel/.test(i.modelKey))) return reject("Intel-Mac (alleen Apple-chip, vanaf M1)", "intel");
   if (i.family === "macbook_air") {
     const chip = (i.chip ?? "").toUpperCase().match(/M\d/)?.[0];
-    if (chip && !cfg.macbook.airChips.includes(chip)) return reject(`MacBook Air met chip ${chip} valt buiten de ingestelde chips`);
-    if (i.screenInch != null && !cfg.macbook.airScreens.includes(Math.round(i.screenInch))) return reject(`Schermgrootte ${i.screenInch}″ valt buiten de ingestelde maten`);
-    if (i.ramGb != null && !cfg.macbook.ramGb.includes(i.ramGb)) return reject(`RAM ${i.ramGb} GB valt buiten de ingestelde waarden`);
-    if (i.storageGb != null && !cfg.macbook.ssdGb.includes(i.storageGb)) return reject(`SSD ${i.storageGb} GB valt buiten de ingestelde waarden`);
+    if (chip && !cfg.macbook.airChips.includes(chip)) return reject(`MacBook Air met chip ${chip} valt buiten de ingestelde chips`, "macbook-air");
+    if (i.screenInch != null && !cfg.macbook.airScreens.includes(Math.round(i.screenInch))) return reject(`Schermgrootte ${i.screenInch}″ valt buiten de ingestelde maten`, "macbook-air");
+    if (i.ramGb != null && !cfg.macbook.ramGb.includes(i.ramGb)) return reject(`RAM ${i.ramGb} GB valt buiten de ingestelde waarden`, "macbook-air");
+    if (i.storageGb != null && !cfg.macbook.ssdGb.includes(i.storageGb)) return reject(`SSD ${i.storageGb} GB valt buiten de ingestelde waarden`, "macbook-air");
   }
-  if (i.batteryPct != null && batteryFamily && i.batteryPct < cfg.battery.excludeBelowPct) return reject(`Batterij ${i.batteryPct}% is lager dan ${cfg.battery.excludeBelowPct}% (wordt nooit gekocht)`);
+  if (i.batteryPct != null && batteryFamily && i.batteryPct < cfg.battery.excludeBelowPct) return reject(`Batterij ${i.batteryPct}% is lager dan ${cfg.battery.excludeBelowPct}% (wordt nooit gekocht)`, "battery-min");
 
   // ---- afstand en verzenden ----
   const hits = centerHits(i.latitude, i.longitude, cfg.distance);
@@ -109,19 +114,20 @@ export function evaluateRules(i: VerdictInput, prices: BasePrice[], cfg: RulesCo
   const maxKm = newestPro ? cfg.distance.newestProMaxKm : cfg.distance.maxKmDefault;
   let shipping: ShipResult | null = null;
   let reviewReason: string | null = null;
+  let reviewStep: StepId | null = null;
   if (km == null) {
     v.notes.push("Afstand onbekend");
-    if (!cfg.distance.includeShipping) { reviewReason = `Afstand onbekend: ophalen binnen ${cfg.distance.pickupMaxKm} km is niet vast te stellen`; v.flags.push("distanceUnknown"); }
+    if (!cfg.distance.includeShipping) { reviewReason = `Afstand onbekend: ophalen binnen ${cfg.distance.pickupMaxKm} km is niet vast te stellen`; reviewStep = "distance-unknown"; v.flags.push("distanceUnknown"); }
   }
-  else if (!cfg.distance.includeShipping && km > cfg.distance.pickupMaxKm) return reject(`${km} km is buiten ${cfg.distance.pickupMaxKm} km hemelsbreed (verzending staat uit)`);
-  else if (km > maxKm) return reject(`${km} km is verder dan het maximum van ${maxKm} km${newestPro ? " voor de nieuwste Pro/Pro Max" : ""}`);
+  else if (!cfg.distance.includeShipping && km > cfg.distance.pickupMaxKm) return reject(`${km} km is buiten ${cfg.distance.pickupMaxKm} km hemelsbreed (verzending staat uit)`, "distance-pickup-only");
+  else if (km > maxKm) return reject(`${km} km is verder dan het maximum van ${maxKm} km${newestPro ? " voor de nieuwste Pro/Pro Max" : ""}`, "distance-max");
   else if (km > cfg.distance.pickupMaxKm) {
-    if (!i.shippingOffered) return reject(`${km} km is verder dan ${cfg.distance.pickupMaxKm} km en de verkoper biedt geen verzending aan`);
+    if (!i.shippingOffered) return reject(`${km} km is verder dan ${cfg.distance.pickupMaxKm} km en de verkoper biedt geen verzending aan`, "distance-no-shipping");
     if (cfg.shipping.enabled) {
       shipping = shippingEligibility(i.seller, cfg.shipping);
       v.distance.shipping = shipping;
-      if (shipping.status === "never" || shipping.status === "fail") return reject(`Verzendfilter: ${shipping.reasons.join("; ")}`);
-      if (shipping.status === "unknown") { reviewReason ??= "Verkoper handmatig controleren"; v.flags.push("sellerCheck"); v.notes.push(`Verkoper handmatig controleren: ${shipping.reasons.join("; ")}`); }
+      if (shipping.status === "never" || shipping.status === "fail") return reject(`Verzendfilter: ${shipping.reasons.join("; ")}`, "seller-shipping");
+      if (shipping.status === "unknown") { if (!reviewReason) { reviewReason = "Verkoper handmatig controleren"; reviewStep = "seller-shipping"; } v.flags.push("sellerCheck"); v.notes.push(`Verkoper handmatig controleren: ${shipping.reasons.join("; ")}`); }
     }
   } else if (cfg.distance.perKmEnabled) {
     shipping = shippingEligibility(i.seller, cfg.shipping);
@@ -153,8 +159,9 @@ export function evaluateRules(i: VerdictInput, prices: BasePrice[], cfg: RulesCo
   const found = findBasePrice(prices, i.modelKey, i.storageGb, variant);
   if (!found.price) {
     v.notes.push(`Geen basisprijs voor ${i.modelLabel}${i.storageGb ? ` ${i.storageGb} GB` : ""}`);
-    if (cfg.unknownBase === "skip") return reject("Geen basisprijs ingesteld voor dit model/opslag");
+    if (cfg.unknownBase === "skip") return reject("Geen basisprijs ingesteld voor dit model/opslag", "base-price");
     v.status = "skip";
+    v.decidedBy = "base-price";
     return v;
   }
   v.baseEuro = found.price.priceEuro;
@@ -230,18 +237,18 @@ export function evaluateRules(i: VerdictInput, prices: BasePrice[], cfg: RulesCo
     if (zb.requireScratchFree && sc.state !== "free") fails.push("niet krasvrij/altijd beschermd");
     if (!trusted && !near) fails.push(`geen betrouwbare verkoper en niet binnen ${zb.requireTrustedOrNearKm} km`);
     v.flags.push("bid0");
-    if (fails.length === 0) { v.notes.push("Bieden vanaf €0: voldoet aan de aanvullende voorwaarden (batterij, krasvrij, betrouwbaar of dichtbij)"); v.effectiveEuro = null; return finish(v, i, cfg, null, true, false, "bid", reviewReason); }
-    if (cfg.bid.zeroBidMode === "filter") return reject(`Bieden vanaf €0 zonder prijs en niet interessant: ${fails.join("; ")}`);
-    v.status = "review"; v.reasons.push(`Bieden vanaf €0: ${fails.join("; ")}`); return v;
+    if (fails.length === 0) { v.notes.push("Bieden vanaf €0: voldoet aan de aanvullende voorwaarden (batterij, krasvrij, betrouwbaar of dichtbij)"); v.effectiveEuro = null; return finish(v, i, cfg, null, true, false, "bid", reviewReason, reviewStep); }
+    if (cfg.bid.zeroBidMode === "filter") return reject(`Bieden vanaf €0 zonder prijs en niet interessant: ${fails.join("; ")}`, "bid-zero");
+    v.status = "review"; v.decidedBy = "bid-zero"; v.reasons.push(`Bieden vanaf €0: ${fails.join("; ")}`); return v;
   } else {
-    v.status = "review"; v.reasons.push("Prijs onbekend"); return v;
+    v.status = "review"; v.decidedBy = "price-unknown"; v.reasons.push("Prijs onbekend"); return v;
   }
   v.effectiveEuro = eff;
-  if (eff != null && eff > 0 && eff < minP) return reject(`€${eff} is lager dan de minimumprijs €${minP} (waarschijnlijk hoesje of accessoire)`);
-  return finish(v, i, cfg, eff, pass, high, kindForHigh, reviewReason);
+  if (eff != null && eff > 0 && eff < minP) return reject(`€${eff} is lager dan de minimumprijs €${minP} (waarschijnlijk hoesje of accessoire)`, "min-price");
+  return finish(v, i, cfg, eff, pass, high, kindForHigh, reviewReason, reviewStep);
 }
 
-function finish(v: Verdict, i: VerdictInput, cfg: RulesConfig, eff: number | null, pass: boolean, high: boolean, kind: "ask" | "bid", reviewReason: string | null = null): Verdict {
+function finish(v: Verdict, i: VerdictInput, cfg: RulesConfig, eff: number | null, pass: boolean, high: boolean, kind: "ask" | "bid", reviewReason: string | null = null, reviewStep: StepId | null = null): Verdict {
   const known = new Set(cfg.highMargin.requireKnown);
   const allKnown =
     (!known.has("model") || i.family !== "unknown") &&
@@ -249,17 +256,18 @@ function finish(v: Verdict, i: VerdictInput, cfg: RulesConfig, eff: number | nul
     (!known.has("distance") || v.distance.km != null) &&
     (!known.has("price") || eff != null);
   v.marginEuro = eff != null && v.maxSellEuro != null ? round(v.maxSellEuro - eff) : null;
-  if (!pass) { v.status = "reject"; v.reasons.push(eff != null ? `€${eff} is hoger dan de toegestane ${kind === "bid" ? "bieden-vanaf-prijs" : "vraagprijs"} (€${kind === "bid" ? v.allowedBid : v.allowedAsk})` : "Prijs te hoog"); return v; }
+  if (!pass) { v.status = "reject"; v.decidedBy = "price-too-high"; v.reasons.push(eff != null ? `€${eff} is hoger dan de toegestane ${kind === "bid" ? "bieden-vanaf-prijs" : "vraagprijs"} (€${kind === "bid" ? v.allowedBid : v.allowedAsk})` : "Prijs te hoog"); return v; }
   const minMargin = kind === "bid" ? cfg.highMargin.minBidMarginEuro : cfg.highMargin.minAskMarginEuro;
   const isHigh = cfg.highMargin.enabled && high && allKnown && v.baseKind === "sell" && (v.marginEuro == null || v.marginEuro >= minMargin);
   // voorraadregel: bij volle voorraad alleen echte topdeals
   if (cfg.stock.enabled && i.stock) {
     const threshold = Math.max(1, Math.round(cfg.stock.baseThreshold + i.stock.sold30d * cfg.stock.perSoldLast30d));
-    if (i.stock.count >= threshold && !isHigh) { v.status = "reject"; v.reasons.push(`Voorraad ${i.stock.count} ≥ ${threshold}: alleen deals met hoge marge`); return v; }
+    if (i.stock.count >= threshold && !isHigh) { v.status = "reject"; v.decidedBy = "stock"; v.reasons.push(`Voorraad ${i.stock.count} ≥ ${threshold}: alleen deals met hoge marge`); return v; }
     if (i.stock.count >= threshold) v.notes.push(`Voorraad ${i.stock.count} ≥ ${threshold}: alleen hoge marge toegelaten`);
   }
   if (isHigh) v.flags.push("high");
   v.status = reviewReason ? "review" : isHigh ? "high" : "match";
+  if (reviewReason) v.decidedBy = reviewStep;
   if (reviewReason) v.reasons.push(reviewReason);
   return v;
 }

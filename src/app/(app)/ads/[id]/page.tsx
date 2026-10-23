@@ -157,6 +157,7 @@ export default async function AdDetailPage({ params }: { params: Promise<{ id: s
                 {costs.rules.reasons.length > 0 && <ul className="list-disc pl-5">{costs.rules.reasons.map((r) => <li key={r}>{r}</li>)}</ul>}
                 {costs.rules.lines.length > 0 && <table className="w-full max-w-md"><tbody>{costs.rules.lines.map((l, i) => <tr key={i}><td className="py-0.5 pr-3">{i === 0 ? "" : l.euro < 0 ? "− " : "+ "}{l.label}</td><td className="text-right tabular-nums">€{Math.abs(l.euro)}</td></tr>)}</tbody></table>}
                 {rulesLines(costs.rules).map((l) => <p key={l}>{l}</p>)}
+                <p><Link href={`/rules/beslisboom?ad=${ad.id}`} className="underline">Bekijk de beslisboom voor deze advertentie</Link></p>
                 {costs.rules.notes.length > 0 && <ul className="list-disc pl-5 text-muted">{costs.rules.notes.map((n) => <li key={n}>{n}</li>)}</ul>}
               </CardContent>
             </Card>

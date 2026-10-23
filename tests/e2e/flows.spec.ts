@@ -615,6 +615,7 @@ test("mobiel: geen horizontale scroll en bottom-navigatie zichtbaar", async ({
     "/status",
     "/settings",
     "/rules",
+    "/rules/beslisboom",
     "/funnel",
   ]) {
     await page.goto(path);
@@ -777,6 +778,28 @@ test("meldingen: controle toont de toestemming, knop vraagt toestemming en een l
   const n = await page.evaluate(async () => (await (await navigator.serviceWorker.ready).getNotifications()).map((x) => x.title));
   expect(n).toContain("Testmelding van de app");
   await ctx.close();
+});
+
+test("beslisboom: alle stappen met de huidige waarden, en het spoor van één advertentie", async ({ page }) => {
+  const db = new PrismaClient({ datasourceUrl: E2E_DB });
+  const ad = await db.advertisement.create({
+    data: {
+      source: "marktplaats", origin: "MANUAL_URL", externalId: "m-tree-1", url: "https://www.marktplaats.nl/v/x/m-tree-1", title: "iPhone 14 Pro 128GB batterij 70%", description: "Batterij 70%.",
+      askingPriceCents: 20000, fingerprint: "fp-tree", status: "ANALYZED", distanceKm: 10,
+      product: { create: { family: "iphone", modelKey: "iphone-14-pro", modelLabel: "iPhone 14 Pro", recognizedBy: "rules", confidence: 0.9, specs: { create: [{ key: "batteryHealth", value: "70", source: "CONFIRMED" }, { key: "storageGb", value: "128", source: "CONFIRMED" }] } } },
+    },
+  });
+  await db.$disconnect();
+  await login(page);
+  await page.goto("/rules/beslisboom");
+  await expect(page.getByRole("heading", { name: "Beslisboom", level: 1 })).toBeVisible();
+  await expect(page.getByRole("list", { name: "Stappen" }).getByRole("listitem")).toHaveCount(16);
+  await expect(page.getByText(/Batterij onder 80% wordt nooit gekocht/)).toBeVisible();
+  await page.goto(`/rules/beslisboom?ad=${ad.id}`);
+  await expect(page.getByRole("status").filter({ hasText: "Afgewezen" })).toBeVisible();
+  await expect(page.locator('li[data-state="decided"]')).toHaveCount(1);
+  await expect(page.locator('li[data-state="decided"]')).toContainText("Batterij onder het minimum");
+  await expect(page.locator('li[data-state="not-reached"]').first()).toBeVisible();
 });
 
 test("uitloggen", async ({ page }) => {

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { RulesEditor } from "@/components/rules/rules-editor";
 import { getCurrentUser } from "@/lib/auth";
 import { getBasePrices, getRules } from "@/lib/rules/config";
@@ -12,7 +13,7 @@ export default async function RulesPage() {
     <div className="mx-auto max-w-4xl space-y-6">
       <div>
         <h1 className="text-[32px] font-semibold tracking-tight">Inkoopregels</h1>
-        <p className="mt-1 text-muted">Maximale prijs per model op basis van batterij, krassen en afstand, met marge- en verzendregels. Zo bepaalt de app welke advertenties een melding geven.</p>
+        <p className="mt-1 text-muted">Maximale prijs per model op basis van batterij, krassen en afstand, met marge- en verzendregels. Zo bepaalt de app welke advertenties een melding geven. <Link href="/rules/beslisboom" className="underline">Bekijk de beslisboom</Link>.</p>
       </div>
       <RulesEditor initialRules={rules} initialPrices={prices} isAdmin={user?.role === "ADMIN"} />
     </div>

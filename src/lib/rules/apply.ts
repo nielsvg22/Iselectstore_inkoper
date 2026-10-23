@@ -105,3 +105,14 @@ export async function pickupOnlyKm(): Promise<number | null> {
   const { cfg } = await loadRules();
   return cfg.enabled && !cfg.distance.includeShipping ? cfg.distance.pickupMaxKm : null;
 }
+
+/** Beoordeelt een opgeslagen advertentie opnieuw met de huidige regels (voor de beslisboom en controles). Slaat niets op. */
+export async function evaluateAdById(adId: string): Promise<{ title: string; url: string; verdict: Verdict } | null> {
+  const ad = await prisma.advertisement.findUnique({ where: { id: adId }, include: { product: { include: { specs: true } } } });
+  if (!ad?.product) return null;
+  const specs = Object.fromEntries(ad.product.specs.filter((s) => s.value !== "onbekend").map((s) => [s.key, { value: /^\d+(\.\d+)?$/.test(s.value) ? Number(s.value) : s.value }]));
+  const { cfg, prices } = await loadRules();
+  const stock = cfg.stock.enabled ? await stockFor(ad.product.modelKey) : null;
+  const { input } = buildVerdictInput({ ad, rec: { modelKey: ad.product.modelKey, modelLabel: ad.product.modelLabel, family: ad.product.family, facts: specs }, shipping: (ad.shippingOptions as string[]) ?? [], stock });
+  return { title: ad.title, url: ad.url, verdict: evaluateRules(input, prices, cfg) };
+}
