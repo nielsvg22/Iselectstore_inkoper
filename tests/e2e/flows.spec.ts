@@ -716,6 +716,27 @@ test("service worker: een binnenkomende push wordt als melding aangemaakt (zonde
   await expect.poll(async () => (await titles()).some((n) => n.title === "iSelectStore")).toBe(true);
 });
 
+test("meldingen: controle toont de toestemming, knop vraagt toestemming en een lokale testmelding wordt aangemaakt", async ({ browser }) => {
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  await login(page);
+  await page.goto("/settings");
+  const box = page.getByLabel("Controle meldingen");
+  await expect(box).toBeVisible();
+  // eerst nog niet gevraagd: er is een knop om toestemming te vragen
+  await expect(box.getByText("nog niet gevraagd")).toBeVisible();
+  await expect(box.getByRole("button", { name: "Toestemming vragen" })).toBeVisible();
+  // na toestemming: testmelding rechtstreeks uit de browser
+  await ctx.grantPermissions(["notifications"], { origin: new URL(page.url()).origin });
+  await box.getByRole("button", { name: "Opnieuw controleren" }).click();
+  await expect(box.getByText("toegestaan")).toBeVisible();
+  await box.getByRole("button", { name: "Toon testmelding op dit scherm" }).click();
+  await expect(box.getByRole("status")).toContainText("De browser heeft de melding aangemaakt");
+  const n = await page.evaluate(async () => (await (await navigator.serviceWorker.ready).getNotifications()).map((x) => x.title));
+  expect(n).toContain("Testmelding van de app");
+  await ctx.close();
+});
+
 test("uitloggen", async ({ page }) => {
   await login(page);
   await page.getByRole("button", { name: "Accountmenu" }).first().click();

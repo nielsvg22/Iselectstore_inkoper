@@ -21,6 +21,8 @@ export function PushSettings({ initialPrefs, profiles }: { initialPrefs: NotifyP
   const [here, setHere] = React.useState<string | null>(null); // endpoint van dit apparaat
   const [hereId, setHereId] = React.useState<string | null>(null); // vingerafdruk van dit apparaat
   const healed = React.useRef(false);
+  const [perm, setPerm] = React.useState<NotificationPermission | "unsupported">("unsupported");
+  const [localTest, setLocalTest] = React.useState<string | null>(null);
   const [devices, setDevices] = React.useState<Device[]>([]);
   const [prefs, setPrefs] = React.useState<NotifyPrefs>(initialPrefs);
   const [busy, setBusy] = React.useState<string | null>(null);
@@ -29,6 +31,7 @@ export function PushSettings({ initialPrefs, profiles }: { initialPrefs: NotifyP
 
   const refresh = React.useCallback(async () => {
     setSupport(pushSupport());
+    setPerm(typeof Notification === "undefined" ? "unsupported" : Notification.permission);
     try {
       let sub = await currentSubscription();
       let list = (await api<{ devices: Device[] }>("/api/push/devices")).devices;
@@ -78,6 +81,37 @@ export function PushSettings({ initialPrefs, profiles }: { initialPrefs: NotifyP
       await refresh();
     } catch (e) {
       toast(friendlyPushError(e, platform), "err");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  /** Vraagt de browser opnieuw om toestemming (alleen mogelijk zolang die niet op "geblokkeerd" staat). */
+  const askPermission = async () => {
+    setBusy("perm");
+    try {
+      const p = await Notification.requestPermission();
+      setPerm(p);
+      toast(p === "granted" ? "Toestemming gegeven" : p === "denied" ? "Toestemming geweigerd of geblokkeerd" : "Er is geen keuze gemaakt", p === "granted" ? "ok" : "err");
+      await refresh();
+    } catch (e) {
+      toast((e as Error).message, "err");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  /** Toont een melding rechtstreeks vanuit de browser (zonder pushdienst): bewijst of de computer meldingen van deze site toont. */
+  const showLocal = async () => {
+    setBusy("local");
+    setLocalTest(null);
+    try {
+      const reg = (await navigator.serviceWorker.getRegistration("/")) ?? (await navigator.serviceWorker.register("/sw.js", { scope: "/" }));
+      await navigator.serviceWorker.ready;
+      await reg.showNotification("Testmelding van de app", { body: "Zie je deze melding? Dan werken meldingen op deze computer.", icon: "/icons/icon-192.png", tag: "local-test" });
+      setLocalTest("De browser heeft de melding aangemaakt. Zie je hem niet op je scherm? Dan blokkeert Windows of macOS hem: zet meldingen voor de browser aan en Niet storen/Focus uit.");
+    } catch (e) {
+      setLocalTest(`De browser kon de melding niet tonen: ${(e as Error).message}`);
     } finally {
       setBusy(null);
     }
@@ -142,6 +176,30 @@ export function PushSettings({ initialPrefs, profiles }: { initialPrefs: NotifyP
         {support === "unsupported" && <Notice tone="warning">Deze browser ondersteunt geen Web Push. Gebruik Chrome, Edge, Firefox of Safari (iOS 16.4+ als geïnstalleerde app), of kies Telegram als alternatief.</Notice>}
         {support === "denied" && <Notice tone="danger">Meldingen zijn voor deze site geblokkeerd. {platform.browser === "safari" ? "Safari → Instellingen → Websites → Meldingen: zet deze site op Toestaan." : "Klik op het slotje links in de adresbalk → Meldingen → Toestaan."} Herlaad daarna de pagina.</Notice>}
         {hint && <Notice tone="warning">{hint}</Notice>}
+
+        {perm !== "unsupported" && (
+          <div className="space-y-3 rounded-2xl border border-card-border bg-ivory p-4" aria-label="Controle meldingen">
+            <p className="text-sm font-semibold">Controle op deze computer</p>
+            <p className="text-sm text-muted">
+              Toestemming in de browser:{" "}
+              <strong className={perm === "granted" ? "text-success" : perm === "denied" ? "text-danger" : "text-warning"}>
+                {perm === "granted" ? "toegestaan" : perm === "denied" ? "geblokkeerd" : "nog niet gevraagd"}
+              </strong>
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {perm === "default" && <Button onClick={askPermission} loading={busy === "perm"}><BellRing className="h-4 w-4" />Toestemming vragen</Button>}
+              {perm === "granted" && <Button variant="secondary" onClick={showLocal} loading={busy === "local"}>Toon testmelding op dit scherm</Button>}
+              {perm === "denied" && (
+                <Button variant="outline" onClick={() => { void navigator.clipboard?.writeText("chrome://settings/content/notifications").then(() => toast("Adres gekopieerd: plak het in een nieuw tabblad")); }}>Kopieer instellingenadres van Chrome</Button>
+              )}
+              <Button variant="ghost" onClick={refresh}>Opnieuw controleren</Button>
+            </div>
+            {perm === "denied" && (
+              <p className="text-sm text-muted">De browser staat het niet toe dat de app dit opnieuw vraagt. Zet het zelf aan: klik op het slotje links in de adresbalk → Meldingen → <b>Toestaan</b> (Chrome: plak het gekopieerde adres in een nieuw tabblad en haal deze site weg bij “Niet toegestaan”). Ververs daarna deze pagina.</p>
+            )}
+            {localTest && <p className="text-sm" role="status">{localTest}</p>}
+          </div>
+        )}
 
         <div className="flex flex-wrap items-center gap-3">
           {support === "ready" && !here && <Button onClick={enable} loading={busy === "enable"}><BellRing className="h-4 w-4" />Pushmeldingen inschakelen</Button>}
