@@ -31,3 +31,11 @@ export function assumedBatteryPct(ageMonths: number, cfg: RulesConfig["battery"]
   if (ageMonths <= cfg.fullUntilMonths) return 100;
   return Math.max(cfg.floorPct, Math.round(100 - (ageMonths - cfg.fullUntilMonths) * cfg.dropPerMonthPct));
 }
+
+/** Factor (0..1) waarmee kras-bedragen worden vermenigvuldigd: nieuwere modellen houden het volle bedrag, oudere minder. */
+export function scratchFactor(modelKey: string, now: Date, cfg: { enabled: boolean; decayPerMonthPct: number; minPct: number }): number {
+  if (!cfg.enabled) return 1;
+  const age = modelAgeMonths(modelKey, now);
+  if (age == null) return 1;
+  return Math.max(cfg.minPct / 100, 1 - (age * cfg.decayPerMonthPct) / 100);
+}

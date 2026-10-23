@@ -143,6 +143,18 @@ export function RulesEditor({ initialRules, initialPrices, isAdmin }: { initialR
             <div className="space-y-2"><Switch checked={rules.monthly.enabled} onChange={(v) => setR((r) => ({ ...r, monthly: { ...r.monthly, enabled: v } }))} label="Maandelijkse prijsaanpassing" disabled={!isAdmin} />{numField("Percentage per maand (−5 = 5% lager)", () => rules.monthly.percent, (v) => setR((r) => ({ ...r, monthly: { ...r.monthly, percent: v } })), "Alle basisprijzen, eenmaal per kalendermaand; elke wijziging staat in het logboek.", "0.5")}</div>
             <div className="space-y-2"><Switch checked={rules.telegramPurchases.enabled} onChange={(v) => setR((r) => ({ ...r, telegramPurchases: { ...r.telegramPurchases, enabled: v } }))} label="M-nummers uit Telegram-kanaal" disabled={!isAdmin} /><Fld label="Kanaal-ID" hint="Chat-ID van het kanaal waarin gekochte advertenties worden doorgestuurd (bot moet lid zijn). Herinnering na 3 dagen zonder aankoop."><Input value={rules.telegramPurchases.chatId} disabled={!isAdmin} onChange={(e) => setR((r) => ({ ...r, telegramPurchases: { ...r.telegramPurchases, chatId: e.target.value } }))} /></Fld></div>
           </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2"><Switch checked={rules.scratch.ageScaling.enabled} onChange={(v) => setR((r) => ({ ...r, scratch: { ...r.scratch, ageScaling: { ...r.scratch.ageScaling, enabled: v } } }))} label="Kras-bedragen schalen met leeftijd model" disabled={!isAdmin} />
+              <div className="grid gap-4 sm:grid-cols-2">
+                {numField("Afname per maand na release (%)", () => rules.scratch.ageScaling.decayPerMonthPct, (v) => setR((r) => ({ ...r, scratch: { ...r.scratch, ageScaling: { ...r.scratch.ageScaling, decayPerMonthPct: v } } })), "Een krasvrije iPhone 16 Pro is meer waard dan een krasvrije 13", "0.1")}
+                {numField("Nooit minder dan (% van het bedrag)", () => rules.scratch.ageScaling.minPct, (v) => setR((r) => ({ ...r, scratch: { ...r.scratch, ageScaling: { ...r.scratch.ageScaling, minPct: v } } })))}
+              </div></div>
+            <div className="space-y-2"><Switch checked={rules.digest.enabled} onChange={(v) => setR((r) => ({ ...r, digest: { ...r.digest, enabled: v } }))} label="Aanbodoverzicht en release-waarschuwing (Telegram)" disabled={!isAdmin} />
+              <div className="grid gap-4 sm:grid-cols-2">
+                {numField("Overzicht elke (dagen)", () => rules.digest.everyDays, (v) => setR((r) => ({ ...r, digest: { ...r.digest, everyDays: v } })), "Per model: aantal ontvangen, met prijs, bieden vanaf 0, gemiddelden, met verschil")}
+                {numField("Waarschuw vanaf maand (0 = uit)", () => rules.digest.releaseWarnFromMonth, (v) => setR((r) => ({ ...r, digest: { ...r.digest, releaseWarnFromMonth: v } })), "7 = vanaf juli, voor de nieuwe serie in september")}
+              </div></div>
+          </div>
           <div>
             <p className="mb-2 text-sm font-semibold">Verzendfilter naar accountleeftijd</p>
             <p className="mb-3 text-xs text-muted">Onder {Math.round(rules.shipping.neverBelowMonths / 12 * 10) / 10} jaar actief: nooit laten verzenden. Alleen adverteerders waarvan de bron reviews en accountleeftijd levert kunnen goedgekeurd worden; zonder die gegevens krijgt de advertentie “Verkoper handmatig controleren”.</p>

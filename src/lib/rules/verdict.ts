@@ -1,4 +1,4 @@
-import { assumedBatteryPct, batteryAdjustEuro, batteryDeductionEuro, modelAgeMonths } from "./battery";
+import { assumedBatteryPct, batteryAdjustEuro, batteryDeductionEuro, modelAgeMonths, scratchFactor } from "./battery";
 import { assessBid } from "./bid";
 import { findBasePrice, type BasePrice, type RulesConfig } from "./config";
 import { centerHits } from "./geo";
@@ -178,8 +178,11 @@ export function evaluateRules(i: VerdictInput, prices: BasePrice[], cfg: RulesCo
       if (cfg.priceBase === "sell") add(`Batterij ${batteryPct}%${v.battery.assumed ? " (aangenomen)" : ""}`, -batteryDeductionEuro(batteryPct));
       else add(`Batterij ${batteryPct}%${v.battery.assumed ? " (aangenomen)" : ""}`, batteryAdjustEuro(batteryPct));
     }
-    if (cfg.priceBase === "sell") add(sc.state === "scratched" ? "Met krassen" : sc.state === "unknown" ? "Krassen onbekend" : "Krasvrij", sc.state === "scratched" ? -cfg.scratch.scratchedEuro : sc.state === "unknown" ? -cfg.scratch.unknownEuro : 0);
-    else if (sc.state === "free") add("Krasvrij", cfg.scratch.freeBonusEuro);
+    const sf = scratchFactor(i.modelKey, i.now, cfg.scratch.ageScaling);
+    const scaled = (euro: number) => euro * sf;
+    const sfNote = sf < 1 ? ` (${Math.round(sf * 100)}% door leeftijd model)` : "";
+    if (cfg.priceBase === "sell") add((sc.state === "scratched" ? "Met krassen" : sc.state === "unknown" ? "Krassen onbekend" : "Krasvrij") + (sc.state === "free" ? "" : sfNote), sc.state === "scratched" ? -scaled(cfg.scratch.scratchedEuro) : sc.state === "unknown" ? -scaled(cfg.scratch.unknownEuro) : 0);
+    else if (sc.state === "free") add("Krasvrij" + sfNote, scaled(cfg.scratch.freeBonusEuro));
     if (MAC_FAMILIES.has(i.family) && i.ramGb != null) {
       const std = cfg.macbook.standardRamGb[i.modelKey] ?? cfg.macbook.standardRamGb.default ?? 8;
       if (i.ramGb > std) add(`RAM ${i.ramGb} GB (standaard ${std} GB)`, cfg.macbook.ramBonusEuro[String(i.ramGb)] ?? 0);

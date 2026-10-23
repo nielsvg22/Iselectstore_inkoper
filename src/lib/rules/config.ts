@@ -64,6 +64,14 @@ export const rulesSchema = z.object({
     scratchPhrases: z.array(z.string()).default(DEFAULT_SCRATCH_PHRASES),
     /** conditie "Nieuw" op Marktplaats telt als krasvrij */
     newCountsAsFree: z.boolean().default(true),
+    /** kras-bedragen schalen met de leeftijd van het model: een krasvrije 16 Pro is meer waard dan een krasvrije 13 */
+    ageScaling: z.object({
+      enabled: z.boolean().default(false),
+      /** per maand na release gaat dit percentage van de bedragen af */
+      decayPerMonthPct: num(1.5),
+      /** ondergrens: nooit minder dan dit percentage van het bedrag */
+      minPct: num(50),
+    }).default({}),
   }).default({}),
   distance: z.object({
     /** "Verzending meenemen": uit = alleen ophalen binnen `pickupMaxKm` hemelsbreed; verder weg komt er niets doorheen, ook niet bij 5 sterren */
@@ -140,6 +148,14 @@ export const rulesSchema = z.object({
     enabled: z.boolean().default(false),
     percent: num(0),
     lastAppliedMonth: z.string().default(""),
+  }).default({}),
+  digest: z.object({
+    enabled: z.boolean().default(false),
+    everyDays: num(14),
+    lastSentAt: z.string().default(""),
+    /** vanaf welke maand (1-12) we waarschuwen voor een nieuwe iPhone-serie; 0 = uit */
+    releaseWarnFromMonth: num(7),
+    releaseWarnedYear: num(0),
   }).default({}),
   telegramPurchases: z.object({
     enabled: z.boolean().default(false),

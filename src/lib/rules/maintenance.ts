@@ -3,6 +3,7 @@ import { errMsg, log } from "@/lib/log";
 import { registerPurchases, extractMNumbers } from "@/lib/funnel";
 import { sendTelegram } from "@/lib/notify/senders";
 import { getConfig, getSecret } from "@/lib/settings/store";
+import { sendDigestIfDue } from "./digest";
 import { clearRulesCache } from "./apply";
 import { getBasePrices, getRules, saveBasePrices, saveRules } from "./config";
 
@@ -84,4 +85,5 @@ export async function pollTelegramPurchases(now = new Date(), fetchImpl: FetchLi
 export async function runRulesMaintenance(now = new Date()): Promise<void> {
   try { const r = await applyMonthlyAdjustment(now); if (r.applied) log("info", "Maandelijkse prijsaanpassing toegepast", { changed: r.changed }); } catch (e) { log("error", "Maandaanpassing mislukt", { error: errMsg(e) }); }
   try { const r = await pollTelegramPurchases(now); if (r.registered || r.alerted || r.error) log("info", "Telegram M-nummers", { ...r }); } catch (e) { log("error", "Telegram M-nummers mislukt", { error: errMsg(e) }); }
+  try { const r = await sendDigestIfDue(now); if (r.sent || r.warned || r.error) log("info", "Aanbodoverzicht", { ...r }); } catch (e) { log("error", "Aanbodoverzicht mislukt", { error: errMsg(e) }); }
 }
