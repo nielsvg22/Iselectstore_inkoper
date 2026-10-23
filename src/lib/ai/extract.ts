@@ -64,7 +64,7 @@ export async function aiBudgetAvailable(cfg: AppConfig, providerId: string): Pro
   return row.calls < cfg.ai.maxCallsPerDay && row.costMicros / 1_000_000 < cfg.ai.maxCostEurPerDay;
 }
 
-async function recordUsage(cfg: AppConfig, providerId: string, inTok: number, outTok: number) {
+export async function recordAiUsage(cfg: AppConfig, providerId: string, inTok: number, outTok: number) {
   const eur = (inTok / 1e6) * cfg.ai.inputPricePerMTokEur + (outTok / 1e6) * cfg.ai.outputPricePerMTokEur;
   const micros = Math.round(eur * 1_000_000);
   await prisma.aiUsage.upsert({
@@ -103,7 +103,7 @@ export async function enrichWithAi(rec: Recognition, ad: AiAdInput, cfg: AppConf
     try {
       const user = `<ad>${JSON.stringify({ title: sanitizeAdText(ad.title, 200), description: sanitizeAdText(ad.description, 2500) })}</ad>\nGeef alleen het JSON-object terug.`;
       const res = await provider.complete({ system: SYSTEM, user, imageUrls: images, maxTokens: 500 });
-      await recordUsage(cfg, provider.id, res.inputTokens, res.outputTokens);
+      await recordAiUsage(cfg, provider.id, res.inputTokens, res.outputTokens);
       output = aiOutputSchema.parse(extractJson(res.text));
       await prisma.aiCache.upsert({ where: { key: cacheKey }, create: { key: cacheKey, value: output as object }, update: { value: output as object } });
     } catch (e) {

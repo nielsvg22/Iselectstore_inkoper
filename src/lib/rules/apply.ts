@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db/client";
 import { getBasePrices, getRules, type BasePrice, type RulesConfig } from "./config";
+import { getPhotoAnalysis, photoScratchVerdict } from "@/lib/ai/photos";
 import { extractPricesFromText } from "./price-text";
 import { evaluateRules, type Verdict, type VerdictInput } from "./verdict";
 
@@ -15,6 +16,7 @@ export async function loadRules(force = false): Promise<{ cfg: RulesConfig; pric
 export const clearRulesCache = () => { cache = null; };
 
 export interface AdForRules {
+  id?: string;
   title: string;
   description: string;
   askingPriceCents: number | null;
@@ -34,6 +36,7 @@ export function buildVerdictInput(a: {
   shipping: string[];
   now?: Date;
   stock?: VerdictInput["stock"];
+  photoScratch?: VerdictInput["photoScratch"];
 }): { input: VerdictInput; textPrices: { ask: number | null; bid: number | null } | null } {
   const attrs = ((a.ad.rawPayload as { attributes?: Record<string, unknown> } | null)?.attributes ?? {}) as Record<string, unknown>;
   const priceType = typeof attrs.priceType === "string" ? attrs.priceType : null;
@@ -79,6 +82,7 @@ export function buildVerdictInput(a: {
     directBuy: traits.includes("SHOPPING_CART") || /\bdirect\s+kopen\b/i.test(a.ad.title),
     now: a.now ?? new Date(),
     stock: a.stock ?? null,
+    photoScratch: a.photoScratch ?? null,
   };
   return { input, textPrices };
 }
@@ -96,7 +100,8 @@ export async function stockFor(modelKey: string): Promise<{ count: number; sold3
 export async function evaluateForAd(a: Parameters<typeof buildVerdictInput>[0]): Promise<{ verdict: Verdict; textPrices: { ask: number | null; bid: number | null } | null; cfg: RulesConfig }> {
   const { cfg, prices } = await loadRules();
   const stock = cfg.stock.enabled && a.stock === undefined ? await stockFor(a.rec.modelKey) : a.stock;
-  const { input, textPrices } = buildVerdictInput({ ...a, stock });
+  const photoScratch = a.photoScratch !== undefined ? a.photoScratch : a.ad.id ? photoScratchVerdict(await getPhotoAnalysis(a.ad.id)) : null;
+  const { input, textPrices } = buildVerdictInput({ ...a, stock, photoScratch });
   return { verdict: evaluateRules(input, prices, cfg), textPrices, cfg };
 }
 
@@ -113,6 +118,6 @@ export async function evaluateAdById(adId: string): Promise<{ title: string; url
   const specs = Object.fromEntries(ad.product.specs.filter((s) => s.value !== "onbekend").map((s) => [s.key, { value: /^\d+(\.\d+)?$/.test(s.value) ? Number(s.value) : s.value }]));
   const { cfg, prices } = await loadRules();
   const stock = cfg.stock.enabled ? await stockFor(ad.product.modelKey) : null;
-  const { input } = buildVerdictInput({ ad, rec: { modelKey: ad.product.modelKey, modelLabel: ad.product.modelLabel, family: ad.product.family, facts: specs }, shipping: (ad.shippingOptions as string[]) ?? [], stock });
+  const { input } = buildVerdictInput({ ad, rec: { modelKey: ad.product.modelKey, modelLabel: ad.product.modelLabel, family: ad.product.family, facts: specs }, shipping: (ad.shippingOptions as string[]) ?? [], stock, photoScratch: photoScratchVerdict(await getPhotoAnalysis(ad.id)) });
   return { title: ad.title, url: ad.url, verdict: evaluateRules(input, prices, cfg) };
 }

@@ -31,6 +31,8 @@ export interface VerdictInput {
   shippingOffered: boolean;
   seller: SellerFacts;
   directBuy: boolean;
+  /** oordeel van de foto-analyse (AI) over krassen; telt alleen mee als de tekst niets over krassen zegt */
+  photoScratch?: "free" | "scratched" | null;
   now: Date;
   /** voorraad van dit model (alleen voor de voorraadregel) */
   stock?: { count: number; sold30d: number } | null;
@@ -135,7 +137,8 @@ export function evaluateRules(i: VerdictInput, prices: BasePrice[], cfg: RulesCo
   }
 
   // ---- krassen, batterij ----
-  const sc = analyzeScratch(i.text, i.mpCondition, cfg.scratch);
+  let sc = analyzeScratch(i.text, i.mpCondition, cfg.scratch);
+  if (sc.state === "unknown" && i.photoScratch) { sc = { state: i.photoScratch, evidence: "foto-analyse" }; v.notes.push(`Kras-status uit de foto's (AI): ${i.photoScratch === "free" ? "geen krassen zichtbaar" : "krassen zichtbaar"}`); }
   v.scratch = sc;
   if (sc.state === "free") v.flags.push("scratchFree");
   if (sc.state === "scratched") v.flags.push("scratched");

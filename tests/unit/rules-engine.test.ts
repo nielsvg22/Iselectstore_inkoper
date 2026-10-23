@@ -121,6 +121,16 @@ const input = (o: Partial<VerdictInput> = {}): VerdictInput => ({
   distanceKm: 5, shippingOffered: true, seller: { ageMonths: 60, reviews: 20, rating: 4.9, verified: true }, directBuy: false, now: NOW, ...o,
 });
 
+describe("foto-oordeel over krassen", () => {
+  it("telt alleen mee als de tekst niets over krassen zegt", () => {
+    const unk = evaluateRules(input({ text: "iPhone 14 Pro 128GB", photoScratch: "free" }), PRICES, cfg);
+    expect(unk.scratch).toEqual({ state: "free", evidence: "foto-analyse" });
+    const txt = evaluateRules(input({ text: "met krasjes", photoScratch: "free" }), PRICES, cfg);
+    expect(txt.scratch.state).toBe("scratched");
+    expect(evaluateRules(input({ text: "iPhone 14 Pro 128GB", photoScratch: null }), PRICES, cfg).scratch.state).toBe("unknown");
+  });
+});
+
 describe("totaaloordeel", () => {
   it("max verkoopprijs = basis − batterij − kras; toegestane vraagprijs = max − marge", () => {
     // 400 − 75 (90%) − 0 (krasvrij) = 325; +20 (dichtbij Apeldoorn niet bekend → geen coördinaten) ; − 5 km rijfilter? verkoper voldoet aan het verzendfilter → geen aftrek

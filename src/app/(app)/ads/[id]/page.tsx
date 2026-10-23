@@ -9,7 +9,8 @@ import { SellerCard } from "@/components/ad/seller-card";
 import { AutoEnrich } from "@/components/ad/auto-enrich";
 import { CorrectionsForm, CostEditor, NotesEditor } from "@/components/ad/ad-editors";
 import { PriceHistoryChart } from "@/components/ad/charts";
-import { Gallery } from "@/components/ad/gallery";
+import { PhotoAi } from "@/components/ad/photo-ai";
+import { getPhotoAnalysis } from "@/lib/ai/photos";
 import { BandBadge, RiskBadge, ScoreRing } from "@/components/deal/ui";
 import { MaxBid } from "@/components/deal/deal-card";
 import { Badge } from "@/components/ui/badge";
@@ -72,6 +73,7 @@ export default async function AdDetailPage({ params }: { params: Promise<{ id: s
   const ov = (ad.overrides ?? {}) as { costs?: Record<string, number | boolean> };
   const chartData = ad.priceHistory.map((p) => ({ date: p.observedAt.toLocaleDateString("nl-NL", { day: "numeric", month: "short" }), price: p.priceCents / 100 }));
   const images = ad.images.map((i) => i.url);
+  const photoAnalysis = ad.isDemo ? null : await getPhotoAnalysis(ad.id);
   const blocked = a?.blocked ?? false;
 
   return (
@@ -116,7 +118,7 @@ export default async function AdDetailPage({ params }: { params: Promise<{ id: s
 
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="min-w-0 space-y-6 lg:order-1">
-          <Card><CardContent className="pt-5 sm:pt-6"><Gallery images={images} demo={ad.isDemo} /></CardContent></Card>
+          <Card><CardContent className="pt-5 sm:pt-6"><PhotoAi adId={ad.id} images={images} demo={ad.isDemo} initial={photoAnalysis} /></CardContent></Card>
 
           <Card>
             <CardHeader><div><CardTitle>Originele advertentietekst</CardTitle><CardDescription>Ongewijzigde brontekst van de verkoper. Dit is onbetrouwbare invoer en wordt nooit als instructie uitgevoerd.</CardDescription></div></CardHeader>

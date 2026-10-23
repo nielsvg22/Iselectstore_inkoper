@@ -2,8 +2,9 @@
 import * as React from "react";
 import { cn } from "@/lib/cn";
 import { hiRes } from "@/lib/images";
+import { LABEL_INFO, type PhotoLabel } from "@/lib/ai/photo-labels";
 
-export function Gallery({ images, demo }: { images: string[]; demo: boolean }) {
+export function Gallery({ images, demo, labels }: { images: string[]; demo: boolean; labels?: Record<number, PhotoLabel[]> }) {
   const [i, setI] = React.useState(0);
   if (!images.length) return <div className="flex aspect-[16/10] items-center justify-center rounded-2xl bg-muted-bg text-sm text-muted">Geen foto&apos;s beschikbaar</div>;
   return (
@@ -11,6 +12,13 @@ export function Gallery({ images, demo }: { images: string[]; demo: boolean }) {
       <div className="relative overflow-hidden rounded-2xl bg-muted-bg">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={hiRes(images[i], "full")} alt={`Foto ${i + 1} van ${images.length}`} className="aspect-[4/3] w-full object-contain" referrerPolicy="no-referrer" />
+        {labels?.[i]?.length ? (
+          <div className="absolute bottom-3 left-3 right-3 flex flex-wrap gap-1.5">
+            {labels[i].map((l) => (
+              <span key={l} className={cn("rounded-full px-2.5 py-1 text-xs font-medium backdrop-blur", LABEL_INFO[l].tone === "good" ? "bg-success-soft text-success" : LABEL_INFO[l].tone === "bad" ? "bg-danger-soft text-danger" : "bg-card/80 text-foreground")}>{LABEL_INFO[l].emoji} {LABEL_INFO[l].text}</span>
+            ))}
+          </div>
+        ) : null}
         {demo && <span className="absolute left-3 top-3 rounded-full bg-warning-soft px-2.5 py-1 text-xs font-medium text-warning backdrop-blur">Voorbeelddata</span>}
       </div>
       {images.length > 1 && (
