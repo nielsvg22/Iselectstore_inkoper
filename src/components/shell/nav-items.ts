@@ -1,4 +1,4 @@
-import { Activity, BarChart3, Gauge, Smartphone, Bell, Download, LayoutGrid, LineChart, Filter, Scale, Search, Settings, ShoppingBag, Tag } from "lucide-react";
+import { Activity, ListChecks, Mail, BarChart3, Gauge, Smartphone, Bell, Download, LayoutGrid, LineChart, Filter, Scale, Search, Settings, ShoppingBag, Tag } from "lucide-react";
 
 export const MAIN_NAV = [
   { href: "/", label: "Dashboard", icon: LayoutGrid },
@@ -12,6 +12,8 @@ export const MAIN_NAV = [
 export const MORE_NAV = [
   { href: "/purchases", label: "Mijn inkopen", icon: ShoppingBag },
   { href: "/rules", label: "Inkoopregels", icon: Scale },
+  { href: "/rules/zoekfilters", label: "Zoekfilters", icon: ListChecks },
+  { href: "/rules/automsg", label: "Auto-berichten", icon: Mail },
   { href: "/funnel", label: "Funnel & aanbod", icon: Filter },
   { href: "/market", label: "Marktdata", icon: LineChart },
   { href: "/import", label: "Importeren", icon: Download },
@@ -22,6 +24,7 @@ export const MORE_NAV = [
 
 export function isActive(path: string, href: string): boolean {
   if (href === "/") return path === "/";
+  if (href === "/rules") return path === "/rules" || path.startsWith("/rules/beslisboom");
   if (href === "/deals") return path.startsWith("/deals") || path.startsWith("/ads");
   return path === href || path.startsWith(href + "/");
 }
