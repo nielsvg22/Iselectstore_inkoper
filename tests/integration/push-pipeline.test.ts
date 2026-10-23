@@ -619,3 +619,28 @@ describe("push naar meerdere apparaten (Chrome en iPhone)", () => {
     expect(JSON.stringify(list)).not.toContain("googleapis");
   });
 });
+
+describe("terugmelding van de browser (getoond of niet)", () => {
+  it("de browser meldt getoond of een fout; alleen voor eigen apparaten", async () => {
+    const { user, cookie } = await setup({ push: false });
+    const other = await makeUser("USER", "ander@example.com");
+    await prisma.pushSubscription.create({ data: { userId: user.id, endpoint: "https://fcm.googleapis.com/fcm/send/win", p256dh: "p".repeat(30), auth: "a".repeat(12), label: "Windows-pc" } });
+    const { createHash } = await import("node:crypto");
+    const endpointId = createHash("sha256").update("https://fcm.googleapis.com/fcm/send/win").digest("hex").slice(0, 16);
+    const { POST: ackPost } = await import("@/app/api/push/ack/route");
+    const post = (body: unknown, c: string) => ackPost(req("/api/push/ack", { method: "POST", body, cookie: c }));
+    expect(((await (await post({ endpointId, ok: true }, cookie)).json()) as { ok: boolean }).ok).toBe(true);
+    let row = await prisma.pushSubscription.findFirstOrThrow({ where: { userId: user.id } });
+    expect(row.lastShownAt).toBeTruthy();
+    expect(row.lastShowError).toBeNull();
+    await post({ endpointId, ok: false, error: "No notification permission has been granted for this origin" }, cookie);
+    row = await prisma.pushSubscription.findFirstOrThrow({ where: { userId: user.id } });
+    expect(row.lastShowError).toMatch(/permission/);
+    // een andere gebruiker raakt dit apparaat niet; ongeldige invoer wordt geweigerd; zonder sessie geen toegang
+    expect(((await (await post({ endpointId, ok: true }, other.cookie)).json()) as { ok: boolean }).ok).toBe(false);
+    expect((await post({ endpointId: "zomaar", ok: true }, cookie)).status).toBe(400);
+    expect((await ackPost(req("/api/push/ack", { method: "POST", body: { endpointId, ok: true } }))).status).toBe(401);
+    const list = (await (await devicesGet(req("/api/push/devices", { cookie }))).json()) as { devices: Array<{ lastShowError: string | null }> };
+    expect(list.devices[0].lastShowError).toMatch(/permission/);
+  });
+});

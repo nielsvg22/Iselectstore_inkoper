@@ -13,7 +13,7 @@ import type { NotifyPrefs } from "@/lib/notify/prefs";
 import { currentSubscription, deliveryHint, endpointId, friendlyPushError, platformOf, pushSupport, sameKey, urlBase64ToUint8Array, type PushSupport } from "@/lib/pwa-client";
 import { timeAgo } from "@/lib/format";
 
-interface Device { id: string; endpointId: string; label: string; enabled: boolean; failures: number; lastSuccessAt: string | null; lastError: string | null }
+interface Device { id: string; endpointId: string; label: string; enabled: boolean; failures: number; lastSuccessAt: string | null; lastError: string | null; lastShownAt: string | null; lastShowError: string | null }
 
 export function PushSettings({ initialPrefs, profiles }: { initialPrefs: NotifyPrefs; profiles: Array<{ id: string; name: string }> }) {
   const toast = useToast();
@@ -157,6 +157,7 @@ export function PushSettings({ initialPrefs, profiles }: { initialPrefs: NotifyP
                 <Smartphone className="h-4 w-4 text-muted" />
                 <div className="min-w-0 flex-1">
                   <p className="flex flex-wrap items-center gap-2 text-sm font-medium">{d.label || "Apparaat"}{d.endpointId === hereId && <Badge tone="accent">Dit apparaat</Badge>}{!d.enabled && d.failures > 0 && <Badge tone="danger">Uitgeschakeld na fouten</Badge>}</p>
+                  {d.lastShowError ? <p className="text-xs text-danger">De browser kon de melding niet tonen: {d.lastShowError}. Controleer of meldingen voor deze site zijn toegestaan.</p> : d.lastSuccessAt && d.lastShownAt ? <p className="text-xs text-muted">Laatst getoond door de browser {timeAgo(d.lastShownAt)}. Zie je niets? Dan blokkeert Windows of macOS de melding (Focus/Niet storen, of meldingen voor de browser uit).</p> : d.lastSuccessAt ? <p className="text-xs text-warning">Bezorgd bij de pushdienst, maar de browser heeft nog niet teruggemeld dat hij de melding toonde. Open de browser en probeer opnieuw.</p> : null}
                   <p className="truncate text-xs text-muted">{d.lastError ? `Laatste fout (${d.failures}×): ${d.lastError}` : d.lastSuccessAt ? `Laatst bezorgd ${timeAgo(d.lastSuccessAt)}` : "Nog niets verstuurd"}</p>
                 </div>
                 <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" className="h-4 w-4 accent-[var(--accent)]" checked={d.enabled} onChange={async (e) => { await api(`/api/push/devices/${d.id}`, { method: "PATCH", body: { enabled: e.target.checked } }); await refresh(); }} />Aan</label>
