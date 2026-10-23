@@ -347,6 +347,8 @@ test("eigen filters: maken in Instellingen met productlijst, toepassen op dashbo
 test("instellingen: geheimen worden nooit teruggetoond", async ({ page }) => {
   await login(page);
   await page.goto("/settings");
+  // wacht tot de pagina klaar is (hydratie): anders overschrijft React een te vroeg ingevuld veld
+  await page.waitForLoadState("networkidle");
   const token = "123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZabcd";
   await page.getByLabel("Telegram Bot Token").fill(token);
   await page.getByLabel("Telegram Chat ID").fill("4242");

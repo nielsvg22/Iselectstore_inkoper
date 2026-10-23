@@ -1,3 +1,4 @@
+import { sharedNotifyUserIds } from "../notify/shared";
 import { allowsPurchase, purchasePolicy, validDriveSeconds } from "../radar/driving";
 import { purchaseStatus } from "../radar/safety";
 import { inCityScope } from "../radar/locality";
@@ -699,6 +700,7 @@ export async function matchProfiles(
     where: { active: true },
   });
   const prefsCache = new Map<string, { prefs: NotifyPrefs; push: boolean }>();
+  const shared = await sharedNotifyUserIds();
   for (const p of profiles) {
     try {
       const tree = await loadTree(p.id);
@@ -806,59 +808,31 @@ export async function matchProfiles(
               runAt,
             });
         }
-        // Pop-up in de app: één per gebruiker per advertentie, direct "verzonden" (de geopende app haalt ze op)
-        if (
-          prefs.prefs.popup &&
-          passesPrefs(prefs.prefs, {
-            score: meta.score,
-            band: meta.band,
-            netProfitCents: meta.netProfitCents,
-            profileId: p.id,
-          }).ok
-        ) {
-          const key = `INAPP:${adId}:${p.userId}`;
-          if (
-            !(await prisma.notification.findUnique({
-              where: { dedupeKey: key },
-            }))
-          ) {
-            try {
-              await prisma.notification.create({
-                data: {
-                  adId,
-                  profileId: p.id,
-                  userId: p.userId,
-                  channel: "INAPP",
-                  dedupeKey: key,
-                  status: "SENT",
-                  sentAt: new Date(),
-                },
-              });
-            } catch (e) {
-              if ((e as { code?: string }).code !== "P2002") throw e;
+        // Pop-up en Web Push: één per gebruiker per advertentie, voor de eigenaar van het profiel én voor accounts die de radar meekijken (zie Instellingen → Gebruikers)
+        for (const uid of [p.userId, ...shared.filter((x) => x !== p.userId)]) {
+          let up = prefsCache.get(uid);
+          if (!up) {
+            up = {
+              prefs: await getPrefs(uid),
+              push: (await prisma.pushSubscription.count({ where: { userId: uid, enabled: true } })) > 0,
+            };
+            prefsCache.set(uid, up);
+          }
+          const facts = { score: meta.score, band: meta.band, netProfitCents: meta.netProfitCents, profileId: p.id };
+          const userRunAt = quietEndsAt(up.prefs) ?? undefined;
+          if (up.prefs.popup && passesPrefs(up.prefs, facts).ok) {
+            const key = `INAPP:${adId}:${uid}`;
+            if (!(await prisma.notification.findUnique({ where: { dedupeKey: key } }))) {
+              try {
+                await prisma.notification.create({ data: { adId, profileId: p.id, userId: uid, channel: "INAPP", dedupeKey: key, status: "SENT", sentAt: new Date() } });
+              } catch (e) {
+                if ((e as { code?: string }).code !== "P2002") throw e;
+              }
             }
           }
-        }
-        // Web Push: één melding per gebruiker per advertentie (ook als meerdere profielen matchen)
-        if (
-          prefs.push &&
-          prefs.prefs.push &&
-          passesPrefs(prefs.prefs, {
-            score: meta.score,
-            band: meta.band,
-            netProfitCents: meta.netProfitCents,
-            profileId: p.id,
-          }).ok
-        ) {
-          await createNotification({
-            adId,
-            profileId: p.id,
-            userId: p.userId,
-            channel: "WEBPUSH",
-            dedupeKey: `WEBPUSH:${adId}:${p.userId}`,
-            runAt: complete ? runAt : runAt,
-            priority: complete ? 30 : 40,
-          });
+          if (up.push && up.prefs.push && passesPrefs(up.prefs, facts).ok) {
+            await createNotification({ adId, profileId: p.id, userId: uid, channel: "WEBPUSH", dedupeKey: `WEBPUSH:${adId}:${uid}`, runAt: userRunAt, priority: complete ? 30 : 40 });
+          }
         }
       }
     } catch (e) {

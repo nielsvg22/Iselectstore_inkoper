@@ -11,13 +11,14 @@ import { api } from "@/lib/client-api";
 interface UserRow { id: string; email: string; name: string | null; role: "ADMIN" | "USER" }
 
 /** Gebruikersbeheer (alleen beheerders): account aanmaken met tijdelijk wachtwoord, of een nieuw wachtwoord zetten. */
-export function UsersCard({ users }: { users: UserRow[] }) {
+export function UsersCard({ users, sharedIds }: { users: UserRow[]; sharedIds: string[] }) {
   const router = useRouter();
   const toast = useToast();
   const [email, setEmail] = React.useState("");
   const [name, setName] = React.useState("");
   const [role, setRole] = React.useState<"ADMIN" | "USER">("USER");
   const [busy, setBusy] = React.useState(false);
+  const [shared, setShared] = React.useState<string[]>(sharedIds);
   const [secret, setSecret] = React.useState<{ email: string; password: string } | null>(null);
 
   async function create(e: React.FormEvent) {
@@ -33,6 +34,16 @@ export function UsersCard({ users }: { users: UserRow[] }) {
       toast((err as Error).message);
     } finally {
       setBusy(false);
+    }
+  }
+  async function toggleShared(u: UserRow, on: boolean) {
+    const next = on ? [...new Set([...shared, u.id])] : shared.filter((x) => x !== u.id);
+    try {
+      const r = await api<{ userIds: string[] }>("/api/notify/shared", { method: "PUT", body: { userIds: next } });
+      setShared(r.userIds);
+      toast(on ? `${u.email} krijgt nu de dealmeldingen van de radar` : `${u.email} krijgt geen dealmeldingen meer`);
+    } catch (err) {
+      toast((err as Error).message);
     }
   }
   async function reset(u: UserRow) {
@@ -58,8 +69,9 @@ export function UsersCard({ users }: { users: UserRow[] }) {
                 <p className="truncate text-sm font-medium">{u.name || u.email}</p>
                 {u.name && <p className="truncate text-xs text-muted">{u.email}</p>}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
                 <Badge>{u.role === "ADMIN" ? "Beheerder" : "Gebruiker"}</Badge>
+                <label className="flex w-full cursor-pointer items-center gap-2 text-xs sm:w-auto"><input type="checkbox" className="h-4 w-4 accent-[var(--accent)]" checked={shared.includes(u.id)} onChange={(e) => void toggleShared(u, e.target.checked)} aria-label={`Dealmeldingen van de radar voor ${u.email}`} />Krijgt dealmeldingen van de radar</label>
                 <Button type="button" variant="outline" size="sm" onClick={() => reset(u)}><KeyRound className="h-4 w-4" /> Nieuw wachtwoord</Button>
               </div>
             </li>
