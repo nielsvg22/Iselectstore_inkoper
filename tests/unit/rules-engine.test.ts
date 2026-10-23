@@ -168,6 +168,18 @@ describe("totaaloordeel", () => {
     expect(far({ seller: { ageMonths: 130, reviews: 5, rating: 4.9, verified: true }, askEuro: 100 }).status).not.toBe("reject");
     expect(evaluateRules(input({ distanceKm: 301 }), PRICES, cfg).status).toBe("reject");
   });
+  it("verzending meenemen uit: alleen binnen het ophaalgebied, ook bij een perfecte verkoper", () => {
+    const off = { ...cfg, distance: { ...cfg.distance, includeShipping: false, pickupMaxKm: 40 } };
+    const perfect = { ageMonths: 200, reviews: 500, rating: 5, verified: true };
+    const at = (km: number | null, c = off) => evaluateRules(input({ distanceKm: km, seller: perfect, askEuro: 100 }), PRICES, c);
+    expect(at(40).status).not.toBe("reject");
+    expect(at(41).status).toBe("reject");
+    expect(at(41).reasons[0]).toMatch(/buiten 40 km hemelsbreed \(verzending staat uit\)/);
+    expect(at(120).status).toBe("reject");
+    expect(at(null).status).toBe("review"); // afstand onbekend: niet bewezen, wel gemarkeerd
+    // met verzending aan komt dezelfde verkoper op 120 km wel door
+    expect(at(120, cfg).status).not.toBe("reject");
+  });
   it("nieuwste Pro/Pro Max: nooit verder dan 50 km", () => {
     const p: BasePrice[] = [{ modelKey: "iphone-17-pro", storageGb: 256, variant: "", priceEuro: 900, kind: "sell" }];
     const v = evaluateRules(input({ modelKey: "iphone-17-pro", modelLabel: "iPhone 17 Pro", storageGb: 256, distanceKm: 80, seller: { ageMonths: 130, reviews: 9, rating: 5, verified: true } }), p, cfg);

@@ -71,6 +71,19 @@ describe("inkoopregels in de beoordelingsketen", () => {
     expect((a.costs as { rules: { status: string } }).rules.status).toBe("skip");
   });
 
+  it("verzending meenemen uit: buiten 40 km hemelsbreed geen melding, ook niet voor modellen zonder basisprijs", async () => {
+    await setup();
+    await saveRules({ ...(await getRules()), distance: { ...(await getRules()).distance, includeShipping: false, pickupMaxKm: 40 } });
+    clearRulesCache();
+    // iPhone 14 heeft geen basisprijs: de bestaande waardering beslist, maar de afstandsgrens geldt altijd
+    await analyzed(raw({ externalId: "m4000010", url: "https://www.marktplaats.nl/v/x/m4000010-iphone", title: "iPhone 14 128GB", distanceKm: 92, shipping: ["pickup", "shipping"], seller: { id: "9", name: "Ver", verified: true, business: false, anonymous: false, rating: 5, reviewCount: 200, accountAgeMonths: 200 } }));
+    expect(await pushCount()).toBe(0);
+    await analyzed(raw({ externalId: "m4000011", url: "https://www.marktplaats.nl/v/x/m4000011-iphone", distanceKm: 92, seller: { id: "9", name: "Ver", verified: true, business: false, anonymous: false, rating: 5, reviewCount: 200, accountAgeMonths: 200 }, shipping: ["pickup", "shipping"] }));
+    expect(await pushCount()).toBe(0);
+    await analyzed(raw({ externalId: "m4000012", url: "https://www.marktplaats.nl/v/x/m4000012-iphone", title: "iPhone 15 Pro 256GB Blauw Titanium", imageUrls: ["https://img.example/b1.jpg", "https://img.example/b2.jpg", "https://img.example/b3.jpg"], distanceKm: 30 }));
+    expect(await pushCount()).toBe(1);
+  });
+
   it("prijs uit tekst als de advertentie geen prijs heeft", async () => {
     await setup();
     const id = await analyzed(raw({ externalId: "m4000005", url: "https://www.marktplaats.nl/v/x/m4000005-iphone", askingCents: null, attributes: { priceType: "SEE_DESCRIPTION" }, description: "Vraagprijs €310. Batterij 91%. Krasvrij." }));

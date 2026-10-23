@@ -99,3 +99,9 @@ export async function evaluateForAd(a: Parameters<typeof buildVerdictInput>[0]):
   const { input, textPrices } = buildVerdictInput({ ...a, stock });
   return { verdict: evaluateRules(input, prices, cfg), textPrices, cfg };
 }
+
+/** Als "verzending meenemen" uit staat: tot hoeveel km (hemelsbreed) er maximaal opgehaald wordt; anders null. */
+export async function pickupOnlyKm(): Promise<number | null> {
+  const { cfg } = await loadRules();
+  return cfg.enabled && !cfg.distance.includeShipping ? cfg.distance.pickupMaxKm : null;
+}

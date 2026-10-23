@@ -66,6 +66,8 @@ export const rulesSchema = z.object({
     newCountsAsFree: z.boolean().default(true),
   }).default({}),
   distance: z.object({
+    /** "Verzending meenemen": uit = alleen ophalen binnen `pickupMaxKm` hemelsbreed; verder weg komt er niets doorheen, ook niet bij 5 sterren */
+    includeShipping: z.boolean().default(true),
     pickupMaxKm: num(50),
     maxKmDefault: num(300),
     /** nieuwste Pro/Pro Max: nooit verzenden */

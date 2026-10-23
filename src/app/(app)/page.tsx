@@ -1,3 +1,4 @@
+import { pickupOnlyKm } from "@/lib/rules/apply";
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/client";
@@ -18,11 +19,12 @@ export default async function DashboardPage({
   const sp = await searchParams;
   const tab = sp.tab === "top" ? "top" : sp.tab === "saved" ? "saved" : "new";
   const cfg = await getConfig();
+  const pickupKm = await pickupOnlyKm();
   const base: Prisma.AdvertisementWhereInput = {
     isDemo: cfg.demoMode,
     duplicateOfId: null,
     userState: { not: "IGNORED" },
-    AND: [cityScopeWhere(cfg.radar.cityOnly), drivingWhere(cfg)],
+    AND: [cityScopeWhere(cfg.radar.cityOnly), drivingWhere(cfg), ...(pickupKm != null ? [{ OR: [{ distanceKm: null }, { distanceKm: { lte: pickupKm } }] }] : [])],
   };
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);

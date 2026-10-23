@@ -108,8 +108,12 @@ export function evaluateRules(i: VerdictInput, prices: BasePrice[], cfg: RulesCo
   if (hits.some((h) => h.hot)) v.flags.push("hot");
   const maxKm = newestPro ? cfg.distance.newestProMaxKm : cfg.distance.maxKmDefault;
   let shipping: ShipResult | null = null;
-  let needsSellerCheck = false;
-  if (km == null) v.notes.push("Afstand onbekend");
+  let reviewReason: string | null = null;
+  if (km == null) {
+    v.notes.push("Afstand onbekend");
+    if (!cfg.distance.includeShipping) { reviewReason = `Afstand onbekend: ophalen binnen ${cfg.distance.pickupMaxKm} km is niet vast te stellen`; v.flags.push("distanceUnknown"); }
+  }
+  else if (!cfg.distance.includeShipping && km > cfg.distance.pickupMaxKm) return reject(`${km} km is buiten ${cfg.distance.pickupMaxKm} km hemelsbreed (verzending staat uit)`);
   else if (km > maxKm) return reject(`${km} km is verder dan het maximum van ${maxKm} km${newestPro ? " voor de nieuwste Pro/Pro Max" : ""}`);
   else if (km > cfg.distance.pickupMaxKm) {
     if (!i.shippingOffered) return reject(`${km} km is verder dan ${cfg.distance.pickupMaxKm} km en de verkoper biedt geen verzending aan`);
@@ -117,7 +121,7 @@ export function evaluateRules(i: VerdictInput, prices: BasePrice[], cfg: RulesCo
       shipping = shippingEligibility(i.seller, cfg.shipping);
       v.distance.shipping = shipping;
       if (shipping.status === "never" || shipping.status === "fail") return reject(`Verzendfilter: ${shipping.reasons.join("; ")}`);
-      if (shipping.status === "unknown") { needsSellerCheck = true; v.flags.push("sellerCheck"); v.notes.push(`Verkoper handmatig controleren: ${shipping.reasons.join("; ")}`); }
+      if (shipping.status === "unknown") { reviewReason ??= "Verkoper handmatig controleren"; v.flags.push("sellerCheck"); v.notes.push(`Verkoper handmatig controleren: ${shipping.reasons.join("; ")}`); }
     }
   } else if (cfg.distance.perKmEnabled) {
     shipping = shippingEligibility(i.seller, cfg.shipping);
@@ -226,7 +230,7 @@ export function evaluateRules(i: VerdictInput, prices: BasePrice[], cfg: RulesCo
     if (zb.requireScratchFree && sc.state !== "free") fails.push("niet krasvrij/altijd beschermd");
     if (!trusted && !near) fails.push(`geen betrouwbare verkoper en niet binnen ${zb.requireTrustedOrNearKm} km`);
     v.flags.push("bid0");
-    if (fails.length === 0) { v.notes.push("Bieden vanaf €0: voldoet aan de aanvullende voorwaarden (batterij, krasvrij, betrouwbaar of dichtbij)"); v.effectiveEuro = null; return finish(v, i, cfg, null, true, false, "bid", needsSellerCheck); }
+    if (fails.length === 0) { v.notes.push("Bieden vanaf €0: voldoet aan de aanvullende voorwaarden (batterij, krasvrij, betrouwbaar of dichtbij)"); v.effectiveEuro = null; return finish(v, i, cfg, null, true, false, "bid", reviewReason); }
     if (cfg.bid.zeroBidMode === "filter") return reject(`Bieden vanaf €0 zonder prijs en niet interessant: ${fails.join("; ")}`);
     v.status = "review"; v.reasons.push(`Bieden vanaf €0: ${fails.join("; ")}`); return v;
   } else {
@@ -234,10 +238,10 @@ export function evaluateRules(i: VerdictInput, prices: BasePrice[], cfg: RulesCo
   }
   v.effectiveEuro = eff;
   if (eff != null && eff > 0 && eff < minP) return reject(`€${eff} is lager dan de minimumprijs €${minP} (waarschijnlijk hoesje of accessoire)`);
-  return finish(v, i, cfg, eff, pass, high, kindForHigh, needsSellerCheck);
+  return finish(v, i, cfg, eff, pass, high, kindForHigh, reviewReason);
 }
 
-function finish(v: Verdict, i: VerdictInput, cfg: RulesConfig, eff: number | null, pass: boolean, high: boolean, kind: "ask" | "bid", needsSellerCheck = false): Verdict {
+function finish(v: Verdict, i: VerdictInput, cfg: RulesConfig, eff: number | null, pass: boolean, high: boolean, kind: "ask" | "bid", reviewReason: string | null = null): Verdict {
   const known = new Set(cfg.highMargin.requireKnown);
   const allKnown =
     (!known.has("model") || i.family !== "unknown") &&
@@ -255,8 +259,8 @@ function finish(v: Verdict, i: VerdictInput, cfg: RulesConfig, eff: number | nul
     if (i.stock.count >= threshold) v.notes.push(`Voorraad ${i.stock.count} ≥ ${threshold}: alleen hoge marge toegelaten`);
   }
   if (isHigh) v.flags.push("high");
-  v.status = needsSellerCheck ? "review" : isHigh ? "high" : "match";
-  if (needsSellerCheck) v.reasons.push("Verkoper handmatig controleren");
+  v.status = reviewReason ? "review" : isHigh ? "high" : "match";
+  if (reviewReason) v.reasons.push(reviewReason);
   return v;
 }
 

@@ -1,4 +1,4 @@
-import { evaluateForAd } from "@/lib/rules/apply";
+import { evaluateForAd, pickupOnlyKm } from "@/lib/rules/apply";
 import type { Verdict } from "@/lib/rules/verdict";
 import { allowsPurchase, purchasePolicy, validDriveSeconds } from "../radar/driving";
 import { purchaseStatus } from "../radar/safety";
@@ -678,6 +678,7 @@ export async function analyzeAd(
         publishedAt: ad.publishedAt,
         origin: ad.origin,
         rules: rulesVerdict ? { status: rulesVerdict.status, replaceDistancePolicy: rulesVerdict.replaceDistancePolicy !== false } : null,
+        pickupOnlyKm: await pickupOnlyKm(),
         complete:
           !["SEARCH", "PARTNER_API"].includes(ad.origin) ||
           Boolean(ad.detailFetchedAt) ||
@@ -705,6 +706,8 @@ export async function matchProfiles(
     publishedAt: Date | null;
     origin: string;
     /** volledige advertentie beoordeeld (detailpagina) */ complete: boolean;
+    /** alleen ophalen binnen zoveel km hemelsbreed (verzending uit); null = geen beperking */
+    pickupOnlyKm?: number | null;
     /** oordeel van de inkoopregels; "skip" of null = bestaande logica */
     rules?: { status: string; replaceDistancePolicy: boolean } | null;
   },
@@ -719,7 +722,8 @@ export async function matchProfiles(
       const tree = await loadTree(p.id);
       const rulesOn = Boolean(meta.rules && meta.rules.status !== "skip");
       const bypassPolicy = rulesOn && meta.rules!.replaceDistancePolicy;
-      const matched = (bypassPolicy || (inCityScope(ctx.location, cfg.radar.cityOnly) && allowsPurchase({
+      const tooFar = meta.pickupOnlyKm != null && ctx.distanceKm != null && ctx.distanceKm > meta.pickupOnlyKm;
+      const matched = !tooFar && (bypassPolicy || (inCityScope(ctx.location, cfg.radar.cityOnly) && allowsPurchase({
         distanceKm: ctx.distanceKm, driveSeconds: ctx.driveSeconds, shipping: ctx.shippingAvailable,
         rating: ctx.sellerRating, reviews: ctx.sellerReviewCount, ageMonths: ctx.sellerAgeMonths,
         blocked: ctx.blocked, suspicious: ctx.riskLevel === "HIGH" || ctx.riskLevel === "BLOCKED",

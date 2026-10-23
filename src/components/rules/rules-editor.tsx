@@ -110,6 +110,7 @@ export function RulesEditor({ initialRules, initialPrices, isAdmin }: { initialR
         <CardContent className="space-y-6">
           <div className="flex flex-wrap gap-6">
             <Switch checked={rules.enabled} onChange={(v) => setR((r) => ({ ...r, enabled: v }))} label="Inkoopregels aan" disabled={!isAdmin} />
+            <Switch checked={rules.distance.includeShipping} onChange={(v) => setR((r) => ({ ...r, distance: { ...r.distance, includeShipping: v } }))} label="Verzending meenemen" disabled={!isAdmin} />
             <Switch checked={rules.replaceDistancePolicy} onChange={(v) => setR((r) => ({ ...r, replaceDistancePolicy: v }))} label="Regels vervangen het eerdere afstandsbeleid" disabled={!isAdmin} />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -125,7 +126,7 @@ export function RulesEditor({ initialRules, initialPrices, isAdmin }: { initialR
             {numField("Batterij ondergrens aanname (%)", () => rules.battery.floorPct, (v) => setR((r) => ({ ...r, battery: { ...r.battery, floorPct: v } })))}
             {numField("Kras onbekend: aftrek €", () => rules.scratch.unknownEuro, (v) => setR((r) => ({ ...r, scratch: { ...r.scratch, unknownEuro: v } })))}
             {numField("Met krassen: aftrek €", () => rules.scratch.scratchedEuro, (v) => setR((r) => ({ ...r, scratch: { ...r.scratch, scratchedEuro: v } })))}
-            {numField("Ophalen tot (km, hemelsbreed)", () => rules.distance.pickupMaxKm, (v) => setR((r) => ({ ...r, distance: { ...r.distance, pickupMaxKm: v } })))}
+            {numField("Ophalen tot (km, hemelsbreed)", () => rules.distance.pickupMaxKm, (v) => setR((r) => ({ ...r, distance: { ...r.distance, pickupMaxKm: v } })), rules.distance.includeShipping ? undefined : "Verzending staat uit: alles verder dan dit valt af, ook bij 5 sterren")}
             {numField("Maximaal (km, verzenden)", () => rules.distance.maxKmDefault, (v) => setR((r) => ({ ...r, distance: { ...r.distance, maxKmDefault: v } })))}
             {numField("Nieuwste Pro/Pro Max maximaal (km)", () => rules.distance.newestProMaxKm, (v) => setR((r) => ({ ...r, distance: { ...r.distance, newestProMaxKm: v } })))}
             {numField("Rijfilter: € per km", () => rules.distance.perKmEuro, (v) => setR((r) => ({ ...r, distance: { ...r.distance, perKmEuro: v } })), "Gaat van de maximale prijs af als de verkoper niet aan het verzendfilter voldoet", "0.1")}

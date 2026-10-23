@@ -690,6 +690,14 @@ test("inkoopregels: basisprijs invullen, regels testen, gebruiker aanmaken als b
   await page.getByRole("button", { name: "Beoordeel" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Toegestane vraagprijs" })).toBeVisible();
   await expect(page.getByRole("status").filter({ hasText: "€615" }).first()).toBeVisible();
+  // verzending meenemen uitzetten en bewaren
+  const ship = page.getByRole("switch", { name: "Verzending meenemen" });
+  await expect(ship).toHaveAttribute("aria-checked", "true");
+  await ship.click();
+  await page.getByRole("button", { name: "Opslaan" }).nth(1).click();
+  await expect(page.getByText("Inkoopregels opgeslagen")).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("switch", { name: "Verzending meenemen" })).toHaveAttribute("aria-checked", "false");
   // controle op bestaande advertenties
   await page.getByRole("button", { name: "Controleren" }).click();
   await expect(page.getByText(/advertenties$/).first()).toBeVisible();
