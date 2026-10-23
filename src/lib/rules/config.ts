@@ -33,8 +33,8 @@ export const rulesSchema = z.object({
   priceBase: z.enum(["sell", "buy85"]).default("sell"),
   /** wat als er geen basisprijs voor model/opslag is: bestaande waardering gebruiken of overslaan */
   unknownBase: z.enum(["fallback", "skip"]).default("fallback"),
-  /** Als de regels een oordeel geven vervangen ze het eerdere afstands-/rijtijdbeleid (de regels bevatten hun eigen afstands- en verzendfilter) */
-  replaceDistancePolicy: z.boolean().default(true),
+  /** Als de regels een oordeel geven vervangen ze het eerdere afstands-/rijtijdbeleid; standaard uit zodat het bestaande beleid blijft gelden */
+  replaceDistancePolicy: z.boolean().default(false),
   marginTable: z.enum(["A", "B"]).default("A"),
   /** hoge-marge extra: "same" = de extra van de vraagprijs-kolom voor beide (zoals in het voorbeeld), "table" = eigen kolom per soort */
   highMarginBidMode: z.enum(["same", "table"]).default("same"),
