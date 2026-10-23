@@ -240,6 +240,31 @@ function fromListingObject(
  * de exacte actuele paginastructuur van Marktplaats is niet verifieerbaar vanuit elke omgeving.
  * Gebruik de pagina Bronnen > "Test URL" om te controleren of uw URL goed wordt uitgelezen.
  */
+/** "19 jaar", "3 maanden", "2 weken", "0 dagen" → maanden (afgerond). Onbekende tekst geeft null; er wordt niets gegokt. */
+export function parseActiveSince(text: string | null | undefined): number | null {
+  const m = /^\s*(\d+)\s*(dagen?|weken?|maand(?:en)?|jaar|jaren)\s*$/i.exec(text ?? "");
+  if (!m) return null;
+  const n = Number(m[1]);
+  const unit = m[2].toLowerCase();
+  const months = unit.startsWith("dag") ? n / 30 : unit.startsWith("we") ? (n * 7) / 30 : unit.startsWith("maand") ? n : n * 12;
+  return Math.round(months);
+}
+
+/**
+ * Verkoper uit de detailpagina (publieke /v/-pagina): sinds wanneer de verkoper op Marktplaats zit en of het een bedrijf is.
+ * De reviews staan op een pad dat robots.txt afsluit (/experiences/*) en worden dus niet gelezen.
+ */
+export function sellerFromHtml(html: string): { id: string | null; accountAgeMonths: number | null; business: boolean | null } | null {
+  const diff = /activeSinceDiff\\?"\s*:\s*\\?"([^"\\]{1,30})/.exec(html)?.[1] ?? null;
+  const years = /activeYears\\?"\s*:\s*(\d{1,3})\b/.exec(html)?.[1];
+  let age = parseActiveSince(diff);
+  if (age == null && years != null) age = Number(years) * 12;
+  const type = /sellerType\\?"\s*:\s*\\?"([A-Z_]{3,20})/.exec(html)?.[1];
+  const id = /\\?"seller\\?"\s*:\s*\{\s*\\?"id\\?"\s*:\s*(\d{3,12})/.exec(html)?.[1] ?? null;
+  if (age == null && !type) return null;
+  return { id, accountAgeMonths: age, business: type === "TRADER" ? true : null };
+}
+
 export function parseListingHtml(html: string, pageUrl: string): RawAd {
   const candidates: Partial<RawAd>[] = [];
   const blocks = scriptBlocks(html);
@@ -362,11 +387,21 @@ export function parseListingHtml(html: string, pageUrl: string): RawAd {
     distanceKm: merged.distanceKm ?? null,
     category: merged.category ?? null,
     sellerType: merged.sellerType ?? null,
-    seller: merged.seller,
+    seller: mergeSeller(merged.seller, sellerFromHtml(html)),
     shipping: merged.shipping ?? [],
     conditionText: merged.conditionText ?? null,
     publishedAt: merged.publishedAt ?? null,
     imageUrls: merged.imageUrls ?? [],
     attributes: merged.attributes ?? {},
+  };
+}
+
+function mergeSeller(base: RawAd["seller"], html: ReturnType<typeof sellerFromHtml>): RawAd["seller"] {
+  if (!html) return base;
+  return {
+    ...(base ?? {}),
+    id: base?.id ?? html.id,
+    accountAgeMonths: base?.accountAgeMonths ?? html.accountAgeMonths,
+    business: base?.business ?? html.business,
   };
 }

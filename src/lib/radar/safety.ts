@@ -69,5 +69,11 @@ export function purchaseStatus(
     Number.isFinite(i.ageMonths) && i.ageMonths >= p.minAgeMonths
   )
     return { key: "shipping", label: "Betrouwbare verzending" } as const;
+  // Verder dan het ophaalgebied en een bewezen te jong account: verzenden is geen optie (accountleeftijd komt uit de detailpagina)
+  if (
+    known && value > limit &&
+    i.ageMonths != null && Number.isFinite(i.ageMonths) && i.ageMonths < p.minAgeMonths
+  )
+    return { key: "young", label: "Account te nieuw voor verzending" } as const;
   return { key: "review", label: "Verkoper controleren" } as const;
 }

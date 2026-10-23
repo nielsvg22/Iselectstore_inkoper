@@ -37,6 +37,9 @@ describe("Apeldoorn inkoopveiligheid", () => {
     expect(purchaseStatus({ ...ad, rating: 4.5 }).key).toBe("review");
     expect(purchaseStatus({ ...ad, shipping: false }).key).toBe("review");
     expect(purchaseStatus({ ...ad, suspicious: true }).key).toBe("excluded");
+    // bewezen te jong account buiten het ophaalgebied: nooit verzenden (onbekende leeftijd blijft "controleren")
+    expect(purchaseStatus({ ...ad, ageMonths: 0 }).key).toBe("young");
+    expect(purchaseStatus({ ...ad, ageMonths: 0, distanceKm: 40 }).key).toBe("local");
     expect(purchaseStatus({ ...ad, distanceKm: 40 }).key).toBe("local");
   });
   it("houdt onbekende gegevens zichtbaar, maar keurt ze niet goed voor verzending", () => {
