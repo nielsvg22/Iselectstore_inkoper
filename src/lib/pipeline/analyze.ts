@@ -1,4 +1,5 @@
 import { evaluateForAd, pickupOnlyKm } from "@/lib/rules/apply";
+import { prepareAutoMessage } from "@/lib/rules/automsg";
 import type { Verdict } from "@/lib/rules/verdict";
 import { sharedNotifyUserIds } from "../notify/shared";
 import { allowsPurchase, purchasePolicy, validDriveSeconds } from "../radar/driving";
@@ -689,6 +690,11 @@ export async function analyzeAd(
       },
       cfg,
     );
+  }
+  try {
+    await prepareAutoMessage({ id: ad.id, title: ad.title, url: ad.url, sellerId: ad.sellerId, sellerName: ad.sellerName, isDemo: ad.isDemo }, rulesVerdict?.status ?? null);
+  } catch (e) {
+    log("warn", "Auto-bericht voorbereiden mislukt", { adId, error: errMsg(e) });
   }
   return { score: sc.score, blocked: sc.blocked };
 }

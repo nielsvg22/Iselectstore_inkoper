@@ -2,6 +2,14 @@ import { z } from "zod";
 import { prisma } from "@/lib/db/client";
 import { DEFAULT_SCRATCH_FREE_PHRASES, DEFAULT_SCRATCH_PHRASES, IPAD_SEED, type SeedPrice } from "./tables";
 
+export const DEFAULT_AUTO_MESSAGES = [
+  "Een goede dag {naam}, wat is uw beste prijs waarvoor ik hem vandaag nog kan ophalen?\n\nIk ben bereid om alvast 20 euro over te maken om u te verzekeren dat ik kom. De rest betaal ik dan als ik de telefoon kom ophalen.\n\nMet vriendelijke groet,\n\nTwan de Haas, Best Buy Phone, + 31 6 43 29 50 22",
+  "Een goede dag {naam}, wat is uw gunstigste prijs waarvoor ik hem vandaag nog kan ophalen?\n\nIk ben bereid om alvast 20 euro over te maken om u te verzekeren dat ik kom. De rest betaal ik dan als ik de telefoon kom ophalen.\n\nMet vriendelijke groet,\n\nTwan de Haas, Best Buy Phone, + 31 6 43 29 50 22",
+  "Een goede dag {naam}, wat is uw beste prijs waarvoor ik hem direct kan ophalen?\n\nIk ben bereid om alvast 20 euro over te maken om u te verzekeren dat ik kom. De rest betaal ik als ik de telefoon kom ophalen.\n\nMet vriendelijke groet,\n\nTwan de Haas, Best Buy Phone, + 31 6 43 29 50 22",
+  "Een goede dag {naam}, wat is uw vriendelijkste prijs waarvoor ik hem direct kan ophalen?\n\nIk ben bereid om alvast 20 euro over te maken om u te verzekeren dat ik kom. De rest maak ik over als ik de telefoon kom ophalen.\n\nMet vriendelijke groet,\n\nTwan de Haas, Best Buy Phone, + 31 6 43 29 50 22",
+  "Een goede dag {naam}, wat is uw schappelijkste prijs waar ik u direct kan ontzorgen hiervoor?\n\nIk ben bereid om alvast 20 euro over te maken om u te verzekeren dat ik kom. De rest maak ik dan over als ik de telefoon kom ophalen.\n\nMet vriendelijke groet,\n\nTwan de Haas, Best Buy Phone, + 31 6 43 29 50 22",
+];
+
 const num = (d: number) => z.number().finite().default(d);
 
 const center = z.object({
@@ -156,6 +164,16 @@ export const rulesSchema = z.object({
     enabled: z.boolean().default(false),
     /** model dat niet in de lijst staat: afwijzen of de gewone regels laten beslissen */
     outsideList: z.enum(["reject", "ignore"]).default("reject"),
+  }).default({}),
+  /** Auto-berichten: stelt een bericht aan de verkoper klaar (nog niet automatisch verzonden). Alleen voor de ingestelde verkoper-ID's. */
+  autoMessage: z.object({
+    enabled: z.boolean().default(false),
+    /** Marktplaats-verkoper-ID's waarvoor een bericht wordt klaargezet; leeg = voor niemand */
+    sellerIds: z.array(z.string().regex(/^\d{1,20}$/)).max(200).default([]),
+    /** alleen als de inkoopregels de advertentie goedkeuren (uit = bij elke nieuwe advertentie van de verkoper, voor testen) */
+    requireMatch: z.boolean().default(true),
+    templates: z.array(z.string().min(10).max(2000)).min(1).max(20).default(DEFAULT_AUTO_MESSAGES),
+    notifyTelegram: z.boolean().default(true),
   }).default({}),
   digest: z.object({
     enabled: z.boolean().default(false),
