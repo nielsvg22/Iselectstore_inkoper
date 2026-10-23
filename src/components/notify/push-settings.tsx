@@ -10,15 +10,17 @@ import { Field, Input, Select } from "@/components/ui/form";
 import { Notice } from "@/components/ui/states";
 import { api } from "@/lib/client-api";
 import type { NotifyPrefs } from "@/lib/notify/prefs";
-import { currentSubscription, deliveryHint, friendlyPushError, platformOf, pushSupport, urlBase64ToUint8Array, type PushSupport } from "@/lib/pwa-client";
+import { currentSubscription, deliveryHint, endpointId, friendlyPushError, platformOf, pushSupport, sameKey, urlBase64ToUint8Array, type PushSupport } from "@/lib/pwa-client";
 import { timeAgo } from "@/lib/format";
 
-interface Device { id: string; label: string; enabled: boolean; failures: number; lastSuccessAt: string | null; lastError: string | null }
+interface Device { id: string; endpointId: string; label: string; enabled: boolean; failures: number; lastSuccessAt: string | null; lastError: string | null }
 
 export function PushSettings({ initialPrefs, profiles }: { initialPrefs: NotifyPrefs; profiles: Array<{ id: string; name: string }> }) {
   const toast = useToast();
   const [support, setSupport] = React.useState<PushSupport>("unsupported");
   const [here, setHere] = React.useState<string | null>(null); // endpoint van dit apparaat
+  const [hereId, setHereId] = React.useState<string | null>(null); // vingerafdruk van dit apparaat
+  const healed = React.useRef(false);
   const [devices, setDevices] = React.useState<Device[]>([]);
   const [prefs, setPrefs] = React.useState<NotifyPrefs>(initialPrefs);
   const [busy, setBusy] = React.useState<string | null>(null);
@@ -28,12 +30,36 @@ export function PushSettings({ initialPrefs, profiles }: { initialPrefs: NotifyP
   const refresh = React.useCallback(async () => {
     setSupport(pushSupport());
     try {
-      setHere((await currentSubscription())?.endpoint ?? null);
-      setDevices((await api<{ devices: Device[] }>("/api/push/devices")).devices);
+      let sub = await currentSubscription();
+      let list = (await api<{ devices: Device[] }>("/api/push/devices")).devices;
+      // Zelfherstel (één keer per paginabezoek): oud abonnement met andere sleutel, of apparaat dat op de server ontbreekt of na fouten is uitgezet
+      if (sub && !healed.current && typeof Notification !== "undefined" && Notification.permission === "granted") {
+        healed.current = true;
+        let fixed = false;
+        const { publicKey } = await api<{ publicKey: string }>("/api/push/vapid");
+        if (!sameKey(sub as unknown as Parameters<typeof sameKey>[0], publicKey)) {
+          const reg = await navigator.serviceWorker.getRegistration("/");
+          await sub.unsubscribe();
+          sub = (await reg?.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(publicKey) })) ?? null;
+          fixed = true;
+        }
+        if (sub) {
+          const id = await endpointId(sub.endpoint);
+          const dev = list.find((d) => d.endpointId === id);
+          if (fixed || !dev || (!dev.enabled && dev.failures > 0)) {
+            await api("/api/push/subscribe", { body: { endpoint: sub.endpoint, keys: sub.toJSON().keys } });
+            list = (await api<{ devices: Device[] }>("/api/push/devices")).devices;
+            toast("Dit apparaat is opnieuw verbonden voor pushmeldingen");
+          }
+        }
+      }
+      setHere(sub?.endpoint ?? null);
+      setHereId(sub ? await endpointId(sub.endpoint) : null);
+      setDevices(list);
     } catch {
       /* negeren */
     }
-  }, []);
+  }, [toast]);
   React.useEffect(() => { void refresh(); }, [refresh]);
 
   const enable = async () => {
@@ -78,7 +104,7 @@ export function PushSettings({ initialPrefs, profiles }: { initialPrefs: NotifyP
     setBusy("test");
     try {
       const r = await api<{ sent: number; failed: number; removed: number }>("/api/push/test", { body: {} });
-      toast(r.sent ? `Testpush verstuurd naar ${r.sent} apparaat${r.sent > 1 ? "en" : ""}` : "Testpush mislukte op alle apparaten", r.sent ? "ok" : "err");
+      toast(r.sent ? `Testpush verstuurd naar ${r.sent} apparaat${r.sent > 1 ? "en" : ""}${r.failed ? ` — mislukt op ${r.failed}: zie de fout bij dat apparaat hieronder` : ""}` : "Testpush mislukte op alle apparaten: zie de fout bij elk apparaat hieronder", r.sent && !r.failed ? "ok" : "err");
       setHint(deliveryHint(platform));
       await refresh();
     } catch (e) {
@@ -130,8 +156,8 @@ export function PushSettings({ initialPrefs, profiles }: { initialPrefs: NotifyP
               <li key={d.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
                 <Smartphone className="h-4 w-4 text-muted" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium">{d.label || "Apparaat"}</p>
-                  <p className="truncate text-xs text-muted">{d.lastError ? `Laatste fout: ${d.lastError}` : d.lastSuccessAt ? `Laatst bezorgd ${timeAgo(d.lastSuccessAt)}` : "Nog niets verstuurd"}</p>
+                  <p className="flex flex-wrap items-center gap-2 text-sm font-medium">{d.label || "Apparaat"}{d.endpointId === hereId && <Badge tone="accent">Dit apparaat</Badge>}{!d.enabled && d.failures > 0 && <Badge tone="danger">Uitgeschakeld na fouten</Badge>}</p>
+                  <p className="truncate text-xs text-muted">{d.lastError ? `Laatste fout (${d.failures}×): ${d.lastError}` : d.lastSuccessAt ? `Laatst bezorgd ${timeAgo(d.lastSuccessAt)}` : "Nog niets verstuurd"}</p>
                 </div>
                 <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" className="h-4 w-4 accent-[var(--accent)]" checked={d.enabled} onChange={async (e) => { await api(`/api/push/devices/${d.id}`, { method: "PATCH", body: { enabled: e.target.checked } }); await refresh(); }} />Aan</label>
                 <button type="button" aria-label={`Apparaat ${d.label} verwijderen`} className="rounded-lg p-2 text-muted hover:bg-muted-bg hover:text-danger" onClick={async () => { await api(`/api/push/devices/${d.id}`, { method: "DELETE" }); await refresh(); }}><Trash2 className="h-4 w-4" /></button>
