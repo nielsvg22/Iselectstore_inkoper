@@ -64,8 +64,26 @@ De achtergrondzoeker draait op de server: je hoeft de app niet open te houden. P
 
 **Android:** open het app-adres in Chrome, kies het menu **⋮ → App installeren** (of de aangeboden installatieknop), open de app en activeer en test push onder Instellingen.
 
-**Computer:** open hetzelfde adres in Chrome of Edge en log in. Installatie is optioneel; gebruik daarvoor het installeer-icoon in de adresbalk als dit beschikbaar is.
+### Computer: app installeren en meldingen aanzetten
+
+**Windows of Mac — Chrome**
+1. Open het app-adres in Chrome en log in. Klik rechts in de adresbalk op het installeer-icoon, of kies **⋮ → Opslaan en delen → Pagina installeren als app → Installeren**.
+2. Open de app via het Startmenu (Windows) of Launchpad (Mac). Op het **bureaublad** zetten: Windows → typ `chrome://apps`, rechtermuisknop op *iSelectStore* → **Snelkoppeling maken**; Mac → Finder → Programma's → Chrome-apps, houd **⌥ + ⌘** ingedrukt en sleep *iSelectStore* naar het bureaublad.
+3. Ga in de app naar **Instellingen → Pushmeldingen**, klik op **Pushmeldingen inschakelen** en kies **Toestaan**.
+4. Controleer of de computer de melding toont: Windows → **Instellingen → Systeem → Meldingen** (Chrome of iSelectStore aan, Niet storen uit); Mac → **Systeeminstellingen → Meldingen → iSelectStore** (stijl Banners, Focus uit).
+5. Gebruik in het blok **Controle op deze computer** de knoppen **Toon testmelding op dit scherm** en **Stuur testpush**. Zie je een melding, dan is alles klaar.
+
+**Mac — Safari (macOS 14 Sonoma of nieuwer)**
+1. Open het app-adres in Safari en log in.
+2. Kies **Bestand → Zet in Dock → Voeg toe**. Open de app daarna via het Dock-icoon. Op het bureaublad: Finder → Programma's → rechtermuisknop op *iSelectStore* → **Maak alias**.
+3. Ga in de app naar **Instellingen → Pushmeldingen** → **Pushmeldingen inschakelen** → **Sta toe**.
+4. Controleer **Systeeminstellingen → Meldingen → iSelectStore** en zet Focus/Niet storen uit. Test met de knoppen in **Controle op deze computer**.
+5. Oudere macOS dan Sonoma? Gebruik Chrome.
+
+**Als toestemming op "geblokkeerd" staat:** een website mag dat niet zelf opnieuw vragen. Klik op het slotje links in de adresbalk → **Meldingen → Toestaan** (Chrome: plak `chrome://settings/content/notifications` in een nieuw tabblad en haal de site weg bij *Niet toegestaan*), ververs de pagina en kies opnieuw **Pushmeldingen inschakelen**.
+
+Meldingen komen ook binnen als het venster is gesloten, zolang Chrome of de app op de achtergrond mag draaien (Chrome: `chrome://settings/system` → *Achtergrond-apps blijven uitvoeren als Chrome is gesloten*). Een computer in slaapstand krijgt geen meldingen.
 
 Kom je er niet uit? Geef je beheerder je toestel/iOS-versie, het tijdstip van de test en de getoonde foutmelding. Gaat het om een gemiste advertentie? Stuur ook de Marktplaats-link mee. Deel geen wachtwoorden.
 
-Versie: 22 oktober 2026. De inkoopinstellingen kunnen later door de beheerder worden aangepast. De installatie-instructies staan ook in de app onder **App installeren**.
+Versie: 24 oktober 2026. De inkoopinstellingen kunnen later door de beheerder worden aangepast. De installatie-instructies staan ook in de app onder **App installeren**.

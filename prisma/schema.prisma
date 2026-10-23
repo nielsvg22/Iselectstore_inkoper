@@ -550,6 +550,9 @@ model PushSubscription {
   lastSuccessAt DateTime?
   lastFailureAt DateTime?
   lastError     String?
+  // Teruggemeld door de browser zelf: melding echt getoond, of waarom niet
+  lastShownAt   DateTime?
+  lastShowError String?
   createdAt     DateTime  @default(now())
 
   @@index([userId])

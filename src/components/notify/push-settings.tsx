@@ -10,15 +10,19 @@ import { Field, Input, Select } from "@/components/ui/form";
 import { Notice } from "@/components/ui/states";
 import { api } from "@/lib/client-api";
 import type { NotifyPrefs } from "@/lib/notify/prefs";
-import { currentSubscription, deliveryHint, friendlyPushError, platformOf, pushSupport, urlBase64ToUint8Array, type PushSupport } from "@/lib/pwa-client";
+import { currentSubscription, deliveryHint, endpointId, friendlyPushError, platformOf, pushSupport, sameKey, urlBase64ToUint8Array, type PushSupport } from "@/lib/pwa-client";
 import { timeAgo } from "@/lib/format";
 
-interface Device { id: string; label: string; enabled: boolean; failures: number; lastSuccessAt: string | null; lastError: string | null }
+interface Device { id: string; endpointId: string; label: string; enabled: boolean; failures: number; lastSuccessAt: string | null; lastError: string | null; lastShownAt: string | null; lastShowError: string | null }
 
 export function PushSettings({ initialPrefs, profiles }: { initialPrefs: NotifyPrefs; profiles: Array<{ id: string; name: string }> }) {
   const toast = useToast();
   const [support, setSupport] = React.useState<PushSupport>("unsupported");
   const [here, setHere] = React.useState<string | null>(null); // endpoint van dit apparaat
+  const [hereId, setHereId] = React.useState<string | null>(null); // vingerafdruk van dit apparaat
+  const healed = React.useRef(false);
+  const [perm, setPerm] = React.useState<NotificationPermission | "unsupported">("unsupported");
+  const [localTest, setLocalTest] = React.useState<string | null>(null);
   const [devices, setDevices] = React.useState<Device[]>([]);
   const [prefs, setPrefs] = React.useState<NotifyPrefs>(initialPrefs);
   const [busy, setBusy] = React.useState<string | null>(null);
@@ -27,13 +31,38 @@ export function PushSettings({ initialPrefs, profiles }: { initialPrefs: NotifyP
 
   const refresh = React.useCallback(async () => {
     setSupport(pushSupport());
+    setPerm(typeof Notification === "undefined" ? "unsupported" : Notification.permission);
     try {
-      setHere((await currentSubscription())?.endpoint ?? null);
-      setDevices((await api<{ devices: Device[] }>("/api/push/devices")).devices);
+      let sub = await currentSubscription();
+      let list = (await api<{ devices: Device[] }>("/api/push/devices")).devices;
+      // Zelfherstel (één keer per paginabezoek): oud abonnement met andere sleutel, of apparaat dat op de server ontbreekt of na fouten is uitgezet
+      if (sub && !healed.current && typeof Notification !== "undefined" && Notification.permission === "granted") {
+        healed.current = true;
+        let fixed = false;
+        const { publicKey } = await api<{ publicKey: string }>("/api/push/vapid");
+        if (!sameKey(sub as unknown as Parameters<typeof sameKey>[0], publicKey)) {
+          const reg = await navigator.serviceWorker.getRegistration("/");
+          await sub.unsubscribe();
+          sub = (await reg?.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(publicKey) })) ?? null;
+          fixed = true;
+        }
+        if (sub) {
+          const id = await endpointId(sub.endpoint);
+          const dev = list.find((d) => d.endpointId === id);
+          if (fixed || !dev || (!dev.enabled && dev.failures > 0)) {
+            await api("/api/push/subscribe", { body: { endpoint: sub.endpoint, keys: sub.toJSON().keys } });
+            list = (await api<{ devices: Device[] }>("/api/push/devices")).devices;
+            toast("Dit apparaat is opnieuw verbonden voor pushmeldingen");
+          }
+        }
+      }
+      setHere(sub?.endpoint ?? null);
+      setHereId(sub ? await endpointId(sub.endpoint) : null);
+      setDevices(list);
     } catch {
       /* negeren */
     }
-  }, []);
+  }, [toast]);
   React.useEffect(() => { void refresh(); }, [refresh]);
 
   const enable = async () => {
@@ -52,6 +81,37 @@ export function PushSettings({ initialPrefs, profiles }: { initialPrefs: NotifyP
       await refresh();
     } catch (e) {
       toast(friendlyPushError(e, platform), "err");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  /** Vraagt de browser opnieuw om toestemming (alleen mogelijk zolang die niet op "geblokkeerd" staat). */
+  const askPermission = async () => {
+    setBusy("perm");
+    try {
+      const p = await Notification.requestPermission();
+      setPerm(p);
+      toast(p === "granted" ? "Toestemming gegeven" : p === "denied" ? "Toestemming geweigerd of geblokkeerd" : "Er is geen keuze gemaakt", p === "granted" ? "ok" : "err");
+      await refresh();
+    } catch (e) {
+      toast((e as Error).message, "err");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  /** Toont een melding rechtstreeks vanuit de browser (zonder pushdienst): bewijst of de computer meldingen van deze site toont. */
+  const showLocal = async () => {
+    setBusy("local");
+    setLocalTest(null);
+    try {
+      const reg = (await navigator.serviceWorker.getRegistration("/")) ?? (await navigator.serviceWorker.register("/sw.js", { scope: "/" }));
+      await navigator.serviceWorker.ready;
+      await reg.showNotification("Testmelding van de app", { body: "Zie je deze melding? Dan werken meldingen op deze computer.", icon: "/icons/icon-192.png", tag: "local-test" });
+      setLocalTest("De browser heeft de melding aangemaakt. Zie je hem niet op je scherm? Dan blokkeert Windows of macOS hem: zet meldingen voor de browser aan en Niet storen/Focus uit.");
+    } catch (e) {
+      setLocalTest(`De browser kon de melding niet tonen: ${(e as Error).message}`);
     } finally {
       setBusy(null);
     }
@@ -78,7 +138,7 @@ export function PushSettings({ initialPrefs, profiles }: { initialPrefs: NotifyP
     setBusy("test");
     try {
       const r = await api<{ sent: number; failed: number; removed: number }>("/api/push/test", { body: {} });
-      toast(r.sent ? `Testpush verstuurd naar ${r.sent} apparaat${r.sent > 1 ? "en" : ""}` : "Testpush mislukte op alle apparaten", r.sent ? "ok" : "err");
+      toast(r.sent ? `Testpush verstuurd naar ${r.sent} apparaat${r.sent > 1 ? "en" : ""}${r.failed ? ` — mislukt op ${r.failed}: zie de fout bij dat apparaat hieronder` : ""}` : "Testpush mislukte op alle apparaten: zie de fout bij elk apparaat hieronder", r.sent && !r.failed ? "ok" : "err");
       setHint(deliveryHint(platform));
       await refresh();
     } catch (e) {
@@ -117,6 +177,30 @@ export function PushSettings({ initialPrefs, profiles }: { initialPrefs: NotifyP
         {support === "denied" && <Notice tone="danger">Meldingen zijn voor deze site geblokkeerd. {platform.browser === "safari" ? "Safari → Instellingen → Websites → Meldingen: zet deze site op Toestaan." : "Klik op het slotje links in de adresbalk → Meldingen → Toestaan."} Herlaad daarna de pagina.</Notice>}
         {hint && <Notice tone="warning">{hint}</Notice>}
 
+        {perm !== "unsupported" && (
+          <div className="space-y-3 rounded-2xl border border-card-border bg-ivory p-4" aria-label="Controle meldingen">
+            <p className="text-sm font-semibold">Controle op deze computer</p>
+            <p className="text-sm text-muted">
+              Toestemming in de browser:{" "}
+              <strong className={perm === "granted" ? "text-success" : perm === "denied" ? "text-danger" : "text-warning"}>
+                {perm === "granted" ? "toegestaan" : perm === "denied" ? "geblokkeerd" : "nog niet gevraagd"}
+              </strong>
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {perm === "default" && <Button onClick={askPermission} loading={busy === "perm"}><BellRing className="h-4 w-4" />Toestemming vragen</Button>}
+              {perm === "granted" && <Button variant="secondary" onClick={showLocal} loading={busy === "local"}>Toon testmelding op dit scherm</Button>}
+              {perm === "denied" && (
+                <Button variant="outline" onClick={() => { void navigator.clipboard?.writeText("chrome://settings/content/notifications").then(() => toast("Adres gekopieerd: plak het in een nieuw tabblad")); }}>Kopieer instellingenadres van Chrome</Button>
+              )}
+              <Button variant="ghost" onClick={refresh}>Opnieuw controleren</Button>
+            </div>
+            {perm === "denied" && (
+              <p className="text-sm text-muted">De browser staat het niet toe dat de app dit opnieuw vraagt. Zet het zelf aan: klik op het slotje links in de adresbalk → Meldingen → <b>Toestaan</b> (Chrome: plak het gekopieerde adres in een nieuw tabblad en haal deze site weg bij “Niet toegestaan”). Ververs daarna deze pagina.</p>
+            )}
+            {localTest && <p className="text-sm" role="status">{localTest}</p>}
+          </div>
+        )}
+
         <div className="flex flex-wrap items-center gap-3">
           {support === "ready" && !here && <Button onClick={enable} loading={busy === "enable"}><BellRing className="h-4 w-4" />Pushmeldingen inschakelen</Button>}
           {here && <Button variant="outline" onClick={disableHere} loading={busy === "disable"}>Uitschakelen op dit apparaat</Button>}
@@ -130,8 +214,9 @@ export function PushSettings({ initialPrefs, profiles }: { initialPrefs: NotifyP
               <li key={d.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
                 <Smartphone className="h-4 w-4 text-muted" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium">{d.label || "Apparaat"}</p>
-                  <p className="truncate text-xs text-muted">{d.lastError ? `Laatste fout: ${d.lastError}` : d.lastSuccessAt ? `Laatst bezorgd ${timeAgo(d.lastSuccessAt)}` : "Nog niets verstuurd"}</p>
+                  <p className="flex flex-wrap items-center gap-2 text-sm font-medium">{d.label || "Apparaat"}{d.endpointId === hereId && <Badge tone="accent">Dit apparaat</Badge>}{!d.enabled && d.failures > 0 && <Badge tone="danger">Uitgeschakeld na fouten</Badge>}</p>
+                  {d.lastShowError ? <p className="text-xs text-danger">De browser kon de melding niet tonen: {d.lastShowError}. Controleer of meldingen voor deze site zijn toegestaan.</p> : d.lastSuccessAt && d.lastShownAt ? <p className="text-xs text-muted">Laatst getoond door de browser {timeAgo(d.lastShownAt)}. Zie je niets? Dan blokkeert Windows of macOS de melding (Focus/Niet storen, of meldingen voor de browser uit).</p> : d.lastSuccessAt ? <p className="text-xs text-warning">Bezorgd bij de pushdienst, maar de browser heeft nog niet teruggemeld dat hij de melding toonde. Open de browser en probeer opnieuw.</p> : null}
+                  <p className="truncate text-xs text-muted">{d.lastError ? `Laatste fout (${d.failures}×): ${d.lastError}` : d.lastSuccessAt ? `Laatst bezorgd ${timeAgo(d.lastSuccessAt)}` : "Nog niets verstuurd"}</p>
                 </div>
                 <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" className="h-4 w-4 accent-[var(--accent)]" checked={d.enabled} onChange={async (e) => { await api(`/api/push/devices/${d.id}`, { method: "PATCH", body: { enabled: e.target.checked } }); await refresh(); }} />Aan</label>
                 <button type="button" aria-label={`Apparaat ${d.label} verwijderen`} className="rounded-lg p-2 text-muted hover:bg-muted-bg hover:text-danger" onClick={async () => { await api(`/api/push/devices/${d.id}`, { method: "DELETE" }); await refresh(); }}><Trash2 className="h-4 w-4" /></button>

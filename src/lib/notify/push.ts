@@ -75,7 +75,8 @@ export async function sendPushToUser(userId: string, payload: PushPayload, send?
         vapidDetails: { subject: v.subject, publicKey: v.publicKey, privateKey: v.privateKey },
         TTL: 60 * 60 * 6,
         urgency: payload.isTest ? "normal" : "high",
-        topic: payload.tag.replace(/[^A-Za-z0-9_-]/g, "").slice(0, 32) || undefined,
+        // Topic (vervangt oudere melding met dezelfde onderwerpnaam) alleen voor Apple en Mozilla; Chrome/FCM krijgt het niet mee
+        topic: /fcm\.googleapis\.com|googleapis\.com|android\.googleapis/.test(s.endpoint) ? undefined : payload.tag.replace(/[^A-Za-z0-9_-]/g, "").slice(0, 32) || undefined,
         timeout: 10_000,
       });
       await prisma.pushSubscription.update({ where: { id: s.id }, data: { lastSuccessAt: new Date(), failures: 0, lastError: null } });

@@ -1,7 +1,7 @@
 /* iSelectStore service worker — push, klik-navigatie en veilige caching.
  * Veiligheidsbeleid: er wordt NOOIT iets uit /api of een ingelogde pagina (HTML) gecachet.
  * Alleen onveranderlijke statische bestanden (/_next/static, iconen, merk, productbeelden) en de offline-pagina. */
-const VERSION = "v1";
+const VERSION = "v2";
 const STATIC_CACHE = `adh-static-${VERSION}`;
 const OFFLINE_URL = "/offline.html";
 const PRECACHE = [OFFLINE_URL, "/icons/icon-192.png", "/brand/mark.svg"];
@@ -50,18 +50,34 @@ self.addEventListener("push", (event) => {
   }
   const title = data.title || "iSelectStore";
   event.waitUntil(
-    self.registration.showNotification(title, {
-      body: data.body || "",
-      icon: "/icons/icon-192.png",
-      badge: "/icons/badge-96.png",
-      tag: data.tag || "deal",
-      renotify: false,
-      data: { url: data.url || "/", externalUrl: data.externalUrl || null },
-      requireInteraction: false,
-      timestamp: Date.now(),
-    }),
+    self.registration
+      .showNotification(title, {
+        body: data.body || "",
+        icon: "/icons/icon-192.png",
+        badge: "/icons/badge-96.png",
+        tag: data.tag || "deal",
+        renotify: false,
+        data: { url: data.url || "/", externalUrl: data.externalUrl || null },
+        requireInteraction: false,
+        timestamp: Date.now(),
+      })
+      .then(() => ack(true))
+      .catch((e) => ack(false, String((e && e.message) || e)).then(() => { throw e; })),
   );
 });
+
+/* Meldt aan de server of de browser de melding echt heeft getoond (of waarom niet). Mislukt dit, dan blijft de melding zelf gewoon werken. */
+async function ack(ok, error) {
+  try {
+    const sub = await self.registration.pushManager.getSubscription();
+    if (!sub) return;
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(sub.endpoint));
+    const endpointId = Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 16);
+    await fetch("/api/push/ack", { method: "POST", headers: { "content-type": "application/json" }, credentials: "same-origin", body: JSON.stringify({ endpointId, ok, error: error ? error.slice(0, 180) : undefined }), keepalive: true });
+  } catch {
+    /* negeren */
+  }
+}
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();

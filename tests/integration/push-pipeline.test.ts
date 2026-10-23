@@ -594,3 +594,53 @@ describe("meting en filtertest", () => {
     expect(j.blockers.length).toBeGreaterThan(0);
   });
 });
+
+describe("push naar meerdere apparaten (Chrome en iPhone)", () => {
+  it("elk apparaat krijgt de melding; een mislukt apparaat blokkeert de rest niet en toont zijn fout; Topic niet voor Chrome/FCM", async () => {
+    const { user, cookie } = await setup({ push: false });
+    await prisma.pushSubscription.createMany({ data: [
+      { userId: user.id, endpoint: "https://web.push.apple.com/iphone", p256dh: "p".repeat(30), auth: "a".repeat(12), label: "iPhone" },
+      { userId: user.id, endpoint: "https://fcm.googleapis.com/fcm/send/chrome", p256dh: "p".repeat(30), auth: "a".repeat(12), label: "Mac" },
+    ] });
+    const seen: Array<{ endpoint: string; topic?: string }> = [];
+    const sender: PushSender = async (sub, _payload, opts) => {
+      seen.push({ endpoint: sub.endpoint, topic: (opts as { topic?: string } | undefined)?.topic });
+      if (sub.endpoint.includes("fcm")) throw Object.assign(new Error("403 UnauthorizedRegistration"), { statusCode: 403 });
+      return { statusCode: 201 };
+    };
+    const { sendPushToUser } = await import("@/lib/notify/push");
+    const r = await sendPushToUser(user.id, { title: "t", body: "b", url: "/ads/x", tag: "ad-abc123" }, sender);
+    expect(r.filter((x) => x.ok)).toHaveLength(1);
+    expect(seen.find((s) => s.endpoint.includes("apple"))?.topic).toBe("ad-abc123");
+    expect(seen.find((s) => s.endpoint.includes("fcm"))?.topic).toBeUndefined();
+    const list = (await (await devicesGet(req("/api/push/devices", { cookie }))).json()) as { devices: Array<{ label: string; lastError: string | null; endpointId: string }> };
+    expect(list.devices.find((d) => d.label === "Mac")?.lastError).toMatch(/UnauthorizedRegistration/);
+    expect(list.devices.every((d) => /^[0-9a-f]{16}$/.test(d.endpointId))).toBe(true);
+    expect(JSON.stringify(list)).not.toContain("googleapis");
+  });
+});
+
+describe("terugmelding van de browser (getoond of niet)", () => {
+  it("de browser meldt getoond of een fout; alleen voor eigen apparaten", async () => {
+    const { user, cookie } = await setup({ push: false });
+    const other = await makeUser("USER", "ander@example.com");
+    await prisma.pushSubscription.create({ data: { userId: user.id, endpoint: "https://fcm.googleapis.com/fcm/send/win", p256dh: "p".repeat(30), auth: "a".repeat(12), label: "Windows-pc" } });
+    const { createHash } = await import("node:crypto");
+    const endpointId = createHash("sha256").update("https://fcm.googleapis.com/fcm/send/win").digest("hex").slice(0, 16);
+    const { POST: ackPost } = await import("@/app/api/push/ack/route");
+    const post = (body: unknown, c: string) => ackPost(req("/api/push/ack", { method: "POST", body, cookie: c }));
+    expect(((await (await post({ endpointId, ok: true }, cookie)).json()) as { ok: boolean }).ok).toBe(true);
+    let row = await prisma.pushSubscription.findFirstOrThrow({ where: { userId: user.id } });
+    expect(row.lastShownAt).toBeTruthy();
+    expect(row.lastShowError).toBeNull();
+    await post({ endpointId, ok: false, error: "No notification permission has been granted for this origin" }, cookie);
+    row = await prisma.pushSubscription.findFirstOrThrow({ where: { userId: user.id } });
+    expect(row.lastShowError).toMatch(/permission/);
+    // een andere gebruiker raakt dit apparaat niet; ongeldige invoer wordt geweigerd; zonder sessie geen toegang
+    expect(((await (await post({ endpointId, ok: true }, other.cookie)).json()) as { ok: boolean }).ok).toBe(false);
+    expect((await post({ endpointId: "zomaar", ok: true }, cookie)).status).toBe(400);
+    expect((await ackPost(req("/api/push/ack", { method: "POST", body: { endpointId, ok: true } }))).status).toBe(401);
+    const list = (await (await devicesGet(req("/api/push/devices", { cookie }))).json()) as { devices: Array<{ lastShowError: string | null }> };
+    expect(list.devices[0].lastShowError).toMatch(/permission/);
+  });
+});

@@ -735,6 +735,50 @@ test("mobiel: advertentie met veel foto's past op het scherm (geen horizontale o
   await ctx.close();
 });
 
+test("service worker: een binnenkomende push wordt als melding aangemaakt (zonder tag-conflict, met klikpad)", async ({ page }) => {
+  await login(page);
+  await page.goto("/settings");
+  await page.context().grantPermissions(["notifications"], { origin: new URL(page.url()).origin });
+  const cdp = await page.context().newCDPSession(page);
+  const regIds: string[] = [];
+  cdp.on("ServiceWorker.workerRegistrationUpdated", (e: { registrations: Array<{ registrationId: string }> }) => e.registrations.forEach((r) => regIds.push(r.registrationId)));
+  await cdp.send("ServiceWorker.enable");
+  await page.evaluate(async () => { await navigator.serviceWorker.register("/sw.js", { scope: "/" }); await navigator.serviceWorker.ready; });
+  await expect.poll(() => regIds.length).toBeGreaterThan(0);
+  const send = (payload: object) => cdp.send("ServiceWorker.deliverPushMessage", { origin: new URL(page.url()).origin, registrationId: regIds[0], data: JSON.stringify(payload) });
+  await send({ title: "iPhone 15 Pro 256GB 📍", body: "Max €500 · toegestaan vraag €400 / bieden €380", url: "/ads/abc", tag: "ad-abc", externalUrl: "https://www.marktplaats.nl/v/x" });
+  await send({ title: "iPhone 14 128GB", body: "tweede", url: "/ads/def", tag: "ad-def" });
+  const titles = async () => page.evaluate(async () => (await (await navigator.serviceWorker.ready).getNotifications()).map((n) => ({ title: n.title, tag: n.tag, url: (n.data as { url: string }).url })));
+  await expect.poll(async () => (await titles()).length).toBe(2);
+  expect(await titles()).toEqual(expect.arrayContaining([{ title: "iPhone 15 Pro 256GB 📍", tag: "ad-abc", url: "/ads/abc" }, { title: "iPhone 14 128GB", tag: "ad-def", url: "/ads/def" }]));
+  // zelfde tag vervangt, en een kapotte payload geeft toch een melding
+  await send({ title: "iPhone 14 128GB (bijgewerkt)", body: "x", url: "/ads/def", tag: "ad-def" });
+  await expect.poll(async () => (await titles()).find((n) => n.tag === "ad-def")?.title).toBe("iPhone 14 128GB (bijgewerkt)");
+  await cdp.send("ServiceWorker.deliverPushMessage", { origin: new URL(page.url()).origin, registrationId: regIds[0], data: "geen json" });
+  await expect.poll(async () => (await titles()).some((n) => n.title === "iSelectStore")).toBe(true);
+});
+
+test("meldingen: controle toont de toestemming, knop vraagt toestemming en een lokale testmelding wordt aangemaakt", async ({ browser }) => {
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  await login(page);
+  await page.goto("/settings");
+  const box = page.getByLabel("Controle meldingen");
+  await expect(box).toBeVisible();
+  // eerst nog niet gevraagd: er is een knop om toestemming te vragen
+  await expect(box.getByText("nog niet gevraagd")).toBeVisible();
+  await expect(box.getByRole("button", { name: "Toestemming vragen" })).toBeVisible();
+  // na toestemming: testmelding rechtstreeks uit de browser
+  await ctx.grantPermissions(["notifications"], { origin: new URL(page.url()).origin });
+  await box.getByRole("button", { name: "Opnieuw controleren" }).click();
+  await expect(box.getByText("toegestaan")).toBeVisible();
+  await box.getByRole("button", { name: "Toon testmelding op dit scherm" }).click();
+  await expect(box.getByRole("status")).toContainText("De browser heeft de melding aangemaakt");
+  const n = await page.evaluate(async () => (await (await navigator.serviceWorker.ready).getNotifications()).map((x) => x.title));
+  expect(n).toContain("Testmelding van de app");
+  await ctx.close();
+});
+
 test("uitloggen", async ({ page }) => {
   await login(page);
   await page.getByRole("button", { name: "Accountmenu" }).first().click();

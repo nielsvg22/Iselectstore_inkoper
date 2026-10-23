@@ -56,3 +56,18 @@ export function friendlyPushError(e: unknown, p: Platform): string {
   if (name === "InvalidStateError") return "De browser heeft al een oude aanmelding. Klik op 'Uitschakelen op dit apparaat' en schakel daarna opnieuw in.";
   return msg || "Aanmelden voor pushmeldingen is mislukt.";
 }
+
+/** Korte vingerafdruk van een push-endpoint (zodat de server kan zeggen "dit apparaat" zonder het endpoint terug te geven). */
+export async function endpointId(endpoint: string): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(endpoint));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 16);
+}
+
+/** Is het abonnement gemaakt met de huidige VAPID-sleutel van de server? Een oud abonnement met een andere sleutel levert nooit meer meldingen op. */
+export function sameKey(sub: { options?: { applicationServerKey?: ArrayBuffer | null } }, publicKey: string): boolean {
+  const have = sub.options?.applicationServerKey;
+  if (!have) return true; // niet te controleren (oudere browsers): niet ten onrechte vernieuwen
+  const a = new Uint8Array(have);
+  const b = urlBase64ToUint8Array(publicKey);
+  return a.length === b.length && a.every((x, i) => x === b[i]);
+}
