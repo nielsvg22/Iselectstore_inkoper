@@ -6,6 +6,7 @@ import { extractMNumbers, funnelStats, markClicked, markOpened, offerOverview, r
 import { saveConfig, setSecret } from "@/lib/settings/store";
 import { getBasePrices, getRules, saveBasePrices, saveRules } from "@/lib/rules/config";
 import { applyMonthlyAdjustment, pollTelegramPurchases } from "@/lib/rules/maintenance";
+import { purchaseAudit } from "@/lib/rules/audit";
 import { clearRulesCache } from "@/lib/rules/apply";
 import { POST as openPost } from "@/app/api/funnel/open/route";
 import { POST as clickPost } from "@/app/api/funnel/click/route";
@@ -95,6 +96,28 @@ describe("funnel", () => {
     await ingestAd(raw("m5000007"), { origin: "SEARCH", partial: true });
     await ingestAd(raw("m5000007"), { origin: "SEARCH", partial: true });
     expect((await prisma.advertisement.findUniqueOrThrow({ where: { id: a.adId } })).seenCount).toBe(3);
+  });
+});
+
+describe("ingekocht: wat zeiden de regels", () => {
+  it("telt per oordeel, noemt de regel die tegenhield en de advertenties die de app nooit zag", async () => {
+    const { user } = await makeUser();
+    await saveBasePrices([{ modelKey: "iphone-15-pro", storageGb: 256, priceEuro: 700, kind: "sell" }]);
+    clearRulesCache();
+    const good = await adWithProduct("m6100001"); // 300 euro, krasvrij: ruim binnen de regels
+    const dear = await adWithProduct("m6100002", { title: "iPhone 15 Pro 256GB Blauw", imageUrls: ["https://img.example/z1.jpg", "https://img.example/z2.jpg", "https://img.example/z3.jpg"], askingCents: 65000 });
+    await registerPurchases(user.id, "m6100001 m6100002 m6199999");
+    const audit = await purchaseAudit(null, 30);
+    expect(audit.total).toBe(3);
+    expect(audit.notSeen).toBe(1);
+    expect(audit.counts.reject).toBe(1);
+    expect(audit.counts.high + audit.counts.match).toBe(1);
+    expect(audit.strictest).toEqual([{ step: "price-too-high", title: "Prijs binnen de toegestane vraagprijs of bieden vanaf?", n: 1 }]);
+    expect(audit.highSharePct).toBe(50);
+    const unseen = audit.rows.find((r) => r.mNumber === "m6199999")!;
+    expect(unseen.status).toBe("unknown");
+    expect(unseen.reason).toMatch(/nooit gezien/);
+    expect(good && dear).toBeTruthy();
   });
 });
 

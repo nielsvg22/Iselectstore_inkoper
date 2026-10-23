@@ -37,11 +37,16 @@ Scherm: **Inkoopregels** (`/rules`) · **Funnel & aanbod** (`/funnel`) · code: 
 | Maandelijkse prijsaanpassing in % + wijzigingslog | `rules/maintenance.ts` |
 | Testen op bestaande advertenties | `/rules` → "Controleren" |
 
+## Overzichten en controle
+
+- **Beslisboom** (`/rules/beslisboom`): alle stappen in volgorde met de waarden uit de instellingen. Kies een advertentie om te zien welke stap hem tegenhield.
+- **Ingekocht: wat zeiden de regels?** (`/funnel`): de gekochte M-nummers naast het oordeel van de huidige regels, met per regel hoeveel gekochte advertenties hij tegenhield en welke advertenties de app nooit heeft gezien.
+
 ## Keuzes bij tegenstrijdigheden (alles instelbaar)
 
 | Vraag | Standaard | Waarom |
 |---|---|---|
-| Zoekprijs bij 85% batterij of in perfecte staat? | perfecte staat | "Nieuwe manier van zoeken … LIVE"; oude vuistregel is te kiezen (`priceBase: buy85`) |
+| Zoekprijs bij 85% batterij of in perfecte staat? | perfecte staat | "Nieuwe manier van zoeken" staat in het document als volgende stap. **Let op:** de mailvoorbeelden en logregels in het document laten zien dat het huidige systeem rekent als *zoekfilter + batterij + kras* (krasvrij +€40, onbekend €0): dat is de oude vuistregel (`priceBase: buy85`) |
 | Twee marge-tabellen | A (mailvoorbeeld) | B (💰-indicator) is te kiezen |
 | Hoge-marge-extra voor bieden vanaf | zelfde als vraagprijs | zo rekent het voorbeeld in het document (−€30 op beide) |
 | Gat vraag/bieden | €250 | document noemt ook 150/200 |

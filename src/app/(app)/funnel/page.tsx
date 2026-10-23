@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCurrentUser } from "@/lib/auth";
 import { funnelStats, offerOverview } from "@/lib/funnel";
+import { purchaseAudit } from "@/lib/rules/audit";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Funnel & aanbod" };
@@ -17,7 +18,7 @@ export default async function FunnelPage({ searchParams }: { searchParams: Promi
   const sp = await searchParams;
   const days = [7, 14, 30, 90].includes(Number(sp.days)) ? Number(sp.days) : 30;
   const user = await getCurrentUser();
-  const [f, o] = await Promise.all([funnelStats(user!.role === "ADMIN" ? null : user!.id, days), offerOverview(Math.min(days, 30))]);
+  const [f, o, audit] = await Promise.all([funnelStats(user!.role === "ADMIN" ? null : user!.id, days), offerOverview(Math.min(days, 30)), purchaseAudit(user!.role === "ADMIN" ? null : user!.id, days)]);
   const weak = f.rows.filter((r) => r.sent >= 3 && r.opened / r.sent < 0.75);
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -69,6 +70,41 @@ export default async function FunnelPage({ searchParams }: { searchParams: Promi
                 <td>{eur(r.avgAsk)} <span className="text-muted">{delta(r.avgAsk, r.prev.avgAsk)}</span></td>
                 <td>{eur(r.avgBid)} <span className="text-muted">{delta(r.avgBid, r.prev.avgBid)}</span></td></tr>)}</tbody>
             </table></div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><div><CardTitle>Ingekocht: wat zeiden de regels?</CardTitle><CardDescription>Wat jullie echt hebben gekocht (M-nummers), vergeleken met het oordeel van de inkoopregels van nu. Zo zie je welke regel te streng is.</CardDescription></div></CardHeader>
+        <CardContent className="space-y-4">
+          {audit.total === 0 ? <p className="text-sm text-muted">Nog geen gekochte advertenties in deze periode. Geef M-nummers door onder “Gelogde gegevens” hieronder, of via het Telegram-kanaal.</p> : (
+            <>
+              <div className="flex flex-wrap gap-2 text-sm">
+                <Badge tone="success">💰 Hoge marge: {audit.counts.high}</Badge>
+                <Badge tone="success">Voldoet: {audit.counts.match}</Badge>
+                <Badge tone="warning">Handmatig controleren: {audit.counts.review}</Badge>
+                <Badge tone="danger">Afgewezen: {audit.counts.reject}</Badge>
+                <Badge>Geen oordeel (basisprijs ontbreekt): {audit.counts.skip}</Badge>
+                <Badge tone="warning">Nooit gezien door de app: {audit.notSeen}</Badge>
+              </div>
+              <p className="text-sm text-muted">{audit.highSharePct == null ? "" : `${audit.highSharePct}% van de gekochte advertenties die de app kende had 💰. `}{audit.total} gekocht in deze periode.</p>
+              {audit.strictest.length > 0 && (
+                <div>
+                  <p className="text-sm font-semibold">Regels die gekochte advertenties tegenhielden</p>
+                  <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm text-muted">{audit.strictest.map((r) => <li key={r.step}>{r.n}× {r.title}</li>)}</ul>
+                </div>
+              )}
+              <div className="overflow-auto"><table className="w-full min-w-[640px] text-sm">
+                <thead className="text-left text-xs text-muted"><tr><th className="py-2">Gekocht</th><th>Betaald</th><th>Vraag</th><th>Oordeel nu</th><th>Reden</th></tr></thead>
+                <tbody>{audit.rows.map((r) => (
+                  <tr key={r.purchaseId} className="border-t border-card-border align-top">
+                    <td className="py-1.5">{r.adId ? <Link className="hover:underline" href={`/rules/beslisboom?ad=${r.adId}`}>{r.title}</Link> : r.title}{r.mNumber && <span className="block text-xs text-muted">{r.mNumber}</span>}</td>
+                    <td>{eur(r.paidEuro)}</td><td>{eur(r.askEuro)}</td>
+                    <td><Badge tone={r.status === "high" || r.status === "match" ? "success" : r.status === "reject" ? "danger" : r.status === "review" ? "warning" : "neutral"}>{{ high: "💰", match: "Voldoet", review: "Controleren", reject: "Afgewezen", skip: "Geen oordeel", unknown: "Niet gezien" }[r.status]}</Badge></td>
+                    <td className="text-muted">{r.reason ?? ""}</td>
+                  </tr>))}</tbody>
+              </table></div>
+            </>
           )}
         </CardContent>
       </Card>
