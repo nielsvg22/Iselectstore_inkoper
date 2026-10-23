@@ -702,6 +702,7 @@ test("inkoopregels: basisprijs invullen, regels testen, gebruiker aanmaken als b
   await expect(page.getByText("info@bestbuyphone.nl").first()).toBeVisible();
   await page.goto("/funnel");
   await expect(page.getByRole("heading", { name: /Funnel/, level: 1 })).toBeVisible();
+});
 
 test("mobiel: advertentie met veel foto's past op het scherm (geen horizontale overflow)", async ({ browser }) => {
   const db = new PrismaClient({ datasourceUrl: E2E_DB });
