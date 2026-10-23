@@ -28,7 +28,7 @@ export default async function MarketPage() {
         <h1 className="text-[32px] font-semibold tracking-tight">Marktdata</h1>
         <p className="mt-1 max-w-2xl text-muted">De waarderingsmotor gebruikt vergelijkbare vraagprijzen uit je advertenties én gerealiseerde verkoopprijzen. Een vraagprijs is geen verkoopprijs — eigen verkopen wegen daarom zwaarder.</p>
       </div>
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
         <Card>
           <CardHeader><div><CardTitle>Per model</CardTitle><CardDescription>{comps.length} prijspunten{cfg.demoMode ? " (demodata)" : ""}</CardDescription></div></CardHeader>
           <CardContent>

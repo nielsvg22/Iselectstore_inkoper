@@ -175,6 +175,8 @@ export default async function DashboardPage({
             },
             purchasePolicy(cfg),
           );
+          // bewezen te jong account en buiten het ophaalgebied: niet in de radar (verzenden is geen optie)
+          if (status.key === "young") return null;
           const storage = ad.product?.specs.find(
             (s) => s.key === "storageGb" && s.source !== "UNKNOWN",
           )?.value;
