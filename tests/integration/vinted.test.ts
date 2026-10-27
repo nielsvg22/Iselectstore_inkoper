@@ -10,6 +10,7 @@ import { saveFilters } from "@/lib/rules/filters";
 import { clearRulesCache } from "@/lib/rules/apply";
 import { saveConfig } from "@/lib/settings/store";
 import { saveTree } from "@/lib/pipeline/tree";
+import { listDeals } from "@/lib/queries";
 import { provisionVintedRadar, vintedStatus } from "@/lib/vinted-radar";
 import { makeUser, resetDb } from "../helpers";
 
@@ -118,6 +119,43 @@ describe("Vinted ophalen en verwerken", () => {
     await jobs();
     expect(await prisma.notification.count({ where: { adId: ad.id } })).toBe(n1);
     expect(await prisma.notification.count({ where: { adId: ad.id, channel: "WEBPUSH", userId: user.id } })).toBe(1);
+  });
+});
+
+describe("snelheid en heel Nederland", () => {
+  const fresh = CATALOG.split("10554363104").join("10666666666").split("Apple IPhone 14 256GB violett + Ladekabel").join("iPhone 15 Pro 256GB titanium").split("02_01cfb_9Rin7DuQFHeAPAcUEwyu1jRa").join("02_77777_snel");
+
+  it("een nieuwe advertentie krijgt direct een voorlopige push, nog vóór de detailpagina is opgehaald", async () => {
+    const { user, profileId } = await setup();
+    await saveConfig({ notifications: { requireFullAnalysis: true } });
+    stubSites();
+    await runProfileCheck(profileId); // nulmeting
+    await processJobs(handlers as never, { maxJobs: 80, types: ["FETCH_DETAIL", "ANALYZE_AD"], concurrency: 1 });
+    stubSites({ catalog: fresh });
+    const t0 = Date.now();
+    await runProfileCheck(profileId);
+    // alleen de snelle analyse, géén detailpagina
+    await processJobs(handlers as never, { maxJobs: 20, types: ["ANALYZE_AD"], concurrency: 1 });
+    const ad = await prisma.advertisement.findFirstOrThrow({ where: { source: "vinted", externalId: "10666666666" } });
+    expect(ad.detailFetchedAt).toBeNull();
+    const n = await prisma.notification.findFirst({ where: { adId: ad.id, channel: "WEBPUSH", userId: user.id } });
+    expect(n).not.toBeNull();
+    expect(Date.now() - t0).toBeLessThan(10_000);
+  });
+
+  it("Vinted-advertenties zijn zichtbaar bij stads- en rijtijdbeleid (heel Nederland) en worden niet als 'afstand onbekend' gemarkeerd", async () => {
+    const { profileId } = await setup();
+    await saveConfig({ radar: { cityOnly: "Apeldoorn" }, policies: { distance: { mode: "driving" } } });
+    await saveRules({ ...defaultRules(), distance: { ...defaultRules().distance, includeShipping: false } });
+    clearRulesCache();
+    stubSites();
+    await runProfileCheck(profileId);
+    await jobs();
+    const { rows } = await listDeals({ limit: 50 });
+    expect(rows.some((r) => r.ad.source === "vinted")).toBe(true);
+    const an = await prisma.dealAnalysis.findFirstOrThrow({ where: { isCurrent: true, ad: { source: "vinted" } } });
+    const rules = (an.costs as { rules?: { status?: string; flags?: string[]; notes?: string[] } }).rules;
+    expect(rules?.flags ?? []).not.toContain("distanceUnknown");
   });
 });
 

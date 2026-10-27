@@ -203,9 +203,9 @@ export const configSchema = z.object({
         .object({
           enabled: z.boolean().default(false),
           /** hoe vaak een Vinted-profiel wordt gecontroleerd (minimaal 30 s) */
-          intervalSeconds: z.number().int().min(30).max(3600).default(60),
+          intervalSeconds: z.number().int().min(30).max(3600).default(30),
           /** minimale tijd tussen twee requests naar Vinted (alle profielen samen) */
-          minGapSeconds: z.number().int().min(3).max(120).default(8),
+          minGapSeconds: z.number().int().min(3).max(120).default(5),
           /** pagina's per zoekterm per controle (nieuwste eerst) */
           pages: z.number().int().min(1).max(5).default(1),
         })

@@ -26,7 +26,7 @@ test("platforms, algemene filters, modellenlijst en filterlogboek zijn bereikbaa
   await page.goto("/rules/filters");
   await expect(page.getByRole("heading", { name: "Algemene filters", level: 1 })).toBeVisible();
   await expect(page.getByText("Niet beschikbaar op Vinted", { exact: false })).toBeHidden().catch(() => undefined);
-  await expect(page.getByRole("checkbox", { name: "Vinted aan" })).not.toBeChecked();
+  await expect(page.getByRole("switch", { name: "Vinted aan" })).not.toBeChecked();
   await expect(page.getByLabel("Accessoire-woorden")).toContainText("hoesje");
   await page.getByLabel("Minimale batterijconditie (%)").fill("85");
   await page.getByRole("button", { name: "Algemene filters opslaan" }).click();

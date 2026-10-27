@@ -44,7 +44,7 @@ export async function provisionVintedRadar(userId: string, input: z.infer<typeof
   const existing = (await prisma.searchProfile.findMany({ where: { userId, sourceKind: "SEARCH" } })).find((p) => (p.sourceConfig as { platform?: string } | null)?.platform === "vinted");
   const sourceConfig = {
     ...((existing?.sourceConfig ?? {}) as object),
-    platform: "vinted", queries, maxPages: 1, fetchDetails: true,
+    platform: "vinted", queries, maxPages: 1, fetchDetails: true, fastMode: true,
     priceFrom: input.priceFrom ?? (existing?.sourceConfig as { priceFrom?: number | null } | null)?.priceFrom ?? null,
     priceTo: input.priceTo ?? (existing?.sourceConfig as { priceTo?: number | null } | null)?.priceTo ?? null,
   };

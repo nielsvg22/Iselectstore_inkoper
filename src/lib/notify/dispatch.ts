@@ -106,12 +106,12 @@ export async function deliverNotification(
   if (!rulesDecided && (cfg.radar.cityOnly || cfg.policies.distance.mode === "driving")) {
     const ad = await prisma.advertisement.findUnique({ where: { id: n.adId }, include: { risk: true } });
     const seller = ad?.sellerSignals as { rating?: number; reviewCount?: number; accountAgeMonths?: number } | null;
-    if (!ad || !inCityScope(ad.location, cfg.radar.cityOnly) || !allowsPurchase({
+    if (ad?.source !== "vinted" && (!ad || !inCityScope(ad.location, cfg.radar.cityOnly) || !allowsPurchase({
       distanceKm: ad.distanceKm, driveSeconds: validDriveSeconds(ad),
       shipping: Boolean(ad.risk) && Array.isArray(ad.shippingOptions) && ad.shippingOptions.includes("shipping"),
       rating: seller?.rating, reviews: seller?.reviewCount, ageMonths: seller?.accountAgeMonths,
       blocked: Boolean(ad.risk?.blocked), suspicious: ad.risk?.level === "HIGH" || ad.risk?.level === "BLOCKED",
-    }, cfg)) {
+    }, cfg))) {
       await prisma.notification.update({ where: { id: n.id }, data: {
         status: "SKIPPED", error: "Buiten huidig inkoopgebied of onvoldoende brongegevens voor veilige verzending",
       } });

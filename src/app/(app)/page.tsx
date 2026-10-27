@@ -8,7 +8,7 @@ import { purchaseStatus } from "@/lib/radar/safety";
 import { SaveOpportunity } from "@/components/deal/save-opportunity";
 import { AutoRefresh } from "@/components/radar-refresh";
 import { drivingWhere, validDriveSeconds, purchasePolicy } from "@/lib/radar/driving";
-import { cityScopeWhere } from "@/lib/radar/locality";
+import { cityScopeWhere, marktplaatsScope } from "@/lib/radar/locality";
 
 export const dynamic = "force-dynamic";
 export default async function DashboardPage({
@@ -24,7 +24,7 @@ export default async function DashboardPage({
     isDemo: cfg.demoMode,
     duplicateOfId: null,
     userState: { not: "IGNORED" },
-    AND: [cityScopeWhere(cfg.radar.cityOnly), drivingWhere(cfg), ...(pickupKm != null ? [{ OR: [{ distanceKm: null }, { distanceKm: { lte: pickupKm } }] }] : [])],
+    AND: [marktplaatsScope([cityScopeWhere(cfg.radar.cityOnly), drivingWhere(cfg), ...(pickupKm != null ? [{ OR: [{ distanceKm: null }, { distanceKm: { lte: pickupKm } }] }] : [])])],
   };
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);

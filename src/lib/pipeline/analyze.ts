@@ -735,7 +735,8 @@ export async function matchProfiles(
     try {
       const tree = await loadTree(p.id);
       const rulesOn = Boolean(meta.rules && meta.rules.status !== "skip");
-      const bypassPolicy = rulesOn && meta.rules!.replaceDistancePolicy;
+      // Vinted geeft geen locatie: daar geldt heel Nederland en dus geen stads-/rijtijd-/afstandsbeleid
+      const bypassPolicy = meta.source === "vinted" || (rulesOn && meta.rules!.replaceDistancePolicy);
       const tooFar = meta.pickupOnlyKm != null && ctx.distanceKm != null && ctx.distanceKm > meta.pickupOnlyKm;
       const matched = !tooFar && (bypassPolicy || (inCityScope(ctx.location, cfg.radar.cityOnly) && allowsPurchase({
         distanceKm: ctx.distanceKm, driveSeconds: ctx.driveSeconds, shipping: ctx.shippingAvailable,
@@ -804,9 +805,11 @@ export async function matchProfiles(
         !meta.isDemo &&
         (rulesOn ? meta.rules!.status !== "reject" : meta.score >= p.notifyMinScore);
       // Snelle modus: direct een voorlopige push op basis van de lijstgegevens; de definitieve volgt na de detailpagina
+      // Vinted-profielen sturen altijd direct een voorlopige push op basis van de lijstgegevens (zoals de snelle modus bij Marktplaats)
       const fastProfile =
-        cfg.scheduler.fast.enabled &&
-        (p.sourceConfig as { fastMode?: boolean } | null)?.fastMode === true;
+        ((p.sourceConfig as { platform?: string } | null)?.platform === "vinted" && meta.source === "vinted") ||
+        (cfg.scheduler.fast.enabled &&
+          (p.sourceConfig as { fastMode?: boolean } | null)?.fastMode === true);
       const complete = meta.complete || !cfg.notifications.requireFullAnalysis;
       const eligible = base && (complete || fastProfile);
       if (eligible) {

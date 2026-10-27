@@ -201,8 +201,8 @@ export function evaluateRules(i: VerdictInput, prices: BasePrice[], cfg: RulesCo
   let reviewReason: string | null = null;
   let reviewStep: StepId | null = null;
   if (km == null) {
-    v.notes.push("Afstand onbekend");
-    if (!cfg.distance.includeShipping) { reviewReason = `Afstand onbekend: ophalen binnen ${cfg.distance.pickupMaxKm} km is niet vast te stellen`; reviewStep = "distance-unknown"; v.flags.push("distanceUnknown"); }
+    v.notes.push(platform === "vinted" ? "Vinted: heel Nederland (geen afstandsbepaling)" : "Afstand onbekend");
+    if (!cfg.distance.includeShipping && platform !== "vinted") { reviewReason = `Afstand onbekend: ophalen binnen ${cfg.distance.pickupMaxKm} km is niet vast te stellen`; reviewStep = "distance-unknown"; v.flags.push("distanceUnknown"); }
   }
   else if (!cfg.distance.includeShipping && km > cfg.distance.pickupMaxKm) return reject(`${km} km is buiten ${cfg.distance.pickupMaxKm} km hemelsbreed (verzending staat uit)`, "distance-pickup-only");
   else if (km > maxKm) return reject(`${km} km is verder dan het maximum van ${maxKm} km${newestPro ? " voor de nieuwste Pro/Pro Max" : ""}`, "distance-max");

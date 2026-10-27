@@ -230,7 +230,7 @@ export async function runProfileCheck(
         .fetchDetails !== false;
     const ingestPage = async (page: RawAd[]) => {
       for (const raw of page) {
-        if (!inCityScope(raw.location, cfg.radar.cityOnly)) continue;
+        if (platform !== "vinted" && !inCityScope(raw.location, cfg.radar.cityOnly)) continue; // Vinted geeft geen plaats: heel Nederland
         if (processed.has(raw.externalId)) continue;
         processed.add(raw.externalId);
         const r = await ingestAd({ ...raw, attributes: { ...raw.attributes, detectionSource: adapter.id } }, {
