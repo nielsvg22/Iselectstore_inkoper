@@ -15,7 +15,7 @@ import { timeAgo } from "@/lib/format";
 
 interface Device { id: string; endpointId: string; label: string; enabled: boolean; failures: number; lastSuccessAt: string | null; lastError: string | null; lastShownAt: string | null; lastShowError: string | null }
 
-export function PushSettings({ initialPrefs, profiles }: { initialPrefs: NotifyPrefs; profiles: Array<{ id: string; name: string }> }) {
+export function PushSettings({ initialPrefs, profiles, modelOptions = [] }: { initialPrefs: NotifyPrefs; profiles: Array<{ id: string; name: string }>; modelOptions?: Array<{ key: string; label: string }> }) {
   const toast = useToast();
   const [support, setSupport] = React.useState<PushSupport>("unsupported");
   const [here, setHere] = React.useState<string | null>(null); // endpoint van dit apparaat
@@ -160,6 +160,8 @@ export function PushSettings({ initialPrefs, profiles }: { initialPrefs: NotifyP
     }
   };
 
+  const togglePlatform = (pl: "marktplaats" | "vinted") => setPrefs((p) => ({ ...p, platforms: p.platforms.includes(pl) ? p.platforms.filter((x) => x !== pl) : [...p.platforms, pl] }));
+  const toggleModel = (key: string) => setPrefs((p) => ({ ...p, modelKeys: p.modelKeys.includes(key) ? p.modelKeys.filter((x) => x !== key) : [...p.modelKeys, key] }));
   const toggleProfile = (id: string) => setPrefs((p) => ({ ...p, profileIds: p.profileIds.includes(id) ? p.profileIds.filter((x) => x !== id) : [...p.profileIds, id] }));
 
   return (
@@ -248,6 +250,36 @@ export function PushSettings({ initialPrefs, profiles }: { initialPrefs: NotifyP
               </Select>
             </Field>
           </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Alleen melden vanaf verwachte marge (€)" htmlFor="np-margin" hint="Gebruikt de marge uit de modellenlijst; leeg = geen eis">
+              <Input id="np-margin" type="number" min="0" value={prefs.minMarginEuro ?? ""} onChange={(e) => setPrefs({ ...prefs, minMarginEuro: e.target.value === "" ? null : Number(e.target.value) })} />
+            </Field>
+            <Field label="Maximaal aantal pushmeldingen per uur" htmlFor="np-cap" hint="Leeg = geen limiet">
+              <Input id="np-cap" type="number" min="1" value={prefs.maxPerHour ?? ""} onChange={(e) => setPrefs({ ...prefs, maxPerHour: e.target.value === "" ? null : Number(e.target.value) })} />
+            </Field>
+          </div>
+          <fieldset>
+            <legend className="mb-1.5 text-[13px] font-medium text-foreground/80">Meldingen per platform <span className="font-normal text-muted">(niets aangevinkt = alle)</span></legend>
+            <div className="flex flex-wrap gap-2">
+              {(["marktplaats", "vinted"] as const).map((pl) => (
+                <label key={pl} className="flex cursor-pointer items-center gap-2 rounded-full border border-border px-3.5 py-1.5 text-sm has-[:checked]:border-accent has-[:checked]:bg-accent-soft">
+                  <input type="checkbox" className="h-4 w-4 accent-[var(--accent)]" checked={prefs.platforms.includes(pl)} onChange={() => togglePlatform(pl)} />{pl === "vinted" ? "Vinted" : "Marktplaats"}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          {modelOptions.length > 0 && (
+            <fieldset>
+              <legend className="mb-1.5 text-[13px] font-medium text-foreground/80">Alleen deze modellen melden <span className="font-normal text-muted">(niets aangevinkt = alle modellen uit de modellenlijst)</span></legend>
+              <div className="flex max-h-48 flex-wrap gap-2 overflow-auto">
+                {modelOptions.map((m) => (
+                  <label key={m.key} className="flex cursor-pointer items-center gap-2 rounded-full border border-border px-3 py-1 text-xs has-[:checked]:border-accent has-[:checked]:bg-accent-soft">
+                    <input type="checkbox" className="h-3.5 w-3.5 accent-[var(--accent)]" checked={prefs.modelKeys.includes(m.key)} onChange={() => toggleModel(m.key)} />{m.label}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          )}
           {profiles.length > 0 && (
             <fieldset>
               <legend className="mb-1.5 text-[13px] font-medium text-foreground/80">Alleen geselecteerde zoekprofielen <span className="font-normal text-muted">(niets aangevinkt = alle)</span></legend>

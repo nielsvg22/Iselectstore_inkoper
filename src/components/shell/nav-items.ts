@@ -1,4 +1,4 @@
-import { Activity, ListChecks, Mail, BarChart3, Gauge, Smartphone, Bell, Download, LayoutGrid, LineChart, Filter, Scale, Search, Settings, ShoppingBag, Tag } from "lucide-react";
+import { Activity, ListChecks, Mail, ScrollText, SlidersHorizontal, BarChart3, Gauge, Smartphone, Bell, Download, LayoutGrid, LineChart, Filter, Scale, Search, Settings, ShoppingBag, Tag } from "lucide-react";
 
 export const MAIN_NAV = [
   { href: "/", label: "Dashboard", icon: LayoutGrid },
@@ -12,7 +12,9 @@ export const MAIN_NAV = [
 export const MORE_NAV = [
   { href: "/purchases", label: "Mijn inkopen", icon: ShoppingBag },
   { href: "/rules", label: "Inkoopregels", icon: Scale },
-  { href: "/rules/zoekfilters", label: "Zoekfilters", icon: ListChecks },
+  { href: "/rules/zoekfilters", label: "Modellenlijst", icon: ListChecks },
+  { href: "/rules/filters", label: "Algemene filters", icon: SlidersHorizontal },
+  { href: "/rules/logboek", label: "Filterlogboek", icon: ScrollText },
   { href: "/rules/automsg", label: "Auto-berichten", icon: Mail },
   { href: "/funnel", label: "Funnel & aanbod", icon: Filter },
   { href: "/market", label: "Marktdata", icon: LineChart },

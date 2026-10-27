@@ -14,6 +14,14 @@ export const notifyPrefsSchema = z.object({
   push: z.boolean().default(true),
   /** Pop-up in de app zodra er een nieuwe advertentie is (als de app open staat) */
   popup: z.boolean().default(true),
+  /** meldingen per platform: leeg = alle platforms */
+  platforms: z.array(z.enum(["marktplaats", "vinted"])).max(2).default([]),
+  /** alleen deze modellen (modelsleutels); leeg = alle modellen */
+  modelKeys: z.array(z.string().max(80)).max(300).default([]),
+  /** maximaal zoveel pushmeldingen per uur (null = geen limiet) */
+  maxPerHour: z.number().int().min(1).max(500).nullable().default(null),
+  /** alleen deals met minimaal deze verwachte winst (marge uit de modellenlijst); null = geen eis */
+  minMarginEuro: z.number().min(0).max(100000).nullable().default(null),
   /** profile = zoals ingesteld per zoekprofiel; fallback = alleen als er geen actief pushapparaat is; off = nooit */
   telegram: z.enum(["profile", "fallback", "off"]).default("profile"),
 });
@@ -35,6 +43,11 @@ export interface DealFacts {
   band: string;
   netProfitCents: number;
   profileId: string;
+  /** platform van de advertentie ("marktplaats" | "vinted") */
+  source?: string;
+  modelKey?: string;
+  /** verwachte winst volgens het margefilter (euro); null/ontbreekt = niet berekend */
+  marginEuro?: number | null;
 }
 
 /** Beslist of deze deal voor deze gebruiker een melding mag worden. */
@@ -42,6 +55,9 @@ export function passesPrefs(p: NotifyPrefs, d: DealFacts): { ok: boolean; reason
   if (p.mode === "top" && d.band !== "TOP") return { ok: false, reason: "Alleen topdeals ingesteld" };
   if (p.minScore != null && d.score < p.minScore) return { ok: false, reason: `Score ${d.score} < minimum ${p.minScore}` };
   if (p.minProfitEuro != null && d.netProfitCents < p.minProfitEuro * 100) return { ok: false, reason: `Winst onder minimum €${p.minProfitEuro}` };
+  if (p.platforms.length && d.source && !p.platforms.includes(d.source as "marktplaats" | "vinted")) return { ok: false, reason: `Meldingen voor ${d.source} staan uit` };
+  if (p.modelKeys.length && d.modelKey && !p.modelKeys.includes(d.modelKey)) return { ok: false, reason: "Model niet geselecteerd voor meldingen" };
+  if (p.minMarginEuro != null && d.marginEuro != null && d.marginEuro < p.minMarginEuro) return { ok: false, reason: `Verwachte winst €${d.marginEuro} onder het ingestelde minimum €${p.minMarginEuro}` };
   if (p.profileIds.length && !p.profileIds.includes(d.profileId)) return { ok: false, reason: "Zoekprofiel niet geselecteerd voor meldingen" };
   return { ok: true };
 }

@@ -28,6 +28,8 @@ export interface DealRow {
   distanceKm: number | null;
   firstSeenAt: string;
   isDemo: boolean;
+  /** platform: marktplaats of vinted */
+  source?: string;
   url: string;
   priceKnown: boolean;
   /** vlaggen van de inkoopregels (📍 dichtbij, 🔴 onder 20 km, ✨ krasvrij, 💰 hoge marge …) */
@@ -59,6 +61,7 @@ export function DealCard({ d }: { d: DealRow }) {
           <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
             <BandBadge band={d.band} blocked={d.blocked} />
             {d.isDemo && <Badge tone="warning">Voorbeeld</Badge>}
+            <Badge tone={d.source === "vinted" ? "accent" : "neutral"}>{d.source === "vinted" ? "Vinted" : "Marktplaats"}</Badge>
           </div>
           <div className="absolute right-3 top-3 rounded-full bg-card/90 p-0.5 shadow backdrop-blur"><ScoreRing score={d.score} size={48} blocked={d.blocked} /></div>
         </div>

@@ -7,6 +7,8 @@ import { analyzeAd } from "../pipeline/analyze";
 import { ingestAd } from "../pipeline/ingest";
 import { getConfig } from "../settings/store";
 import { adapterForProfile } from "../sources/adapters";
+import { bumpPrefilterStats } from "../rules/prefilter-stats";
+import { getRules } from "../rules/config";
 import { fetchVintedDetail, platformOf } from "../sources/vinted-search";
 import { officialAdapter, officialReady, OFFICIAL_SOURCE } from "../sources/marktplaats-official";
 import { planSmartUnits, smartPageBudget } from "../sources/smart-plan";
@@ -129,7 +131,11 @@ export async function runProfileCheck(
   } = { pages: 0, cacheHits: 0 };
   try {
     const tree = ["SEARCH", "PARTNER_API"].includes(adapter.origin) ? await loadTree(profileId) : null;
-    const prefilter = tree ? buildPrefilter(tree) : undefined;
+    const rulesCfg = tree ? await getRules() : null;
+    const dropped: Record<string, number> = {};
+    const prefilter = tree
+      ? buildPrefilter(tree, { accessories: rulesCfg?.enabled ? rulesCfg.accessories : undefined, onDrop: (r) => { dropped[r] = (dropped[r] ?? 0) + 1; } })
+      : undefined;
     // Slim zoeken (snelle modus): smalle filterpagina's per model/opslag; af en toe de volledige zoekterm als vangnet
     let slices: Slice[] | undefined;
     let fullSearch = false;
@@ -284,6 +290,7 @@ export async function runProfileCheck(
       });
     await ingestPage(ads);
     await recordSource(adapter.id, true, undefined, stats.pages);
+    await bumpPrefilterStats(platform, dropped).catch(() => undefined);
     const now = new Date();
     // Eerste geslaagde controle van een zoekprofiel = "nulmeting": wat er al stond wordt nooit als nieuwe deal gemeld
     const baseline =

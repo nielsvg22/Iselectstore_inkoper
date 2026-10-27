@@ -30,6 +30,7 @@ async function Deals({ sp, userId }: { sp: Awaited<SP>; userId: string }) {
     family: one(sp.family),
     maxDistanceKm: Number(one(sp.dist)) || undefined,
     profileId: one(sp.profile),
+    source: one(sp.platform) === "vinted" ? "vinted" : one(sp.platform) === "marktplaats" ? "marktplaats" : undefined,
     savedTree: saved ? (saved.tree as unknown as Group) : undefined,
     review: one(sp.review) === "1",
     showBlocked: one(sp.blocked) === "1",
@@ -58,11 +59,12 @@ async function Deals({ sp, userId }: { sp: Awaited<SP>; userId: string }) {
     distanceKm: a.ad.distanceKm,
     firstSeenAt: a.ad.firstSeenAt.toISOString(),
     isDemo: a.ad.isDemo,
+    source: a.ad.source,
     url: a.ad.url,
     priceKnown: a.ad.askingPriceCents != null && a.ad.askingPriceCents > 0,
     flags: ((a.costs as { rules?: { flags?: string[] } } | null)?.rules?.flags) ?? [],
   }));
-  const filtered = Boolean(one(sp.q) || one(sp.band) || one(sp.family) || one(sp.dist) || one(sp.profile) || one(sp.review) || saved);
+  const filtered = Boolean(one(sp.q) || one(sp.band) || one(sp.family) || one(sp.dist) || one(sp.profile) || one(sp.review) || one(sp.platform) || saved);
   if (!data.length) {
     const any = await prisma.advertisement.count({ where: { isDemo: cfg.demoMode } });
     return filtered ? (

@@ -16,6 +16,8 @@ export interface DealFilters {
   /** Maximale afstand in km (advertenties zonder afstand blijven staan) */
   maxDistanceKm?: number;
   profileId?: string;
+  /** Platform van de advertentie: leeg = alles */
+  source?: "marktplaats" | "vinted";
   /** Eigen (opgeslagen) filter: wordt in-memory op de resultaten toegepast */
   savedTree?: Group;
   userState?: string;
@@ -37,6 +39,7 @@ export async function listDeals(f: DealFilters) {
       isDemo: cfg.demoMode,
       AND: [cityScopeWhere(cfg.radar.cityOnly), ...(f.review ? [] : [drivingWhere(cfg)])],
       duplicateOfId: null,
+      ...(f.source ? { source: f.source } : {}),
       userState: f.userState ? (f.userState as never) : { not: "IGNORED" },
       ...(f.q ? { title: { contains: f.q, mode: "insensitive" } } : {}),
       ...(f.review ? { needsManualReview: true } : {}),

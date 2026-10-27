@@ -10,6 +10,9 @@ export const DEFAULT_ACCESSORY_TERMS = [
   "oplader", "lader", "adapter", "kabel", "oplaadkabel", "lightning kabel", "usb-c kabel", "powerbank", "charger", "cable",
   "houder", "standaard", "autohouder", "armband", "polsband", "horlogebandje", "bandje", "strap", "lanyard", "ringhouder", "popsocket",
   "stylus", "toetsenbordhoes", "oordopjes hoesje",
+  // Franse, Duitse en Engelse termen (Vinted wordt ook door verkopers uit andere landen gebruikt)
+  "coque", "étui", "housse", "protège-écran", "protege ecran", "verre trempé", "chargeur", "câble", "hülle", "handyhülle", "schutzhülle",
+  "panzerglas", "schutzfolie", "displayschutz", "ladegerät", "ladekabel", "screen guard", "phone case", "protector",
 ];
 
 export const DEFAULT_PARTS_TERMS = [

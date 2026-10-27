@@ -15,7 +15,9 @@ export default async function RulesPage() {
         <h1 className="text-[32px] font-semibold tracking-tight">Inkoopregels</h1>
         <p className="mt-1 text-muted">Maximale prijs per model op basis van batterij, krassen en afstand, met marge- en verzendregels. Zo bepaalt de app welke advertenties een melding geven.</p>
         <div className="mt-3 flex flex-wrap gap-2">
-          <Link href="/rules/zoekfilters" className="rounded-full border border-card-border px-4 py-2 text-sm font-medium hover:bg-muted-bg">Zoekfilters (lijst van de klant)</Link>
+          <Link href="/rules/filters" className="rounded-full border border-card-border px-4 py-2 text-sm font-medium hover:bg-muted-bg">Algemene filters</Link>
+          <Link href="/rules/logboek" className="rounded-full border border-card-border px-4 py-2 text-sm font-medium hover:bg-muted-bg">Filterlogboek</Link>
+          <Link href="/rules/zoekfilters" className="rounded-full border border-card-border px-4 py-2 text-sm font-medium hover:bg-muted-bg">Modellenlijst</Link>
           <Link href="/rules/automsg" className="rounded-full border border-card-border px-4 py-2 text-sm font-medium hover:bg-muted-bg">Auto-berichten</Link>
           <Link href="/rules/beslisboom" className="rounded-full border border-card-border px-4 py-2 text-sm font-medium hover:bg-muted-bg">Beslisboom</Link>
         </div>

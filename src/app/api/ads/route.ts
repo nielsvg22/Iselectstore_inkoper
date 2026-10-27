@@ -14,6 +14,7 @@ const q = z.object({
   filter: z.string().max(40).optional(),
   userState: z.enum(["NONE", "INTERESTING", "FAVORITE", "IGNORED"]).optional(),
   review: z.enum(["1", "0"]).optional(),
+  source: z.enum(["marktplaats", "vinted"]).optional(),
   showBlocked: z.enum(["1", "0"]).optional(),
   sort: z.enum(["score", "profit", "roi", "new", "price"]).optional(),
   limit: z.coerce.number().int().min(1).max(200).optional(),
@@ -30,6 +31,7 @@ export const GET = route(async (req, { user }) => {
     items: rows.map((a) => ({
       id: a.adId,
       title: a.ad.title,
+      source: a.ad.source,
       model: a.ad.product?.modelLabel ?? null,
       askingCents: a.askingCents,
       expectedCents: a.expectedCents,

@@ -680,6 +680,9 @@ export async function analyzeAd(
         publishedAt: ad.publishedAt,
         origin: ad.origin,
         rules: rulesVerdict ? { status: rulesVerdict.status, replaceDistancePolicy: rulesVerdict.replaceDistancePolicy !== false } : null,
+        source: ad.source,
+        modelKey: rec.modelKey,
+        marginEuro: rulesVerdict?.profit?.profitEuro ?? null,
         pickupOnlyKm: await pickupOnlyKm(),
         complete:
           !["SEARCH", "PARTNER_API"].includes(ad.origin) ||
@@ -717,6 +720,9 @@ export async function matchProfiles(
     pickupOnlyKm?: number | null;
     /** oordeel van de inkoopregels; "skip" of null = bestaande logica */
     rules?: { status: string; replaceDistancePolicy: boolean } | null;
+    source?: string;
+    modelKey?: string;
+    marginEuro?: number | null;
   },
   cfg: AppConfig,
 ) {
@@ -845,7 +851,8 @@ export async function matchProfiles(
             };
             prefsCache.set(uid, up);
           }
-          const facts = { score: meta.score, band: meta.band, netProfitCents: meta.netProfitCents, profileId: p.id };
+          const facts = { score: meta.score, band: meta.band, netProfitCents: meta.netProfitCents, profileId: p.id, source: meta.source, modelKey: meta.modelKey, marginEuro: meta.marginEuro ?? null };
+          const capped = up.prefs.maxPerHour != null && (await prisma.notification.count({ where: { userId: uid, channel: "WEBPUSH", createdAt: { gte: new Date(Date.now() - 3600_000) } } })) >= up.prefs.maxPerHour;
           const userRunAt = quietEndsAt(up.prefs) ?? undefined;
           if (up.prefs.popup && passesPrefs(up.prefs, facts).ok) {
             const key = `INAPP:${adId}:${uid}`;
@@ -857,7 +864,7 @@ export async function matchProfiles(
               }
             }
           }
-          if (up.push && up.prefs.push && passesPrefs(up.prefs, facts).ok) {
+          if (up.push && up.prefs.push && !capped && passesPrefs(up.prefs, facts).ok) {
             await createNotification({ adId, profileId: p.id, userId: uid, channel: "WEBPUSH", dedupeKey: `WEBPUSH:${adId}:${uid}`, runAt: userRunAt, priority: complete ? 30 : 40 });
           }
         }

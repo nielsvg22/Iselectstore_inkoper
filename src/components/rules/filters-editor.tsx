@@ -98,19 +98,20 @@ export function FiltersEditor({ initialFilters, initialRules, isAdmin }: { initi
             </Select>
           </div>
           <div className="overflow-auto rounded-2xl border border-card-border">
-            <table className="w-full min-w-[1100px] text-sm">
+            <table className="w-full min-w-[1400px] text-sm">
               <thead className="bg-muted-bg text-left text-xs text-muted"><tr>
-                <th className="px-3 py-2">Model</th><th className="px-2 py-2">Opslag</th><th className="px-2 py-2">Conditie</th><th className="px-2 py-2">Min €</th><th className="px-2 py-2">Max €</th>
-                <th className="px-2 py-2">Max afstand (km)</th><th className="px-2 py-2">Type advertentie</th><th className="px-2 py-2">Type verkoper</th><th className="px-2 py-2">Verkoper actief (mnd)</th><th />
+                <th className="px-2 py-2">Actief</th><th className="px-3 py-2">Model</th><th className="px-2 py-2">Opslag</th><th className="px-2 py-2">Conditie</th><th className="px-2 py-2">Min €</th><th className="px-2 py-2">Max €</th>
+                <th className="px-2 py-2">Max afstand (km)</th><th className="px-2 py-2">Type advertentie</th><th className="px-2 py-2">Type verkoper</th><th className="px-2 py-2">Verkoper actief (mnd)</th><th className="px-2 py-2">Doorverkoop €</th><th className="px-2 py-2">Min. marge €</th><th />
               </tr></thead>
               <tbody>
                 {view.map(({ f, i }, n) => (
                   <React.Fragment key={f.id + i}>
                   {(n === 0 || categoryOf(view[n - 1].f.modelKey) !== categoryOf(f.modelKey)) && (
-                    <tr className="bg-muted-bg/60"><td colSpan={10} className="px-3 py-2 text-sm font-semibold text-foreground/80">{categoryOf(f.modelKey)}</td></tr>
+                    <tr className="bg-muted-bg/60"><td colSpan={13} className="px-3 py-2 text-sm font-semibold text-foreground/80">{categoryOf(f.modelKey)}</td></tr>
                   )}
                   <tr className="border-t border-card-border">
-                    <td className="min-w-[13rem] px-3 py-1.5 font-medium">{labelOf(f.modelKey, f.variant)}</td>
+                    <td className="px-2"><input type="checkbox" aria-label="Actief" className="h-4 w-4 accent-[var(--accent)]" disabled={!isAdmin} checked={f.active} onChange={(e) => set(i, { active: e.target.checked })} /></td>
+                    <td className={`min-w-[13rem] px-3 py-1.5 font-medium ${f.active ? "" : "text-muted line-through"}`}>{labelOf(f.modelKey, f.variant)}</td>
                     <td className={cell}><Input aria-label="Opslag (GB, leeg = alle)" type="number" className="w-24" value={f.storageGb ?? ""} placeholder="Alle" disabled={!isAdmin} onChange={(e) => set(i, { storageGb: e.target.value === "" ? null : Number(e.target.value) })} /></td>
                     <td className={cell}><Select aria-label="Conditie" className="min-w-[8.5rem]" value={f.condition} disabled={!isAdmin} onChange={(e) => set(i, { condition: e.target.value as FilterCondition })}>{(Object.keys(CONDITION_LABEL) as FilterCondition[]).map((c) => <option key={c} value={c}>{CONDITION_LABEL[c]}</option>)}</Select></td>
                     <td className={cell}><Input aria-label="Minimale prijs" type="number" className="w-20" value={f.minEuro} disabled={!isAdmin} onChange={(e) => set(i, { minEuro: Number(e.target.value) })} /></td>
@@ -119,11 +120,13 @@ export function FiltersEditor({ initialFilters, initialRules, isAdmin }: { initi
                     <td className={cell}><Select aria-label="Type advertentie" className="min-w-[10.5rem]" value={f.adType} disabled={!isAdmin} onChange={(e) => set(i, { adType: e.target.value as FilterAdType })}>{(Object.keys(ADTYPE_LABEL) as FilterAdType[]).map((c) => <option key={c} value={c}>{ADTYPE_LABEL[c]}</option>)}</Select></td>
                     <td className={cell}>{f.sellerType}</td>
                     <td className={cell}><Input aria-label="Verkoper actief (maanden)" type="number" className="w-20" value={f.sellerMinMonths} disabled={!isAdmin} onChange={(e) => set(i, { sellerMinMonths: Number(e.target.value) })} /></td>
+                    <td className={cell}><Input aria-label="Verwachte doorverkoopprijs" type="number" className="w-28" placeholder="—" value={f.resaleEuro ?? ""} disabled={!isAdmin} onChange={(e) => set(i, { resaleEuro: e.target.value === "" ? null : Number(e.target.value) })} /></td>
+                    <td className={cell}><Input aria-label="Minimale winstmarge" type="number" className="w-24" placeholder="segment" value={f.minMarginEuro ?? ""} disabled={!isAdmin} onChange={(e) => set(i, { minMarginEuro: e.target.value === "" ? null : Number(e.target.value) })} /></td>
                     <td className="px-2">{isAdmin && <button type="button" aria-label="Zoekfilter verwijderen" className="rounded-lg p-2 text-muted hover:bg-muted-bg hover:text-danger" onClick={() => setFilters((l) => l.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></button>}</td>
                   </tr>
                   </React.Fragment>
                 ))}
-                {view.length === 0 && <tr><td colSpan={10} className="px-3 py-6 text-center text-muted">Geen zoekfilters{filters.length ? " voor deze selectie" : ". Importeer de lijst hieronder."}</td></tr>}
+                {view.length === 0 && <tr><td colSpan={13} className="px-3 py-6 text-center text-muted">Geen zoekfilters{filters.length ? " voor deze selectie" : ". Importeer de lijst hieronder."}</td></tr>}
               </tbody>
             </table>
           </div>

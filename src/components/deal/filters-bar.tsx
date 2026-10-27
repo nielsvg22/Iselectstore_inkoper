@@ -32,7 +32,7 @@ export function FiltersBar({ profiles, savedFilters = [] }: { profiles: Array<{ 
         <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
         <Input aria-label="Filter op titel" placeholder="Filter op titel…" className="pl-10" value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
         <Select aria-label="Sorteren" value={sp.get("sort") ?? "score"} onChange={(e) => set({ sort: e.target.value === "score" ? null : e.target.value })}>
           <option value="score">Beste score</option>
           <option value="profit">Hoogste winst</option>
@@ -55,6 +55,11 @@ export function FiltersBar({ profiles, savedFilters = [] }: { profiles: Array<{ 
           <option value="ipad">iPad</option>
           <option value="watch">Apple Watch</option>
           <option value="airpods">AirPods</option>
+        </Select>
+        <Select aria-label="Platform" value={sp.get("platform") ?? ""} onChange={(e) => set({ platform: e.target.value || null })}>
+          <option value="">Alle platforms</option>
+          <option value="marktplaats">Marktplaats</option>
+          <option value="vinted">Vinted</option>
         </Select>
         <Select aria-label="Mijn filters" value={sp.get("filter") ?? ""} onChange={(e) => set({ filter: e.target.value || null })}>
           <option value="">{savedFilters.length ? "Mijn filters" : "Geen eigen filters"}</option>

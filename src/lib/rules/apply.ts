@@ -18,6 +18,7 @@ export const clearRulesCache = () => { cache = null; };
 
 export interface AdForRules {
   id?: string;
+  source?: string;
   title: string;
   description: string;
   askingPriceCents: number | null;
@@ -33,7 +34,7 @@ const numOrNull = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ?
 /** Zet advertentie + herkenning om in de invoer voor de regelmotor (alleen echte bronwaarden; tekstprijs alleen als er geen prijsinformatie is). */
 export function buildVerdictInput(a: {
   ad: AdForRules;
-  rec: { modelKey: string; modelLabel: string; family: string; facts: Record<string, { value: unknown }> };
+  rec: { modelKey: string; modelLabel: string; family: string; facts: Record<string, { value: unknown; evidence?: string | null }> };
   shipping: string[];
   now?: Date;
   stock?: VerdictInput["stock"];
@@ -84,6 +85,14 @@ export function buildVerdictInput(a: {
     now: a.now ?? new Date(),
     stock: a.stock ?? null,
     photoScratch: a.photoScratch ?? null,
+    platform: a.ad.source === "vinted" ? "vinted" : "marktplaats",
+    title: a.ad.title,
+    country: typeof attrs.country === "string" ? attrs.country : null,
+    buyerProtection: attrs.buyerProtection === "yes" ? true : attrs.buyerProtection === "no" ? false : null,
+    electronicsVerification: attrs.electronicsVerification === "yes" ? true : attrs.electronicsVerification === "no" ? false : null,
+    listedProtectionCents: numOrNull(attrs.buyerProtectionCents),
+    listedShippingCents: numOrNull(attrs.shippingCents),
+    batteryEvidence: typeof a.rec.facts.batteryHealth?.evidence === "string" ? a.rec.facts.batteryHealth.evidence : null,
   };
   return { input, textPrices };
 }

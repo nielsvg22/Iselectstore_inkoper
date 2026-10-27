@@ -24,7 +24,7 @@ export function DealTable({ rows }: { rows: DealRow[] }) {
                 <Link href={`/ads/${d.adId}`} className="block font-medium hover:text-accent">
                   <span className={`line-clamp-1 ${d.flags?.includes("hot") ? "text-danger" : ""}`}>{d.flags?.includes("hot") ? "❗ " : ""}{d.model ?? d.title}{flagsEmoji(d.flags) ? ` ${flagsEmoji(d.flags)}` : ""}</span>
                 </Link>
-                <div className="mt-1 flex gap-1.5"><BandBadge band={d.band} blocked={d.blocked} />{d.isDemo && <Badge tone="warning">Voorbeeld</Badge>}</div>
+                <div className="mt-1 flex gap-1.5"><BandBadge band={d.band} blocked={d.blocked} />{d.isDemo && <Badge tone="warning">Voorbeeld</Badge>}<Badge tone={d.source === "vinted" ? "accent" : "neutral"}>{d.source === "vinted" ? "Vinted" : "Marktplaats"}</Badge></div>
               </td>
               <td className="tabular px-4 py-3">{d.priceKnown ? formatEuro(d.askingCents) : "Bieden"}</td>
               <td className="tabular px-4 py-3">{d.expectedCents ? formatEuro(d.expectedCents) : "—"}{d.uncertain && <span title="Onzekere waardering" className="ml-1 text-warning">⚠</span>}</td>

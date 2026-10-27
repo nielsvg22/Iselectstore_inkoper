@@ -116,6 +116,19 @@ export default async function AdDetailPage({ params }: { params: Promise<{ id: s
         <Notice tone="warning"><strong>Onzekere waardering.</strong> Er zijn te weinig of te wisselende vergelijkingen ({a.sampleSize}). Behandel de winstverwachting niet als zeker; voeg eventueel eigen verkoopprijzen toe bij <Link href="/market" className="underline">Marktdata</Link>.</Notice>
       )}
 
+      {ad.source === "vinted" && (() => {
+        const at = ((ad.rawPayload as { attributes?: Record<string, string | number> } | null)?.attributes ?? {}) as Record<string, string | number>;
+        const yn = (v: string | number | undefined) => (v === "yes" ? "ja (volgens de advertentiepagina)" : v === "no" ? "nee" : "onbekend (niet bevestigd)");
+        return (
+          <Notice tone="info">
+            <strong>Vinted-advertentie.</strong> Niet beschikbaar op Vinted: exacte locatie en afstand, accountleeftijd en het land van de verkoper. Deze filters kunnen daarom niet worden toegepast; ze sluiten nooit ten onrechte uit.
+            {" "}Kopersbescherming: {yn(at.buyerProtection)}. Elektronicaverificatie: {yn(at.electronicsVerification)}.
+            {at.vintedBatteryBucket ? ` Batterijklasse volgens Vinted: ${at.vintedBatteryBucket} (een bereik, geen exact percentage).` : ""}
+            {at.vintedSellerLastSeen ? ` Verkoper laatst gezien: ${at.vintedSellerLastSeen}.` : ""}
+          </Notice>
+        );
+      })()}
+
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="min-w-0 space-y-6 lg:order-1">
           <Card><CardContent className="pt-5 sm:pt-6"><PhotoAi adId={ad.id} images={images} demo={ad.isDemo} initial={photoAnalysis} /></CardContent></Card>
