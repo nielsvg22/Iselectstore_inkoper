@@ -11,6 +11,7 @@ import { clearRulesCache } from "@/lib/rules/apply";
 import { saveConfig } from "@/lib/settings/store";
 import { saveTree } from "@/lib/pipeline/tree";
 import { listDeals } from "@/lib/queries";
+import { latestVintedAds } from "@/lib/vinted-feed";
 import { provisionVintedRadar, vintedStatus } from "@/lib/vinted-radar";
 import { makeUser, resetDb } from "../helpers";
 
@@ -119,6 +120,20 @@ describe("Vinted ophalen en verwerken", () => {
     await jobs();
     expect(await prisma.notification.count({ where: { adId: ad.id } })).toBe(n1);
     expect(await prisma.notification.count({ where: { adId: ad.id, channel: "WEBPUSH", userId: user.id } })).toBe(1);
+  });
+});
+
+describe("Vinted-tab", () => {
+  it("toont de nieuwste Vinted-advertenties met oordeel en of er een melding is verstuurd", async () => {
+    const { profileId } = await setup();
+    stubSites();
+    await runProfileCheck(profileId);
+    await jobs();
+    const rows = await latestVintedAds(10);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ title: expect.stringMatching(/iphone 14/i), priceEuro: 295, detailLoaded: true, notified: 0 });
+    expect(rows[0].status).not.toBe("wacht op analyse");
+    expect(await latestVintedAds(10)).toEqual(rows);
   });
 });
 

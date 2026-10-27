@@ -1,9 +1,10 @@
-import { Activity, ListChecks, Mail, ScrollText, SlidersHorizontal, BarChart3, Gauge, Smartphone, Bell, Download, LayoutGrid, LineChart, Filter, Scale, Search, Settings, ShoppingBag, Tag } from "lucide-react";
+import { Activity, ListChecks, Mail, ScrollText, Shirt, SlidersHorizontal, BarChart3, Gauge, Smartphone, Bell, Download, LayoutGrid, LineChart, Filter, Scale, Search, Settings, ShoppingBag, Tag } from "lucide-react";
 
 export const MAIN_NAV = [
   { href: "/", label: "Dashboard", icon: LayoutGrid },
   { href: "/profiles", label: "Zoekopdrachten", icon: Search },
   { href: "/deals", label: "Deals", icon: Tag },
+  { href: "/vinted", label: "Vinted", icon: Shirt },
   { href: "/notifications", label: "Meldingen", icon: Bell },
   { href: "/stats", label: "Statistieken", icon: BarChart3 },
   { href: "/settings", label: "Instellingen", icon: Settings },

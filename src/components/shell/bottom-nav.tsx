@@ -13,7 +13,7 @@ export function BottomNav() {
     >
       <ul className="flex items-stretch justify-around">
         {MAIN_NAV.filter((item) =>
-          ["/", "/deals", "/notifications"].includes(item.href),
+          ["/", "/deals", "/vinted", "/notifications"].includes(item.href),
         ).map(({ href, label, icon: Icon }) => {
           const on = isActive(path, href);
           return (
