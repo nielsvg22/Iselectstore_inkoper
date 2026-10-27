@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { classifyCondition, evaluateFilters, matchFilterModel, parseFiltersText, type FilterAd, type SearchFilter } from "@/lib/rules/filters";
+import { checkFilterDistance, checkFilterSeller, classifyCondition, evaluateFilters, matchFilterModel, parseFiltersText, type FilterAd, type SearchFilter } from "@/lib/rules/filters";
 import { defaultRules, type BasePrice } from "@/lib/rules/config";
 import { evaluateRules, type VerdictInput } from "@/lib/rules/verdict";
 
-const f = (o: Partial<SearchFilter>): SearchFilter => ({ id: Math.random().toString(), modelKey: "iphone-13", variant: "", storageGb: 128, condition: "normal", minEuro: 50, maxEuro: 320, maxKm: 300, adType: "all", sellerType: "Alle", sellerMinMonths: 0, ...o });
-const ad = (o: Partial<FilterAd> = {}): FilterAd => ({ modelKey: "iphone-13", variant: "", storageGb: 128, condition: "normal", priceKind: "ask", askEuro: 250, bidEuro: null, km: 20, sellerMonths: 60, ...o });
+const f = (o: Partial<SearchFilter>): SearchFilter => ({ id: Math.random().toString(), modelKey: "iphone-13", variant: "", storageGb: 128, condition: "normal", minEuro: 50, maxEuro: 320, maxKm: 300, adType: "all", sellerType: "Alle", sellerMinMonths: 0, active: true, resaleEuro: null, minMarginEuro: null, ...o });
+const ad = (o: Partial<FilterAd> = {}): FilterAd => ({ modelKey: "iphone-13", variant: "", storageGb: 128, condition: "normal", priceKind: "ask", askEuro: 250, bidEuro: null, ...o });
 
 describe("modelnamen uit de lijst", () => {
   it("koppelt iPhone, iPad, Mac en Watch aan catalogussleutels", () => {
@@ -51,14 +51,25 @@ describe("zoekfilter toepassen", () => {
     expect(evaluateFilters(list, ad({ condition: "broken" }))).toMatchObject({ status: "fail" });
     expect(evaluateFilters(list, ad({ storageGb: 512 }))).toMatchObject({ status: "fail" });
   });
-  it("wijst af op prijs, afstand, type advertentie en verkoper", () => {
-    expect((evaluateFilters(list, ad({ askEuro: 330 })) as { reasons: string[] }).reasons[0]).toContain("hoger dan de zoekfilterprijs");
+  it("wijst af op prijs en type advertentie", () => {
+    expect((evaluateFilters(list, ad({ askEuro: 330 })) as { reasons: string[] }).reasons[0]).toContain("hoger dan de maximumprijs");
     expect((evaluateFilters(list, ad({ askEuro: 30 })) as { reasons: string[] }).reasons[0]).toContain("minimumprijs");
-    expect(evaluateFilters(list, ad({ km: 400 })).status).toBe("fail");
-    expect(evaluateFilters(list, ad({ condition: "sealed", priceKind: "bid", askEuro: null, bidEuro: 200 })).status).toBe("fail");
-    const strict = [f({ sellerMinMonths: 12 })];
-    expect(evaluateFilters(strict, ad({ sellerMonths: 3 })).status).toBe("fail");
-    expect(evaluateFilters(strict, ad({ sellerMonths: null }))).toMatchObject({ status: "ok", sellerUnknown: true });
+    expect(evaluateFilters(list, ad({ condition: "sealed", priceKind: "bid", askEuro: null, bidEuro: 200 }))).toMatchObject({ status: "fail", step: "price-window" });
+  });
+  it("afstand en verkoper van een regel worden apart gecontroleerd", () => {
+    expect(checkFilterDistance(f({ maxKm: 45 }), 60)).toContain("45 km");
+    expect(checkFilterDistance(f({ maxKm: 45 }), 20)).toBeNull();
+    expect(checkFilterDistance(f({ maxKm: 45 }), null)).toBeNull();
+    const strict = f({ sellerMinMonths: 12 });
+    expect(checkFilterSeller(strict, 3)).toContain("12");
+    expect(checkFilterSeller(strict, null)).toBe("unknown");
+    expect(checkFilterSeller(strict, 24)).toBe("ok");
+    expect(checkFilterSeller(f({ sellerMinMonths: 0 }), null)).toBe("ok");
+  });
+  it("inactieve regels doen niet mee en geven een duidelijke reden", () => {
+    const off = [f({ active: false })];
+    expect(evaluateFilters(off, ad())).toMatchObject({ status: "fail", step: "model-list" });
+    expect(evaluateFilters([...off, f({ storageGb: 128, maxEuro: 400 })], ad())).toMatchObject({ status: "ok", filter: { maxEuro: 400 } });
   });
   it("bij bieden accepteert een bod binnen de grens ook als de vraagprijs te hoog is", () => {
     expect(evaluateFilters(list, ad({ priceKind: "both", askEuro: 500, bidEuro: 300 })).status).toBe("ok");
@@ -83,8 +94,8 @@ describe("regelmotor met zoekfilters", () => {
     expect(ok.status).not.toBe("reject");
     expect(ok.baseEuro).toBe(320);
     expect(ok.filter?.maxEuro).toBe(320);
-    expect(evaluateRules(input({ askEuro: 340 }), prices, cfg, list)).toMatchObject({ status: "reject", decidedBy: "filter" });
-    expect(evaluateRules(input({ modelKey: "iphone-14", modelLabel: "iPhone 14" }), prices, cfg, list)).toMatchObject({ status: "reject", decidedBy: "filter" });
+    expect(evaluateRules(input({ askEuro: 340 }), prices, cfg, list)).toMatchObject({ status: "reject", decidedBy: "price-window" });
+    expect(evaluateRules(input({ modelKey: "iphone-14", modelLabel: "iPhone 14" }), prices, cfg, list)).toMatchObject({ status: "reject", decidedBy: "model-list" });
     const ign = evaluateRules(input({ modelKey: "iphone-14", modelLabel: "iPhone 14" }), prices, { ...cfg, filters: { ...cfg.filters, outsideList: "ignore" } }, list);
     expect(ign.decidedBy).not.toBe("filter");
   });

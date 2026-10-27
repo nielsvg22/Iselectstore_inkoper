@@ -1,7 +1,9 @@
 import { assumedBatteryPct, batteryAdjustEuro, batteryDeductionEuro, modelAgeMonths, scratchFactor } from "./battery";
 import { assessBid } from "./bid";
 import { findBasePrice, type BasePrice, type RulesConfig } from "./config";
-import { classifyCondition, evaluateFilters, type SearchFilter } from "./filters";
+import { classifyAccessory } from "./accessory";
+import { checkFilterDistance, checkFilterSeller, classifyCondition, evaluateFilters, type SearchFilter } from "./filters";
+import { marginFor, type MarginResult } from "./margin-filter";
 import { centerHits } from "./geo";
 import { allowedPrices } from "./margin";
 import { belowMinIphone, isNewestPro, minPriceEuro } from "./release";
@@ -32,6 +34,20 @@ export interface VerdictInput {
   shippingOffered: boolean;
   seller: SellerFacts;
   directBuy: boolean;
+  /** platform van de advertentie; zonder waarde geldt Marktplaats */
+  platform?: "marktplaats" | "vinted";
+  /** titel afzonderlijk (voor de accessoire-herkenning); `text` is titel + omschrijving */
+  title?: string;
+  /** land van de verkoper (ISO, bijv. "NL") als het platform dat levert; anders null */
+  country?: string | null;
+  /** kopersbescherming/elektronicaverificatie volgens het platform; null = onbekend (nooit aannemen) */
+  buyerProtection?: boolean | null;
+  electronicsVerification?: boolean | null;
+  /** kosten die het platform in de advertentie noemt (centen) */
+  listedProtectionCents?: number | null;
+  listedShippingCents?: number | null;
+  /** waar het batterijpercentage vandaan komt (bijv. fragment uit de tekst) */
+  batteryEvidence?: string | null;
   /** oordeel van de foto-analyse (AI) over krassen; telt alleen mee als de tekst niets over krassen zegt */
   photoScratch?: "free" | "scratched" | null;
   now: Date;
@@ -42,7 +58,7 @@ export interface VerdictInput {
 export type VerdictStatus = "skip" | "reject" | "review" | "match" | "high";
 export type StepId =
   | "model-min" | "intel" | "macbook-air" | "battery-min" | "distance-pickup-only" | "distance-max" | "distance-no-shipping" | "seller-shipping" | "distance-unknown"
-  | "filter" | "base-price" | "bid-zero" | "price-unknown" | "min-price" | "price-too-high" | "stock";
+  | "model-list" | "accessory" | "price-window" | "margin" | "battery-filter" | "filter-distance" | "country" | "protection" | "seller-filter" | "base-price" | "bid-zero" | "price-unknown" | "min-price" | "price-too-high" | "stock";
 export type PriceKind = "ask" | "bid" | "both" | "bid0" | "none";
 export interface Line { label: string; euro: number }
 
@@ -66,11 +82,14 @@ export interface Verdict {
   highAsk: number | null;
   highBid: number | null;
   marginEuro: number | null;
-  battery: { pct: number | null; assumed: boolean; known: boolean };
+  battery: { pct: number | null; assumed: boolean; known: boolean; source?: string | null };
   scratch: { state: ScratchState; evidence: string | null };
   storageAssumed: boolean;
   distance: { km: number | null; nearestCenter: string | null; shipping: ShipResult | null; newestPro: boolean };
   mpCondition: string | null;
+  platform: string;
+  /** margeberekening (als het margefilter aan staat en het model een doorverkoopprijs heeft) */
+  profit: MarginResult | null;
   /** zoekfilter van de klant dat bij deze advertentie hoort (alleen als zoekfilters aan staan) */
   filter: { condition: string; maxEuro: number; minEuro: number; label: string } | null;
 }
@@ -81,8 +100,8 @@ function emptyVerdict(i: VerdictInput): Verdict {
   return {
     status: "skip", decidedBy: null, reasons: [], notes: [], flags: [], priceKind: "none", effectiveEuro: null, askEuro: i.askEuro, bidEuro: i.bidEuro,
     baseEuro: null, baseKind: null, maxSellEuro: null, lines: [], allowedAsk: null, allowedBid: null, highAsk: null, highBid: null, marginEuro: null,
-    battery: { pct: i.batteryPct, assumed: false, known: i.batteryPct != null }, scratch: { state: "unknown", evidence: null }, storageAssumed: false,
-    distance: { km: i.distanceKm, nearestCenter: null, shipping: null, newestPro: false }, mpCondition: i.mpCondition, filter: null,
+    battery: { pct: i.batteryPct, assumed: false, known: i.batteryPct != null, source: i.batteryPct != null ? i.batteryEvidence ?? null : null }, scratch: { state: "unknown", evidence: null }, storageAssumed: false,
+    distance: { km: i.distanceKm, nearestCenter: null, shipping: null, newestPro: false }, mpCondition: i.mpCondition, platform: i.platform ?? "marktplaats", profit: null, filter: null,
   };
 }
 
@@ -106,6 +125,66 @@ export function evaluateRules(i: VerdictInput, prices: BasePrice[], cfg: RulesCo
     if (i.storageGb != null && !cfg.macbook.ssdGb.includes(i.storageGb)) return reject(`SSD ${i.storageGb} GB valt buiten de ingestelde waarden`, "macbook-air");
   }
   if (i.batteryPct != null && batteryFamily && i.batteryPct < cfg.battery.excludeBelowPct) return reject(`Batterij ${i.batteryPct}% is lager dan ${cfg.battery.excludeBelowPct}% (wordt nooit gekocht)`, "battery-min");
+
+  // ---- prijzen: vraagprijs / bieden vanaf ----
+  const ask = i.askEuro != null && i.askEuro > 0 ? i.askEuro : null;
+  const bidKnown = i.bidEuro != null && i.bidEuro > 0 ? i.bidEuro : null;
+  const bidZero = (i.priceType === "MIN_BID" || i.priceType === "BIDDING") && ask == null && bidKnown == null;
+  v.priceKind = ask != null && bidKnown != null ? "both" : ask != null ? "ask" : bidKnown != null ? "bid" : bidZero ? "bid0" : "none";
+  if (i.directBuy) v.flags.push("directBuy");
+  const platform = i.platform ?? "marktplaats";
+  const purchaseEuro = ask ?? bidKnown;
+
+  // ---- 3. staat het model op de gewenste lijst (modellenlijst/zoekfilters)? ----
+  const variant = i.family === "ipad" && /^ipad-air-m\d$/.test(i.modelKey) && i.screenInch != null ? String(Math.round(i.screenInch)) : "";
+  let filterHit: SearchFilter | null = null;
+  let filterStorageAssumed = false;
+  let priceWindowFail: string[] | null = null;
+  if (cfg.filters.enabled && filters.length) {
+    const cond = classifyCondition(i.text, i.mpCondition);
+    const out = evaluateFilters(filters, { modelKey: i.modelKey, variant, storageGb: i.storageGb, condition: cond, priceKind: v.priceKind, askEuro: ask, bidEuro: bidKnown });
+    if (out.status === "no-filters-for-model") {
+      if (cfg.filters.outsideList === "reject") return reject(`${i.modelLabel} staat niet in de modellenlijst`, "model-list");
+      v.notes.push("Model staat niet in de modellenlijst: gewone regels gelden");
+    } else if (out.status === "fail" && out.step === "model-list") return reject(`Modellenlijst: ${out.reasons.join("; ")}`, "model-list");
+    else if (out.status === "fail") priceWindowFail = out.reasons;
+    else {
+      filterHit = out.filter;
+      filterStorageAssumed = out.storageAssumed;
+      v.notes.push(...out.notes);
+      v.filter = { condition: cond, maxEuro: out.filter.maxEuro, minEuro: out.filter.minEuro, label: `${i.modelLabel}${out.filter.storageGb ? ` ${out.filter.storageGb} GB` : ""} · ${cond === "normal" ? "normaal" : cond === "broken" ? "kapot" : "sealed"}` };
+      v.notes.push(`Zoekfilter: ${v.filter.label}, maximaal €${out.filter.maxEuro}${out.filter.minEuro ? `, minimaal €${out.filter.minEuro}` : ""}`);
+    }
+  }
+
+  // ---- 4. accessoires en onderdelen ----
+  if (i.title) {
+    const acc = classifyAccessory({ title: i.title, description: i.text, priceEuro: purchaseEuro, storageGb: i.storageGb, filterMinEuro: filterHit?.minEuro ?? 0 }, cfg.accessories);
+    if (acc.accessory) return reject(acc.reason, "accessory");
+    if (acc.note) v.notes.push(acc.note);
+  }
+
+  // ---- 5 en 6. minimale en maximale prijs van het model ----
+  if (priceWindowFail) return reject(`Prijsvenster: ${priceWindowFail.join("; ")}`, "price-window");
+
+  // ---- 7. winstmarge ----
+  if (cfg.margin.enabled && filterHit?.resaleEuro != null && purchaseEuro != null) {
+    const m = marginFor({ platform, purchaseEuro, resaleEuro: filterHit.resaleEuro, modelMinMarginEuro: filterHit.minMarginEuro, listedProtectionCents: i.listedProtectionCents, listedShippingCents: i.listedShippingCents }, cfg.margin);
+    v.profit = m;
+    v.notes.push(`Marge: €${m.resaleEuro} − €${m.purchaseEuro}${m.costLines.map((l) => ` − €${l.euro} ${l.label.toLowerCase()}`).join("")} = €${m.profitEuro} (gewenst €${m.requiredEuro}; maximale inkoop €${m.maxPurchaseEuro})`);
+    if (!m.ok) return reject(`Verwachte winst €${m.profitEuro} is lager dan de gewenste marge €${m.requiredEuro} (maximale inkoopprijs €${m.maxPurchaseEuro})`, "margin");
+  } else if (cfg.margin.enabled && purchaseEuro != null) {
+    v.notes.push(filterHit ? "Geen verwachte doorverkoopprijs bij dit model: margefilter niet toegepast" : "Geen modellenlijst-regel met doorverkoopprijs: margefilter niet toegepast");
+  }
+
+  // ---- 8. batterijconditie (alleen een echt gevonden percentage telt, nooit een aanname) ----
+  if (cfg.battery.filterMinPct > 0 && batteryFamily) {
+    if (i.batteryPct != null) {
+      v.battery.source = i.batteryEvidence ?? null;
+      if (i.batteryPct < cfg.battery.filterMinPct) return reject(`Batterijconditie ${i.batteryPct}% is lager dan het gewenste minimum ${cfg.battery.filterMinPct}%`, "battery-filter");
+    } else if (cfg.battery.unknownPolicy === "exclude") return reject(`Batterijconditie niet genoemd (minimum ${cfg.battery.filterMinPct}% is ingesteld)`, "battery-filter");
+    else if (cfg.battery.unknownPolicy === "mark") { v.flags.push("batteryUnknown"); v.notes.push(`Batterijconditie onbekend (minimum ${cfg.battery.filterMinPct}% is ingesteld): gemarkeerd`); }
+  }
 
   // ---- afstand en verzenden ----
   const hits = centerHits(i.latitude, i.longitude, cfg.distance);
@@ -140,6 +219,50 @@ export function evaluateRules(i: VerdictInput, prices: BasePrice[], cfg: RulesCo
     v.distance.shipping = shipping;
   }
 
+  // ---- 9. locatie (zoekfilter) en land ----
+  if (filterHit) {
+    const kmFail = checkFilterDistance(filterHit, km);
+    if (kmFail) return reject(`Zoekfilter: ${kmFail}`, "filter-distance");
+  }
+  const country = (i.country ?? (platform === "marktplaats" ? "NL" : null))?.toUpperCase() ?? null;
+  if (cfg.country.allowed.length) {
+    if (country && !cfg.country.allowed.includes(country)) return reject(`Land ${country} is niet toegestaan (toegestaan: ${cfg.country.allowed.join(", ")})`, "country");
+    if (!country) {
+      if (cfg.country.unknownPolicy === "exclude") return reject("Land van de verkoper is niet vast te stellen en onbekende landen zijn uitgesloten", "country");
+      v.notes.push(`Land van de verkoper onbekend${platform === "vinted" ? " (Vinted toont dit niet op advertentieniveau)" : ""}`);
+      if (cfg.country.unknownPolicy === "mark") v.flags.push("countryUnknown");
+    }
+  }
+
+  // ---- 10. verkopers- en beschermingscriteria ----
+  const unknown = (policy: "show" | "exclude" | "mark", what: string, step: StepId, flag: string) => {
+    if (policy === "exclude") return reject(`${what} is onbekend en onbekend is uitgesloten`, step);
+    v.notes.push(`${what} onbekend`);
+    if (policy === "mark") v.flags.push(flag);
+    return null;
+  };
+  if (platform === "vinted") {
+    for (const [req, val, what, flag] of [
+      [cfg.protection.requireBuyerProtection, i.buyerProtection, "Kopersbescherming", "protectionUnknown"],
+      [cfg.protection.requireElectronicsVerification, i.electronicsVerification, "Elektronicaverificatie", "verificationUnknown"],
+    ] as const) {
+      if (!req) continue;
+      if (val === false) return reject(`${what} is bij deze advertentie niet beschikbaar`, "protection");
+      if (val == null) { const r = unknown(cfg.protection.unknownPolicy, what, "protection", flag); if (r) return r; }
+    }
+  }
+  const sf = cfg.sellerFilter;
+  if (sf.minRating > 0 || sf.minReviews > 0) {
+    if (i.seller.rating != null && i.seller.rating < sf.minRating) return reject(`Verkopersbeoordeling ${i.seller.rating} is lager dan ${sf.minRating}`, "seller-filter");
+    if (i.seller.reviews != null && i.seller.reviews < sf.minReviews) return reject(`Verkoper heeft ${i.seller.reviews} beoordelingen, minimaal ${sf.minReviews}`, "seller-filter");
+    if (sf.minRating > 0 && i.seller.rating == null) { const r = unknown(sf.unknownPolicy, "Verkopersbeoordeling", "seller-filter", "sellerCheck"); if (r) return r; }
+  }
+  if (filterHit) {
+    const sm = checkFilterSeller(filterHit, i.seller.ageMonths);
+    if (sm === "unknown") { if (!reviewReason) { reviewReason = `Verkoper controleren: zoekfilter vraagt ${filterHit.sellerMinMonths} maanden actief, leeftijd onbekend`; reviewStep = "seller-filter"; } v.flags.push("sellerCheck"); }
+    else if (sm !== "ok") return reject(`Zoekfilter: ${sm}`, "seller-filter");
+  }
+
   // ---- krassen, batterij ----
   let sc = analyzeScratch(i.text, i.mpCondition, cfg.scratch);
   if (sc.state === "unknown" && i.photoScratch) { sc = { state: i.photoScratch, evidence: "foto-analyse" }; v.notes.push(`Kras-status uit de foto's (AI): ${i.photoScratch === "free" ? "geen krassen zichtbaar" : "krassen zichtbaar"}`); }
@@ -149,38 +272,10 @@ export function evaluateRules(i: VerdictInput, prices: BasePrice[], cfg: RulesCo
   let batteryPct = i.batteryPct;
   if (batteryFamily && batteryPct == null && cfg.battery.assumeFromAge) {
     const age = modelAgeMonths(i.modelKey, i.now);
-    if (age != null) { batteryPct = assumedBatteryPct(age, cfg.battery); v.battery = { pct: batteryPct, assumed: true, known: false }; v.notes.push(`Batterij onbekend: aangenomen ${batteryPct}% (model is ${age} maanden oud)`); }
+    if (age != null) { batteryPct = assumedBatteryPct(age, cfg.battery); v.battery = { pct: batteryPct, assumed: true, known: false, source: null }; v.notes.push(`Batterij onbekend: aangenomen ${batteryPct}% (model is ${age} maanden oud)`); }
   }
   if (batteryFamily && batteryPct == null) v.flags.push("batteryUnknown");
   else if (v.battery.assumed) v.flags.push("batteryAssumed");
-
-  // ---- prijzen: vraagprijs / bieden vanaf ----
-  const ask = i.askEuro != null && i.askEuro > 0 ? i.askEuro : null;
-  const bidKnown = i.bidEuro != null && i.bidEuro > 0 ? i.bidEuro : null;
-  const bidZero = (i.priceType === "MIN_BID" || i.priceType === "BIDDING") && ask == null && bidKnown == null;
-  v.priceKind = ask != null && bidKnown != null ? "both" : ask != null ? "ask" : bidKnown != null ? "bid" : bidZero ? "bid0" : "none";
-  if (i.directBuy) v.flags.push("directBuy");
-
-  // ---- zoekfilters van de klant ----
-  const variant = i.family === "ipad" && /^ipad-air-m\d$/.test(i.modelKey) && i.screenInch != null ? String(Math.round(i.screenInch)) : "";
-  let filterHit: SearchFilter | null = null;
-  let filterStorageAssumed = false;
-  if (cfg.filters.enabled && filters.length) {
-    const cond = classifyCondition(i.text, i.mpCondition);
-    const out = evaluateFilters(filters, { modelKey: i.modelKey, variant, storageGb: i.storageGb, condition: cond, priceKind: v.priceKind, askEuro: ask, bidEuro: bidKnown, km, sellerMonths: i.seller.ageMonths });
-    if (out.status === "no-filters-for-model") {
-      if (cfg.filters.outsideList === "reject") return reject(`${i.modelLabel} staat niet in de zoekfilters`, "filter");
-      v.notes.push("Model staat niet in de zoekfilters: gewone regels gelden");
-    } else if (out.status === "fail") return reject(`Zoekfilter: ${out.reasons.join("; ")}`, "filter");
-    else {
-      filterHit = out.filter;
-      filterStorageAssumed = out.storageAssumed;
-      v.notes.push(...out.notes);
-      v.filter = { condition: cond, maxEuro: out.filter.maxEuro, minEuro: out.filter.minEuro, label: `${i.modelLabel}${out.filter.storageGb ? ` ${out.filter.storageGb} GB` : ""} · ${cond === "normal" ? "normaal" : cond === "broken" ? "kapot" : "sealed"}` };
-      v.notes.push(`Zoekfilter: ${v.filter.label}, maximaal €${out.filter.maxEuro}${out.filter.minEuro ? `, minimaal €${out.filter.minEuro}` : ""}`);
-      if (out.sellerUnknown) { if (!reviewReason) { reviewReason = `Verkoper controleren: zoekfilter vraagt ${out.filter.sellerMinMonths} maanden actief, leeftijd onbekend`; reviewStep = "filter"; } v.flags.push("sellerCheck"); }
-    }
-  }
 
   // ---- basisprijs ----
   const found = filterHit && cfg.priceBase === "buy85"

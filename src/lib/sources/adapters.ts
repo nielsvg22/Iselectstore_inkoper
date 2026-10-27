@@ -5,6 +5,7 @@ import { fetchListingUrl, throttleFor } from "./adapters-shared";
 import { safeFetch } from "./safe-fetch";
 import { searchAdapter } from "./marktplaats-search";
 import { officialAdapter } from "./marktplaats-official";
+import { vintedAdapter } from "./vinted-search";
 import { SourceError, type FetchContext, type RawAd, type SourceAdapter } from "./types";
 
 export { fetchListingUrl };
@@ -70,6 +71,9 @@ export const demoAdapter: SourceAdapter = {
 
 export const partnerAdapter = officialAdapter;
 
-const ALL: SourceAdapter[] = [searchAdapter, urlAdapter, feedAdapter, demoAdapter, partnerAdapter];
+const ALL: SourceAdapter[] = [searchAdapter, urlAdapter, feedAdapter, demoAdapter, partnerAdapter, vintedAdapter];
 export const listAdapters = () => ALL;
-export const adapterForOrigin = (o: string): SourceAdapter | undefined => ALL.find((a) => a.origin === o);
+export const adapterForOrigin = (o: string): SourceAdapter | undefined => ALL.find((a) => a.origin === o && a !== vintedAdapter);
+/** Kiest de bron bij een zoekprofiel: een Vinted-profiel (sourceConfig.platform = "vinted") gebruikt de Vinted-adapter, al het andere blijft zoals het was. */
+export const adapterForProfile = (sourceKind: string, sourceConfig: unknown): SourceAdapter | undefined =>
+  sourceKind === "SEARCH" && (sourceConfig as { platform?: string } | null)?.platform === "vinted" ? vintedAdapter : adapterForOrigin(sourceKind);

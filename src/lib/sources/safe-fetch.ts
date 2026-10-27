@@ -1,4 +1,4 @@
-import { waitForMarktplaatsSlot } from "./request-gate";
+import { waitForMarktplaatsSlot, waitForVintedSlot } from "./request-gate";
 import { setCooldown } from "../jobs/cooldown";
 import dns from "node:dns";
 import { Agent } from "undici";
@@ -135,6 +135,10 @@ export async function safeFetch(
       /(^|\.)marktplaats\.nl$/.test(u.hostname) &&
       !opts.fetchImpl &&
       process.env.NODE_ENV !== "test";
+    const vinted =
+      /(^|\.)vinted\.(nl|com)$/.test(u.hostname) &&
+      !opts.fetchImpl &&
+      process.env.NODE_ENV !== "test";
     if (opts.respectRobots) {
       const hit = robotsCache.get(u.host);
       let disallow: string[];
@@ -142,12 +146,15 @@ export async function safeFetch(
       else {
         try {
           if (marktplaats) await waitForMarktplaatsSlot(opts.requestPriority);
+          if (vinted) await waitForVintedSlot(opts.requestPriority);
           const r = await doFetch(`${u.origin}/robots.txt`, {
             headers: { "user-agent": USER_AGENT },
             signal: AbortSignal.timeout(5000),
           });
           if (marktplaats && [403, 429].includes(r.status))
             await setCooldown("marktplaats-search", `robots.txt HTTP ${r.status}`);
+          if (vinted && [403, 429].includes(r.status))
+            await setCooldown("vinted-search", `robots.txt HTTP ${r.status}`);
           if (!r.ok && r.status !== 404)
             throw new Error(`robots.txt HTTP ${r.status}`);
           disallow = r.ok ? parseRobots(await r.text()) : [];
@@ -165,6 +172,7 @@ export async function safeFetch(
     }
     if (opts.throttle) await opts.throttle.wait();
     if (marktplaats) await waitForMarktplaatsSlot(opts.requestPriority);
+    if (vinted) await waitForVintedSlot(opts.requestPriority);
     const res = await doFetch(u.toString(), {
       redirect: "manual",
       headers: {
@@ -177,6 +185,8 @@ export async function safeFetch(
     });
     if (marktplaats && [403, 429].includes(res.status))
       await setCooldown("marktplaats-search", `HTTP ${res.status}`);
+    if (vinted && [403, 429].includes(res.status))
+      await setCooldown("vinted-search", `HTTP ${res.status}`);
     if ([301, 302, 303, 307, 308].includes(res.status)) {
       const loc = res.headers.get("location");
       if (!loc) throw new Error("Redirect zonder locatie");
@@ -187,6 +197,10 @@ export async function safeFetch(
     if (marktplaats && res.status === 200 && isBotChallenge(text)) {
       await setCooldown("marktplaats-search", "Botcontrole (CAPTCHA)");
       throw new Error("Marktplaats toont een CAPTCHA/botcontrole; bron gepauzeerd");
+    }
+    if (vinted && /captcha-delivery\.com/i.test(text.slice(0, 60000)) && !/__next_f\.push/.test(text)) {
+      await setCooldown("vinted-search", "Botcontrole (CAPTCHA)");
+      throw new Error("Vinted toont een CAPTCHA/botcontrole; bron gepauzeerd");
     }
     return {
       status: res.status,

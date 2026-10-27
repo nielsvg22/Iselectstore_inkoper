@@ -6,7 +6,8 @@ import { cleanupPushSubscriptions } from "../notify/push";
 import { analyzeAd } from "../pipeline/analyze";
 import { ingestAd } from "../pipeline/ingest";
 import { getConfig } from "../settings/store";
-import { adapterForOrigin } from "../sources/adapters";
+import { adapterForProfile } from "../sources/adapters";
+import { fetchVintedDetail, platformOf } from "../sources/vinted-search";
 import { officialAdapter, officialReady, OFFICIAL_SOURCE } from "../sources/marktplaats-official";
 import { planSmartUnits, smartPageBudget } from "../sources/smart-plan";
 import { loadTree } from "../pipeline/tree";
@@ -86,7 +87,8 @@ export async function runProfileCheck(
   if (!profile || !profile.active)
     return { fetched: 0, created: 0, changed: 0 };
   const cfg = await getConfig();
-  const adapter = official ? officialAdapter : adapterForOrigin(profile.sourceKind);
+  const adapter = official ? officialAdapter : adapterForProfile(profile.sourceKind, profile.sourceConfig);
+  const platform = official ? "marktplaats" : platformOf(profile.sourceConfig);
   if (!adapter)
     throw new PermanentJobError(`Onbekende bron ${profile.sourceKind}`);
   if (!cfg.sources.allowed.includes(adapter.origin)) {
@@ -107,6 +109,7 @@ export async function runProfileCheck(
   };
   const fast =
     adapter.origin === "SEARCH" &&
+    platform === "marktplaats" &&
     cfg.scheduler.fast.enabled &&
     sc.fastMode === true;
   if (adapter.origin === "SEARCH") {
@@ -226,6 +229,7 @@ export async function runProfileCheck(
         processed.add(raw.externalId);
         const r = await ingestAd({ ...raw, attributes: { ...raw.attributes, detectionSource: adapter.id } }, {
           origin: adapter.origin,
+          ...(platform === "vinted" ? { source: "vinted" } : {}),
           isDemo: adapter.origin === "DEMO",
           partial: ["SEARCH", "PARTNER_API"].includes(adapter.origin),
         });
@@ -379,16 +383,18 @@ export async function runDetailFetch(
   if (!ad || ad.isDemo || ad.detailFetchedAt) return;
   const cfg = await getConfig();
   try {
-    const d = await fetchListingUrl(ad.url, {
-      allowlist: cfg.sources.urlAllowlist,
-      minSecondsBetween: Math.max(
-        cfg.limits.minSecondsBetweenRequests,
-        process.env.NODE_ENV === "test" ? 0 : 3,
-      ),
-      fetchImpl,
-      throttleId: "search-detail",
-      requestPriority: "background",
-    });
+    const d = ad.source === "vinted"
+      ? await fetchVintedDetail(ad.url, { fetchImpl, requestPriority: "background" })
+      : await fetchListingUrl(ad.url, {
+          allowlist: cfg.sources.urlAllowlist,
+          minSecondsBetween: Math.max(
+            cfg.limits.minSecondsBetweenRequests,
+            process.env.NODE_ENV === "test" ? 0 : 3,
+          ),
+          fetchImpl,
+          throttleId: "search-detail",
+          requestPriority: "background",
+        });
     const attrs = (
       ad.rawPayload as { attributes?: Record<string, string | number> } | null
     )?.attributes;
@@ -539,9 +545,18 @@ export async function scheduleDueProfiles(now = new Date()): Promise<number> {
   for (const r of lastRuns)
     if (!lastPages.has(r.profileId) && r.pages > 0)
       lastPages.set(r.profileId, r.pages);
+  const vintedCooldown = await getCooldown("vinted-search", now);
   const plan = profiles.flatMap((p) => {
-    const adapter = adapterForOrigin(p.sourceKind);
+    const adapter = adapterForProfile(p.sourceKind, p.sourceConfig);
     if (!adapter || !adapter.automatic) return [];
+    if (platformOf(p.sourceConfig) === "vinted") {
+      // Vinted: eigen interval en eigen pauze, los van Marktplaats; staat standaard uit
+      if (!cfg.scheduler.vinted.enabled || vintedCooldown) return [];
+      const vms = cfg.scheduler.vinted.intervalSeconds * 1000;
+      const vage = p.lastCheckedAt ? now.getTime() - p.lastCheckedAt.getTime() : Number.POSITIVE_INFINITY;
+      if (vage < vms) return [];
+      return [{ p, fast: false, intervalMs: vms, ratio: vage / vms, high: false }];
+    }
     const isSearch = adapter.origin === "SEARCH";
     const sc = (p.sourceConfig ?? {}) as {
       mailOnly?: boolean;

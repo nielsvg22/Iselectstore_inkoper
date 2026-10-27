@@ -19,6 +19,12 @@ export interface SearchFilter {
   sellerType: string;
   /** minimale tijd dat de verkoper actief is op Marktplaats (maanden) */
   sellerMinMonths: number;
+  /** uit = dit model/deze regel doet niet mee zonder de regel te verwijderen */
+  active: boolean;
+  /** verwachte doorverkoopprijs voor het margefilter; leeg = geen margefilter voor deze regel */
+  resaleEuro: number | null;
+  /** minimale gewenste winst; leeg = marge per verkoopprijssegment (algemene instelling) */
+  minMarginEuro: number | null;
 }
 export type FilterCondition = "normal" | "broken" | "sealed";
 export type FilterAdType = "all" | "withPrice" | "ask";
@@ -38,6 +44,9 @@ export const filterSchema = z.object({
   adType: z.enum(["all", "withPrice", "ask"]).default("all"),
   sellerType: z.string().max(30).default("Alle"),
   sellerMinMonths: z.number().finite().min(0).max(600).default(0),
+  active: z.boolean().default(true),
+  resaleEuro: z.number().finite().min(0).max(100000).nullable().default(null),
+  minMarginEuro: z.number().finite().min(0).max(100000).nullable().default(null),
 });
 
 const KEY = "rules:bbp:filters";
@@ -130,6 +139,7 @@ export function parseFiltersText(text: string): FilterImport {
       modelKey: model.modelKey, variant: model.variant, storageGb: storage, condition,
       minEuro: Number.isFinite(min) ? min : 0, maxEuro: max, maxKm: Number.isFinite(km) ? km : 300, adType,
       sellerType: p[7] || "Alle", sellerMinMonths: months ? Number(months) : 0,
+      active: true, resaleEuro: num(p[9]) || null, minMarginEuro: Number.isFinite(num(p[10])) ? num(p[10]) : null,
     });
   });
   return { rows, errors, unmatched: [...unmatched] };
@@ -158,18 +168,18 @@ export interface FilterAd {
   priceKind: "ask" | "bid" | "both" | "bid0" | "none";
   askEuro: number | null;
   bidEuro: number | null;
-  km: number | null;
-  sellerMonths: number | null;
 }
 
 export type FilterOutcome =
   | { status: "no-filters-for-model" }
-  | { status: "fail"; reasons: string[] }
-  | { status: "ok"; filter: SearchFilter; storageAssumed: boolean; sellerUnknown: boolean; notes: string[] };
+  /** step: model-list = geen passende (actieve) regel voor model/opslag/conditie; price-window = prijs of type advertentie past niet */
+  | { status: "fail"; step: "model-list" | "price-window"; reasons: string[] }
+  | { status: "ok"; filter: SearchFilter; storageAssumed: boolean; notes: string[] };
 
 const eur = (n: number) => `€${n}`;
 
-function check(f: SearchFilter, a: FilterAd): { ok: boolean; reasons: string[]; sellerUnknown: boolean } {
+/** Prijsvenster en type advertentie van één regel (minimum, maximum, vraagprijs/bieden). */
+function checkPrice(f: SearchFilter, a: FilterAd): string[] {
   const reasons: string[] = [];
   const hasAsk = a.priceKind === "ask" || a.priceKind === "both";
   const hasPrice = a.priceKind !== "none" && a.priceKind !== "bid0";
@@ -177,41 +187,53 @@ function check(f: SearchFilter, a: FilterAd): { ok: boolean; reasons: string[]; 
   if (f.adType === "withPrice" && !hasPrice) reasons.push("zoekfilter vraagt een advertentie met prijs");
   const prices = [a.askEuro, a.bidEuro].filter((x): x is number => x != null && x > 0);
   if (prices.length) {
-    if (!prices.some((p) => p <= f.maxEuro)) reasons.push(`${eur(Math.min(...prices))} is hoger dan de zoekfilterprijs ${eur(f.maxEuro)}`);
+    if (!prices.some((p) => p <= f.maxEuro)) reasons.push(`${eur(Math.min(...prices))} is hoger dan de maximumprijs ${eur(f.maxEuro)}`);
     else if (f.minEuro > 0 && prices.every((p) => p < f.minEuro)) reasons.push(`${eur(Math.max(...prices))} is lager dan de minimumprijs ${eur(f.minEuro)}`);
   }
-  if (a.km != null && a.km > f.maxKm) reasons.push(`${a.km} km is verder dan de ${f.maxKm} km van het zoekfilter`);
-  let sellerUnknown = false;
-  if (f.sellerMinMonths > 0) {
-    if (a.sellerMonths == null) sellerUnknown = true;
-    else if (a.sellerMonths < f.sellerMinMonths) reasons.push(`verkoper is ${a.sellerMonths} maanden actief, zoekfilter vraagt ${f.sellerMinMonths}`);
-  }
-  return { ok: reasons.length === 0, reasons, sellerUnknown };
+  return reasons;
 }
 
-/** Zoekt het zoekfilter waar deze advertentie bij past. Bij onbekende opslag wordt het gemiddelde van de passende filters gebruikt. */
+/** Afstand van het zoekfilter (stap "locatie"). */
+export function checkFilterDistance(f: SearchFilter, km: number | null): string | null {
+  return km != null && km > f.maxKm ? `${km} km is verder dan de ${f.maxKm} km van het zoekfilter` : null;
+}
+
+/** Minimale accountleeftijd van het zoekfilter (stap "verkoper"): "ok", "unknown" (leeftijd niet bekend) of een foutmelding. */
+export function checkFilterSeller(f: SearchFilter, months: number | null): "ok" | "unknown" | string {
+  if (f.sellerMinMonths <= 0) return "ok";
+  if (months == null) return "unknown";
+  return months < f.sellerMinMonths ? `verkoper is ${months} maanden actief, zoekfilter vraagt ${f.sellerMinMonths}` : "ok";
+}
+
+/**
+ * Zoekt het zoekfilter waar deze advertentie bij past: model, opslag, conditie en (actief) → prijsvenster en type advertentie.
+ * Bij onbekende opslag wordt het gemiddelde van de passende filters gebruikt.
+ */
 export function evaluateFilters(filters: SearchFilter[], a: FilterAd): FilterOutcome {
   const pool = filters.filter((f) => f.modelKey === a.modelKey && (f.variant === "" || a.variant === "" || f.variant === a.variant));
   if (!pool.length) return { status: "no-filters-for-model" };
-  const byCond = pool.filter((f) => f.condition === a.condition);
-  if (!byCond.length) return { status: "fail", reasons: [`geen zoekfilter voor conditie ${CONDITION_LABEL[a.condition].toLowerCase()}`] };
+  const live = pool.filter((f) => f.active);
+  if (!live.length) return { status: "fail", step: "model-list", reasons: ["model staat in de lijst maar is op inactief gezet"] };
+  const byCond = live.filter((f) => f.condition === a.condition);
+  if (!byCond.length) return { status: "fail", step: "model-list", reasons: [`geen actief zoekfilter voor conditie ${CONDITION_LABEL[a.condition].toLowerCase()}`] };
   const notes: string[] = [];
   let candidates: SearchFilter[];
   let storageAssumed = false;
   if (a.storageGb != null) {
     candidates = byCond.filter((f) => f.storageGb === a.storageGb).concat(byCond.filter((f) => f.storageGb === null));
-    if (!candidates.length) return { status: "fail", reasons: [`geen zoekfilter voor ${a.storageGb} GB`] };
+    if (!candidates.length) return { status: "fail", step: "model-list", reasons: [`geen actief zoekfilter voor ${a.storageGb} GB`] };
   } else {
     storageAssumed = true;
     const avg = (k: "minEuro" | "maxEuro") => Math.round(byCond.reduce((s, f) => s + f[k], 0) / byCond.length);
-    candidates = [{ ...byCond[0], storageGb: null, minEuro: avg("minEuro"), maxEuro: avg("maxEuro") }];
+    const resales = byCond.map((f) => f.resaleEuro).filter((x): x is number => x != null);
+    candidates = [{ ...byCond[0], storageGb: null, minEuro: avg("minEuro"), maxEuro: avg("maxEuro"), resaleEuro: resales.length ? Math.round(resales.reduce((s, x) => s + x, 0) / resales.length) : null }];
     notes.push("Opslag onbekend: gemiddelde van de zoekfilters voor dit model gebruikt");
   }
   const failures: string[] = [];
   for (const f of candidates) {
-    const r = check(f, a);
-    if (r.ok) return { status: "ok", filter: f, storageAssumed, sellerUnknown: r.sellerUnknown, notes };
-    for (const x of r.reasons) if (!failures.includes(x)) failures.push(x);
+    const r = checkPrice(f, a);
+    if (!r.length) return { status: "ok", filter: f, storageAssumed, notes };
+    for (const x of r) if (!failures.includes(x)) failures.push(x);
   }
-  return { status: "fail", reasons: failures };
+  return { status: "fail", step: "price-window", reasons: failures };
 }

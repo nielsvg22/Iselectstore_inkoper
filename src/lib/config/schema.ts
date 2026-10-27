@@ -198,6 +198,18 @@ export const configSchema = z.object({
       /** Gedeelde cache van zoekpagina's zodat profielen met dezelfde zoekterm niet dubbel ophalen */
       pageCacheSeconds: z.number().int().min(0).max(900).default(120),
       /** Snelle modus: per profiel elke ±minuut kijken, direct voorlopige push. Staat standaard UIT (bewuste keuze). */
+      /** Vinted: eigen schaal, los van Marktplaats. Staat standaard UIT; alleen openbare pagina's, met eigen pauze bij 403/429. */
+      vinted: z
+        .object({
+          enabled: z.boolean().default(false),
+          /** hoe vaak een Vinted-profiel wordt gecontroleerd (minimaal 30 s) */
+          intervalSeconds: z.number().int().min(30).max(3600).default(60),
+          /** minimale tijd tussen twee requests naar Vinted (alle profielen samen) */
+          minGapSeconds: z.number().int().min(3).max(120).default(8),
+          /** pagina's per zoekterm per controle (nieuwste eerst) */
+          pages: z.number().int().min(1).max(5).default(1),
+        })
+        .default({}),
       fast: z
         .object({
           enabled: z.boolean().default(false),

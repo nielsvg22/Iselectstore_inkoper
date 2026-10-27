@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DEFAULT_ACCESSORY_TERMS, DEFAULT_INCLUDE_MARKERS, DEFAULT_PARTS_TERMS, DEFAULT_WITHOUT_MARKERS } from "./accessory";
 import { prisma } from "@/lib/db/client";
 import { DEFAULT_SCRATCH_FREE_PHRASES, DEFAULT_SCRATCH_PHRASES, IPAD_SEED, type SeedPrice } from "./tables";
 
@@ -62,6 +63,10 @@ export const rulesSchema = z.object({
     fullUntilMonths: num(6),
     dropPerMonthPct: num(1),
     floorPct: num(82),
+    /** optioneel filter: minimale batterijconditie uit de advertentietekst (0 = uit). Alleen een echt gevonden percentage telt; een aanname op leeftijd nooit. */
+    filterMinPct: num(0),
+    /** wat als de advertentie geen batterijpercentage noemt: tonen, uitsluiten of markeren als onbekend */
+    unknownPolicy: z.enum(["show", "exclude", "mark"]).default("show"),
     /** op welke families de batterijcorrectie geldt */
     families: z.array(z.string()).default(["iphone"]),
   }).default({}),
@@ -158,6 +163,48 @@ export const rulesSchema = z.object({
     enabled: z.boolean().default(false),
     percent: num(0),
     lastAppliedMonth: z.string().default(""),
+  }).default({}),
+  /** Marge: verwachte winst = doorverkoopprijs − inkoopprijs − bijkomende kosten, per platform instelbaar */
+  margin: z.object({
+    enabled: z.boolean().default(false),
+    /** minimale marge als het model zelf geen marge heeft en geen segment past */
+    defaultMinMarginEuro: num(0),
+    /** minimale marge per verkoopprijssegment: vanaf deze doorverkoopprijs geldt deze marge (hoogste passende segment wint) */
+    segments: z.array(z.object({ fromResaleEuro: z.number().min(0).max(100000), minMarginEuro: z.number().min(0).max(100000) })).max(30).default([]),
+    costs: z.object({
+      marktplaats: z.object({ shippingEuro: num(0), protectionPct: num(0), protectionFixedEuro: num(0), otherEuro: num(0) }).default({}),
+      vinted: z.object({ shippingEuro: num(0), protectionPct: num(0), protectionFixedEuro: num(0), otherEuro: num(0) }).default({}),
+    }).default({}),
+    /** Vinted: de kosten die de advertentiepagina zelf noemt (kopersbescherming, verzending) gebruiken als ze beschikbaar zijn */
+    useListedPlatformCosts: z.boolean().default(true),
+  }).default({}),
+  /** accessoires en onderdelen uitsluiten (hoesje, screenprotector, oplader, kabel, lege doos, onderdelen) */
+  accessories: z.object({
+    enabled: z.boolean().default(true),
+    terms: z.array(z.string().max(60)).max(300).default(DEFAULT_ACCESSORY_TERMS),
+    partsTerms: z.array(z.string().max(60)).max(300).default(DEFAULT_PARTS_TERMS),
+    includeMarkers: z.array(z.string().max(40)).max(100).default(DEFAULT_INCLUDE_MARKERS),
+    withoutMarkers: z.array(z.string().max(40)).max(100).default(DEFAULT_WITHOUT_MARKERS),
+    minDevicePriceEuro: num(80),
+    excludeDefect: z.boolean().default(false),
+  }).default({}),
+  /** land van de verkoper: standaard alleen Nederland. Marktplaats is altijd NL; Vinted geeft het land van de verkoper niet op advertentieniveau. */
+  country: z.object({
+    allowed: z.array(z.string().regex(/^[A-Z]{2}$/)).max(40).default(["NL"]),
+    /** onbekend land: tonen, uitsluiten of markeren */
+    unknownPolicy: z.enum(["show", "exclude", "mark"]).default("mark"),
+  }).default({}),
+  /** Vinted: kopersbescherming en elektronicaverificatie worden afzonderlijk gecontroleerd; onbekend wordt nooit als aanwezig beschouwd */
+  protection: z.object({
+    requireBuyerProtection: z.boolean().default(false),
+    requireElectronicsVerification: z.boolean().default(false),
+    unknownPolicy: z.enum(["show", "exclude", "mark"]).default("mark"),
+  }).default({}),
+  /** verkopersbeoordeling: alleen toegepast als het platform de gegevens levert */
+  sellerFilter: z.object({
+    minRating: num(0),
+    minReviews: num(0),
+    unknownPolicy: z.enum(["show", "exclude", "mark"]).default("show"),
   }).default({}),
   /** zoekfilters van de klant (lijst met model/opslag/conditie/prijs/afstand per regel) */
   filters: z.object({
