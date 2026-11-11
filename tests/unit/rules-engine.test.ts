@@ -330,7 +330,7 @@ describe("prijs bekend per serie en minimumprijs", () => {
     const v = evaluateRules(input({ askEuro: 90 }), PRICES, c);
     expect(v.status).toBe("reject");
     expect(v.decidedBy).toBe("min-price");
-    expect(evaluateRules(input({ askEuro: 90 }), PRICES, cfg).decidedBy).not.toBe("min-price");
+    expect(evaluateRules(input({ askEuro: 90 }), PRICES, cfg).status).not.toBe("reject"); // onder het eigen minimum van het model maar boven €50: geen afwijzing
   });
 });
 
@@ -367,5 +367,26 @@ describe("voorinstelling van Twan", () => {
     expect(c.minPrice.globalEuro).toBe(90);
     expect(c.distance.pickupMaxKm).toBe(35);
     expect(c.bid.requireKnownPriceSeries).toEqual(["iphone-16"]);
+  });
+});
+
+describe("onlogisch lage prijs", () => {
+  const seller = { ageMonths: 130, reviews: 5, rating: 4.9, verified: true };
+  it("een prijs ver onder de waarde wordt gemarkeerd om te controleren", () => {
+    const v = evaluateRules(input({ distanceKm: 5, seller, askEuro: 90 }), PRICES, cfg); // max verkoop 325, 35% = 113,75
+    expect(v.status).toBe("review");
+    expect(v.flags).toContain("priceTooLow");
+    expect(v.reasons.join(" ")).toMatch(/Onlogisch lage prijs/);
+  });
+  it("een normale lage deal blijft gewoon door", () => {
+    const v = evaluateRules(input({ distanceKm: 5, seller, askEuro: 200 }), PRICES, cfg);
+    expect(v.flags).not.toContain("priceTooLow");
+    expect(["match", "high"]).toContain(v.status);
+  });
+  it("percentage instelbaar, 0 zet het uit", () => {
+    const off = { ...cfg, minPrice: { ...cfg.minPrice, lowPricePct: 0 } };
+    expect(evaluateRules(input({ distanceKm: 5, seller, askEuro: 90 }), PRICES, off).flags).not.toContain("priceTooLow");
+    const strict = { ...cfg, minPrice: { ...cfg.minPrice, lowPricePct: 70 } };
+    expect(evaluateRules(input({ distanceKm: 5, seller, askEuro: 200 }), PRICES, strict).flags).toContain("priceTooLow");
   });
 });

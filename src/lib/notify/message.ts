@@ -56,7 +56,7 @@ const eur0 = (n: number | null | undefined) => (n == null ? "?" : `€${Math.rou
 /** Emoji-samenvatting voor onderwerp/titel, bijv. "📍✨💰". */
 export function flagsEmoji(flags: string[] | null | undefined): string {
   if (!flags?.length) return "";
-  const order = ["hot", "near", "scratchFree", "scratched", "high", "directBuy", "sellerCheck", "bid0"];
+  const order = ["hot", "near", "scratchFree", "scratched", "high", "directBuy", "sellerCheck", "priceTooLow", "bid0"];
   return order.filter((f) => flags.includes(f) && !(f === "near" && flags.includes("hot"))).map((f) => FLAG_EMOJI[f]).join("");
 }
 export const rulesEmoji = (r: RulesSummary | null | undefined): string => flagsEmoji(r?.flags);

@@ -127,6 +127,8 @@ export const rulesSchema = z.object({
   minPrice: z.object({
     /** minimumprijs voor alle advertenties met een bekende prijs (0 = uit); filtert hoesjes en accessoires ook als het model niet herkend is */
     globalEuro: num(0),
+    /** prijs onder dit percentage van de maximale verkoopprijs is onlogisch laag (defect/geblokkeerd/nep): handmatig controleren; 0 = uit */
+    lowPricePct: num(35),
     newerEuro: num(70),
     olderEuro: num(50),
     /** iPhone-generatie vanaf waar 'nieuwer' geldt */

@@ -379,6 +379,12 @@ export function evaluateRules(i: VerdictInput, prices: BasePrice[], cfg: RulesCo
     v.status = "review"; v.decidedBy = "price-unknown"; v.reasons.push("Prijs onbekend"); return v;
   }
   v.effectiveEuro = eff;
+  // onlogisch lage prijs t.o.v. de waarde: vaak defect, geblokkeerd of nep → eerst handmatig controleren
+  if (eff != null && eff > 0 && cfg.minPrice.lowPricePct > 0 && found.price.kind === "sell" && v.maxSellEuro != null && v.maxSellEuro > 0 && eff < (v.maxSellEuro * cfg.minPrice.lowPricePct) / 100 && !reviewReason) {
+    reviewReason = `Onlogisch lage prijs: €${eff} is minder dan ${cfg.minPrice.lowPricePct}% van de maximale verkoopprijs (€${v.maxSellEuro}); controleer op defect, blokkade of nep`;
+    reviewStep = "min-price";
+    v.flags.push("priceTooLow");
+  }
   if (eff != null && eff > 0 && eff < minP) return reject(`€${eff} is lager dan de minimumprijs €${minP} (waarschijnlijk hoesje of accessoire)`, "min-price");
   return finish(v, i, cfg, eff, pass, high, kindForHigh, reviewReason, reviewStep);
 }
@@ -407,4 +413,4 @@ function finish(v: Verdict, i: VerdictInput, cfg: RulesConfig, eff: number | nul
   return v;
 }
 
-export const FLAG_EMOJI: Record<string, string> = { near: "📍", hot: "🔴", scratchFree: "✨", scratched: "⚠️", high: "💰", directBuy: "🛒", storageUnknown: "?", batteryUnknown: "?", batteryAssumed: "?", bid0: "0️⃣", sellerCheck: "👀" };
+export const FLAG_EMOJI: Record<string, string> = { near: "📍", hot: "🔴", scratchFree: "✨", scratched: "⚠️", high: "💰", directBuy: "🛒", storageUnknown: "?", batteryUnknown: "?", batteryAssumed: "?", bid0: "0️⃣", sellerCheck: "👀", priceTooLow: "🚩" };
