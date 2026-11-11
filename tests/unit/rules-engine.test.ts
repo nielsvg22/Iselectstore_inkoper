@@ -360,6 +360,8 @@ describe("voorinstelling van Twan", () => {
     expect(c.bid.requireKnownPriceSeries).toEqual(["iphone-15"]);
     expect(c.minPrice.globalEuro).toBe(50);
     expect(c.dynamic.presets).toEqual({ marktplaats: "normaal", vinted: "normaal" });
+    expect(c.filters).toMatchObject({ enabled: true, outsideList: "reject" });
+    expect(c.minIphoneGeneration).toBe(14);
   });
   it("laat andere instellingen en een hogere eigen minimumprijs ongemoeid", () => {
     const base = defaultRules();

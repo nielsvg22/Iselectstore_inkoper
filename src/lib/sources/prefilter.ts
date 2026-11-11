@@ -1,4 +1,5 @@
 import { recognizeByRules } from "../engines/recognition";
+import { belowMinIphone } from "../rules/release";
 import { classifyAccessory, type AccessoryConfig } from "../rules/accessory";
 import { isGroup, type Group } from "../engines/filters";
 import type { RawAd } from "./types";
@@ -34,7 +35,10 @@ export function isNoise(ad: RawAd, accessories?: AccessoryConfig): boolean {
   return noiseReason(ad, accessories) != null;
 }
 
-export function buildPrefilter(tree: Group, opts: { accessories?: AccessoryConfig; onDrop?: (reason: string) => void } = {}): ((ad: RawAd) => boolean) | undefined {
+/** Wat de klant wil: alleen modellen uit de modellenlijst (null = geen lijst) en iPhones vanaf een generatie (0 = alle). */
+export interface PrefilterScope { allowedModelKeys?: ReadonlySet<string> | null; minIphoneGeneration?: number }
+
+export function buildPrefilter(tree: Group, opts: { accessories?: AccessoryConfig; scope?: PrefilterScope; onDrop?: (reason: string) => void } = {}): ((ad: RawAd) => boolean) | undefined {
   if (tree.op !== "AND") return undefined;
   let maxEuro: number | null = null;
   let models: string[] | null = null;
@@ -46,6 +50,13 @@ export function buildPrefilter(tree: Group, opts: { accessories?: AccessoryConfi
   return (ad) => {
     const noise = noiseReason(ad, opts.accessories);
     if (noise) { opts.onDrop?.(noise); return false; }
+    if (opts.scope) {
+      const r = recognizeByRules({ title: ad.title, description: ad.description, structured: ad.attributes ?? null });
+      if (r.confidence >= 0.6 && r.family !== "unknown") {
+        if (belowMinIphone(r.modelKey, r.family, opts.scope.minIphoneGeneration ?? 0)) { opts.onDrop?.("iphone-te-oud"); return false; }
+        if (opts.scope.allowedModelKeys && !opts.scope.allowedModelKeys.has(r.modelKey)) { opts.onDrop?.("buiten-modellenlijst"); return false; }
+      }
+    }
     if (maxEuro != null && ad.askingCents != null && ad.askingCents > 0 && ad.askingCents / 100 > maxEuro) return false;
     if (models) {
       const r = recognizeByRules({ title: ad.title, description: ad.description, structured: ad.attributes ?? null });

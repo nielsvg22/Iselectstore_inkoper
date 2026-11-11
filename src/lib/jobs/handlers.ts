@@ -9,6 +9,7 @@ import { getConfig } from "../settings/store";
 import { adapterForProfile } from "../sources/adapters";
 import { bumpPrefilterStats } from "../rules/prefilter-stats";
 import { getRules } from "../rules/config";
+import { getFilters } from "../rules/filters";
 import { fetchVintedDetail, platformOf } from "../sources/vinted-search";
 import { officialAdapter, officialReady, OFFICIAL_SOURCE } from "../sources/marktplaats-official";
 import { planSmartUnits, smartPageBudget } from "../sources/smart-plan";
@@ -133,8 +134,11 @@ export async function runProfileCheck(
     const tree = ["SEARCH", "PARTNER_API"].includes(adapter.origin) ? await loadTree(profileId) : null;
     const rulesCfg = tree ? await getRules() : null;
     const dropped: Record<string, number> = {};
+    // alleen zoeken wat de klant heeft aangegeven: modellen uit de modellenlijst en iPhones vanaf de ingestelde generatie
+    const listed = rulesCfg?.enabled && rulesCfg.filters.enabled && rulesCfg.filters.outsideList === "reject" ? (await getFilters()).filter((f) => f.active) : [];
+    const scope = rulesCfg?.enabled ? { allowedModelKeys: listed.length ? new Set(listed.map((f) => f.modelKey)) : null, minIphoneGeneration: rulesCfg.minIphoneGeneration } : undefined;
     const prefilter = tree
-      ? buildPrefilter(tree, { accessories: rulesCfg?.enabled ? rulesCfg.accessories : undefined, onDrop: (r) => { dropped[r] = (dropped[r] ?? 0) + 1; } })
+      ? buildPrefilter(tree, { accessories: rulesCfg?.enabled ? rulesCfg.accessories : undefined, scope, onDrop: (r) => { dropped[r] = (dropped[r] ?? 0) + 1; } })
       : undefined;
     // Slim zoeken (snelle modus): smalle filterpagina's per model/opslag; af en toe de volledige zoekterm als vangnet
     let slices: Slice[] | undefined;

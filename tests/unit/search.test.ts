@@ -272,6 +272,21 @@ describe("voorselectie op basis van het zoekprofiel", () => {
     expect(f(ad("iPhone 15 Pro 256GB", null))).toBe(true);
     expect(f(ad("Mooie telefoon", 20000))).toBe(true);
   });
+  it("alleen zoeken wat de klant aangaf: modellenlijst en minimale iPhone-generatie", () => {
+    const dropped: string[] = [];
+    const f = buildPrefilter({ op: "AND", children: [] }, { scope: { allowedModelKeys: new Set(["iphone-15-pro", "iphone-16"]), minIphoneGeneration: 14 }, onDrop: (r) => dropped.push(r) })!;
+    expect(f(ad("iPhone 15 Pro 256GB", 80000))).toBe(true);
+    expect(f(ad("iPhone 16 128GB", 70000))).toBe(true);
+    expect(f(ad("iPhone 15 Pro Max 256GB", 90000))).toBe(false); // niet in de lijst
+    expect(f(ad("iPhone 13 128GB", 30000))).toBe(false); // ouder dan generatie 14
+    expect(f(ad("Mooie telefoon", 20000))).toBe(true); // onzekere herkenning: de regels beslissen
+    expect(dropped).toEqual(["buiten-modellenlijst", "iphone-te-oud"]);
+  });
+  it("zonder modellenlijst geldt alleen de generatie", () => {
+    const f = buildPrefilter({ op: "AND", children: [] }, { scope: { allowedModelKeys: null, minIphoneGeneration: 14 } })!;
+    expect(f(ad("iPhone 15 Pro Max 256GB", 90000))).toBe(true);
+    expect(f(ad("iPhone 12 64GB", 20000))).toBe(false);
+  });
   it("filtert altijd ruis: koopadvertenties en losse accessoires", () => {
     const f = buildPrefilter({ op: "AND", children: [] })!;
     expect(f(ad("GEZOCHT EN GEKOCHT – DIRECT CASH VOOR JOUW IPHONE!", 0))).toBe(

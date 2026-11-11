@@ -273,12 +273,12 @@ const PRICES_KEY = "rules:bbp:prices";
 const HISTORY_ACTION = "rules.prices_changed";
 
 /** Huidige versie van de voorinstelling van Twan. Bij een hoger getal wordt ze één keer opnieuw toegepast. */
-export const TWAN_PRESET_VERSION = 1;
+export const TWAN_PRESET_VERSION = 2;
 
 /**
  * Zet de instellingen zoals Twan ze heeft aangegeven: margetabel (vraag/bieden/extra), batterijaftrek, waarderen vanaf de
  * verkoopprijs in top staat, batterij schatten op leeftijd, bieden-vanaf-gemiddelde, alleen bekende prijs voor de 15-serie,
- * minimumprijs, hoge marge aan en de margeknop op Normaal. Andere instellingen (afstanden, verzendregels, accessoires, kosten) blijven staan.
+ * minimumprijs, hoge marge aan, de modellenlijst als enige bron (met iPhone 14 en nieuwer) en de margeknop op Normaal. Andere instellingen (afstanden, verzendregels, accessoires, kosten) blijven staan.
  */
 export function applyTwanPreset(c: RulesConfig): RulesConfig {
   return {
@@ -292,6 +292,9 @@ export function applyTwanPreset(c: RulesConfig): RulesConfig {
     bid: { ...c.bid, requireKnownPriceSeries: c.bid.requireKnownPriceSeries.length ? c.bid.requireKnownPriceSeries : ["iphone-15"] },
     minPrice: { ...c.minPrice, globalEuro: Math.max(c.minPrice.globalEuro, 50) },
     dynamic: { ...c.dynamic, presets: { marktplaats: "normaal", vinted: "normaal" } },
+    // alleen zoeken wat Twan heeft aangegeven: modellenlijst als enige bron (zodra er een lijst is) en iPhone 14 en nieuwer
+    filters: { ...c.filters, enabled: true, outsideList: "reject" },
+    minIphoneGeneration: 14,
   };
 }
 

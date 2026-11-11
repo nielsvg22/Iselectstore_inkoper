@@ -51,5 +51,8 @@ test("Twan-voorinstelling staat er vanzelf in en de margeknop werkt per platform
   const audit = await page.request.get("/api/rules");
   const rules = (await audit.json()).rules;
   expect(rules.presetVersion).toBeGreaterThanOrEqual(1);
+  // alleen zoeken wat Twan aangaf: modellenlijst als enige bron en iPhone 14 en nieuwer
+  expect(rules.filters).toMatchObject({ enabled: true, outsideList: "reject" });
+  expect(rules.minIphoneGeneration).toBe(14);
   expect(rules.dynamic.presets).toEqual({ marktplaats: "druk", vinted: "normaal" });
 });

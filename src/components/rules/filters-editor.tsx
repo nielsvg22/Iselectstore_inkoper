@@ -81,7 +81,7 @@ export function FiltersEditor({ initialFilters, initialRules, isAdmin }: { initi
               </Select>
             </label>
           </div>
-          {rules.filters.enabled && filters.length === 0 && <Notice tone="warning">Zoekfilters staan aan maar de lijst is leeg: alles wordt afgewezen. Importeer eerst de lijst.</Notice>}
+          {rules.filters.enabled && filters.length === 0 && <Notice tone="warning">Zoekfilters staan aan maar de lijst is leeg: er wordt nog niets beperkt tot jouw modellen. Importeer eerst de lijst.</Notice>}
         </CardContent>
       </Card>
 
