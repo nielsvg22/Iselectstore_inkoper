@@ -1,5 +1,6 @@
 import { recognizeByRules } from "../engines/recognition";
-import { belowMinIphone } from "../rules/release";
+import { belowMinIphone, minPriceEuro } from "../rules/release";
+import type { RulesConfig } from "../rules/config";
 import { classifyAccessory, type AccessoryConfig } from "../rules/accessory";
 import { isGroup, type Group } from "../engines/filters";
 import type { RawAd } from "./types";
@@ -36,13 +37,23 @@ export function isNoise(ad: RawAd, accessories?: AccessoryConfig): boolean {
 }
 
 /** Wat de klant wil: alleen modellen uit de modellenlijst (null = geen lijst) en iPhones vanaf een generatie (0 = alle). */
-export interface PrefilterScope { allowedModelKeys?: ReadonlySet<string> | null; minIphoneGeneration?: number }
+export interface PrefilterScope {
+  allowedModelKeys?: ReadonlySet<string> | null;
+  minIphoneGeneration?: number;
+  /** minimumprijzen: een vaste vraagprijs eronder (hoesje, kabel) komt er niet in; "bieden vanaf" telt niet mee */
+  minPrice?: RulesConfig["minPrice"];
+}
+/** Woorden die erop wijzen dat het om een Apple-product gaat; zonder herkend model en zonder zo'n woord is het geen Apple (bijv. een slimme ring). */
+const APPLE_WORD = /\b(iphone|ipad|macbook|imac|mac\s?mini|mac\s?studio|apple|airpods?|ipod)\b/i;
+const FIXED_PRICE = new Set(["FIXED", undefined, ""]);
 
 export function buildPrefilter(tree: Group, opts: { accessories?: AccessoryConfig; scope?: PrefilterScope; onDrop?: (reason: string) => void } = {}): ((ad: RawAd) => boolean) | undefined {
-  if (tree.op !== "AND") return undefined;
+  // bij een OR-profiel gelden de prijs- en modelgrenzen van het profiel niet, maar ruis en de wensen van de klant (lijst, generatie, minimumprijs) wel
+  const isAnd = tree.op === "AND";
+  if (!isAnd && !opts.scope && !opts.accessories) return undefined;
   let maxEuro: number | null = null;
   let models: string[] | null = null;
-  for (const n of tree.children) {
+  for (const n of isAnd ? tree.children : []) {
     if (isGroup(n)) continue;
     if (n.field === "askingEuro" && n.operator === "lte" && typeof n.value === "number") maxEuro = maxEuro == null ? n.value : Math.min(maxEuro, n.value);
     if (n.field === "modelKey" && n.operator === "in" && Array.isArray(n.value) && n.value.length) models = (n.value as string[]).map((m) => m.toLowerCase());
@@ -52,7 +63,14 @@ export function buildPrefilter(tree: Group, opts: { accessories?: AccessoryConfi
     if (noise) { opts.onDrop?.(noise); return false; }
     if (opts.scope) {
       const r = recognizeByRules({ title: ad.title, description: ad.description, structured: ad.attributes ?? null });
-      if (r.confidence >= 0.6 && r.family !== "unknown") {
+      const known = r.confidence >= 0.6 && r.family !== "unknown";
+      if (!known && !APPLE_WORD.test(`${ad.title} ${ad.description ?? ""}`)) { opts.onDrop?.("geen-apple-product"); return false; }
+      const pt = ad.attributes?.priceType;
+      if (opts.scope.minPrice && ad.askingCents != null && ad.askingCents > 0 && FIXED_PRICE.has(typeof pt === "string" ? pt : undefined)) {
+        const min = Math.max(opts.scope.minPrice.globalEuro, known ? minPriceEuro(r.modelKey, r.family, opts.scope.minPrice) : 0);
+        if (min > 0 && ad.askingCents / 100 < min) { opts.onDrop?.("onder-minimumprijs"); return false; }
+      }
+      if (known) {
         if (belowMinIphone(r.modelKey, r.family, opts.scope.minIphoneGeneration ?? 0)) { opts.onDrop?.("iphone-te-oud"); return false; }
         if (opts.scope.allowedModelKeys && !opts.scope.allowedModelKeys.has(r.modelKey)) { opts.onDrop?.("buiten-modellenlijst"); return false; }
       }

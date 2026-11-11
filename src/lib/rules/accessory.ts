@@ -13,6 +13,8 @@ export const DEFAULT_ACCESSORY_TERMS = [
   // Franse, Duitse en Engelse termen (Vinted wordt ook door verkopers uit andere landen gebruikt)
   "coque", "étui", "housse", "protège-écran", "protege ecran", "verre trempé", "chargeur", "câble", "hülle", "handyhülle", "schutzhülle",
   "panzerglas", "schutzfolie", "displayschutz", "ladegerät", "ladekabel", "screen guard", "phone case", "protector",
+  // Spaanse en Portugese termen en meervouden (komen ook via Vinted binnen)
+  "funda", "fundas", "carcasa", "carcasas", "capa", "estuche", "custodia", "hoesjes", "cases", "covers", "folio",
 ];
 
 export const DEFAULT_PARTS_TERMS = [

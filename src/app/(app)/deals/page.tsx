@@ -34,6 +34,7 @@ async function Deals({ sp, userId }: { sp: Awaited<SP>; userId: string }) {
     savedTree: saved ? (saved.tree as unknown as Group) : undefined,
     review: one(sp.review) === "1",
     showBlocked: one(sp.blocked) === "1",
+    showRejected: one(sp.rejected) === "1",
     sort: sort ?? "score",
     limit: 60,
     offset: Number(one(sp.offset) ?? 0) || 0,

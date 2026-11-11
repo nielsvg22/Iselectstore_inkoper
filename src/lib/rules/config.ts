@@ -273,7 +273,7 @@ const PRICES_KEY = "rules:bbp:prices";
 const HISTORY_ACTION = "rules.prices_changed";
 
 /** Huidige versie van de voorinstelling van Twan. Bij een hoger getal wordt ze één keer opnieuw toegepast. */
-export const TWAN_PRESET_VERSION = 2;
+export const TWAN_PRESET_VERSION = 3;
 
 /**
  * Zet de instellingen zoals Twan ze heeft aangegeven: margetabel (vraag/bieden/extra), batterijaftrek, waarderen vanaf de
@@ -295,6 +295,8 @@ export function applyTwanPreset(c: RulesConfig): RulesConfig {
     // alleen zoeken wat Twan heeft aangegeven: modellenlijst als enige bron (zodra er een lijst is) en iPhone 14 en nieuwer
     filters: { ...c.filters, enabled: true, outsideList: "reject" },
     minIphoneGeneration: 14,
+    // nieuwe standaardwoorden voor accessoires (funda, carcasa, …) toevoegen aan de opgeslagen lijst; eigen woorden blijven staan
+    accessories: { ...c.accessories, terms: [...new Set([...c.accessories.terms, ...DEFAULT_ACCESSORY_TERMS])] },
   };
 }
 

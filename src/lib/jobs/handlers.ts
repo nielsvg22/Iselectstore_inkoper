@@ -136,7 +136,7 @@ export async function runProfileCheck(
     const dropped: Record<string, number> = {};
     // alleen zoeken wat de klant heeft aangegeven: modellen uit de modellenlijst en iPhones vanaf de ingestelde generatie
     const listed = rulesCfg?.enabled && rulesCfg.filters.enabled && rulesCfg.filters.outsideList === "reject" ? (await getFilters()).filter((f) => f.active) : [];
-    const scope = rulesCfg?.enabled ? { allowedModelKeys: listed.length ? new Set(listed.map((f) => f.modelKey)) : null, minIphoneGeneration: rulesCfg.minIphoneGeneration } : undefined;
+    const scope = rulesCfg?.enabled ? { allowedModelKeys: listed.length ? new Set(listed.map((f) => f.modelKey)) : null, minIphoneGeneration: rulesCfg.minIphoneGeneration, minPrice: rulesCfg.minPrice } : undefined;
     const prefilter = tree
       ? buildPrefilter(tree, { accessories: rulesCfg?.enabled ? rulesCfg.accessories : undefined, scope, onDrop: (r) => { dropped[r] = (dropped[r] ?? 0) + 1; } })
       : undefined;

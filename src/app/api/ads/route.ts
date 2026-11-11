@@ -16,6 +16,7 @@ const q = z.object({
   review: z.enum(["1", "0"]).optional(),
   source: z.enum(["marktplaats", "vinted"]).optional(),
   showBlocked: z.enum(["1", "0"]).optional(),
+  rejected: z.enum(["1", "0"]).optional(),
   sort: z.enum(["score", "profit", "roi", "new", "price"]).optional(),
   limit: z.coerce.number().int().min(1).max(200).optional(),
   offset: z.coerce.number().int().min(0).optional(),
@@ -25,7 +26,7 @@ export const GET = route(async (req, { user }) => {
   const p = q.parse(Object.fromEntries(new URL(req.url).searchParams));
   const saved = p.filter ? await prisma.savedFilter.findFirst({ where: { id: p.filter, userId: user.id } }) : null;
   if (p.filter && !saved) throw new HttpError(404, "Filter niet gevonden");
-  const { rows, total } = await listDeals({ ...p, savedTree: saved ? (saved.tree as unknown as Group) : undefined, review: p.review === "1", showBlocked: p.showBlocked === "1" });
+  const { rows, total } = await listDeals({ ...p, savedTree: saved ? (saved.tree as unknown as Group) : undefined, review: p.review === "1", showBlocked: p.showBlocked === "1", showRejected: p.rejected === "1" });
   return {
     total,
     items: rows.map((a) => ({

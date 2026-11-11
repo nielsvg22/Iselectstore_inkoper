@@ -5,6 +5,7 @@ import { MarginKnob } from "@/components/rules/margin-knob";
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/client";
+import { REJECTED_BY_RULES } from "@/lib/queries";
 import { formatEuro, timeAgo } from "@/lib/format";
 import { getConfig } from "@/lib/settings/store";
 import { purchaseStatus } from "@/lib/radar/safety";
@@ -28,6 +29,8 @@ export default async function DashboardPage({
     isDemo: cfg.demoMode,
     duplicateOfId: null,
     userState: { not: "IGNORED" },
+    // wat de inkoopregels afwijzen (hoesje, te laag, buiten de lijst) hoort niet op het dashboard
+    NOT: { analyses: { some: REJECTED_BY_RULES } },
     AND: [marktplaatsScope([cityScopeWhere(cfg.radar.cityOnly), drivingWhere(cfg), ...(pickupKm != null ? [{ OR: [{ distanceKm: null }, { distanceKm: { lte: pickupKm } }] }] : [])])],
   };
   const today = new Date();

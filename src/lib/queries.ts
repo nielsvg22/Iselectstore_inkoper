@@ -1,6 +1,6 @@
 import { drivingWhere } from "./radar/driving";
 import { cityScopeWhere, marktplaatsScope } from "./radar/locality";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "./db/client";
 import { evaluate, type Group } from "./engines/filters";
 import { contextFromRow } from "./pipeline/context";
@@ -23,10 +23,15 @@ export interface DealFilters {
   userState?: string;
   review?: boolean;
   showBlocked?: boolean;
+  /** ook advertenties tonen die de inkoopregels hebben afgewezen (standaard verborgen) */
+  showRejected?: boolean;
   sort?: "score" | "profit" | "roi" | "new" | "price";
   limit?: number;
   offset?: number;
 }
+
+/** Huidige analyse die door de inkoopregels is afgewezen (hoesje, te laag, buiten de lijst, …). */
+export const REJECTED_BY_RULES: Prisma.DealAnalysisWhereInput = { isCurrent: true, costs: { path: ["rules", "status"], equals: "reject" } };
 
 export async function listDeals(f: DealFilters) {
   const cfg = await getConfig();
@@ -35,6 +40,8 @@ export async function listDeals(f: DealFilters) {
     ...(f.band ? { band: f.band as never } : {}),
     ...(f.minScore != null ? { score: { gte: f.minScore } } : {}),
     ...(f.showBlocked ? {} : { blocked: false }),
+    // advertenties die de inkoopregels hebben afgewezen (hoesje, te laag, buiten de lijst) blijven standaard uit de lijst; zonder oordeel blijft staan
+    ...(f.showRejected ? {} : { OR: [{ NOT: { costs: { path: ["rules", "status"], equals: "reject" } } }, { costs: { path: ["rules", "status"], equals: Prisma.AnyNull } }] }),
     ad: {
       isDemo: cfg.demoMode,
       AND: [marktplaatsScope([cityScopeWhere(cfg.radar.cityOnly), ...(f.review ? [] : [drivingWhere(cfg)])])],

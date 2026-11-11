@@ -61,22 +61,22 @@ describe("Mijn filters (opgeslagen filters)", () => {
     ].join("\n");
     await importFile(req("/api/import/file", { method: "POST", cookie, body: { content: csv } }));
     await tick(req("/api/jobs/tick", { method: "POST", cookie }));
-    const all = await j(await listAds(req("/api/ads?showBlocked=1", { cookie })));
+    const all = await j(await listAds(req("/api/ads?showBlocked=1&rejected=1", { cookie })));
     expect(all.body.total).toBe(4);
 
     const f1 = (await j(await createFilter(req("/api/filters", { method: "POST", cookie, body: { name: "iPhone 14 ≤ €500", tree: tree({ models: ["iphone-14"], maxPrice: "500" }) } })))).body.id;
-    const r1 = await j(await listAds(req(`/api/ads?showBlocked=1&filter=${f1}`, { cookie })));
+    const r1 = await j(await listAds(req(`/api/ads?showBlocked=1&rejected=1&filter=${f1}`, { cookie })));
     expect(r1.body.total).toBe(1);
     expect(r1.body.items[0].title).toBe("iPhone 14 128GB");
 
     const f2 = (await j(await createFilter(req("/api/filters", { method: "POST", cookie, body: { name: "Alle iPhones", tree: tree({ models: ["iphone-14", "iphone-13"] }) } })))).body.id;
-    expect((await j(await listAds(req(`/api/ads?showBlocked=1&filter=${f2}`, { cookie })))).body.total).toBe(3);
+    expect((await j(await listAds(req(`/api/ads?showBlocked=1&rejected=1&filter=${f2}`, { cookie })))).body.total).toBe(3);
 
     const f3 = (await j(await createFilter(req("/api/filters", { method: "POST", cookie, body: { name: "256 GB", tree: tree({ storage: [256] }) } })))).body.id;
-    expect((await j(await listAds(req(`/api/ads?showBlocked=1&filter=${f3}`, { cookie })))).body.items.map((i: { title: string }) => i.title)).toEqual(["iPhone 14 256GB"]);
+    expect((await j(await listAds(req(`/api/ads?showBlocked=1&rejected=1&filter=${f3}`, { cookie })))).body.items.map((i: { title: string }) => i.title)).toEqual(["iPhone 14 256GB"]);
 
     const f4 = (await j(await createFilter(req("/api/filters", { method: "POST", cookie, body: { name: "Leeg", tree: tree({}) } })))).body.id;
-    expect((await j(await listAds(req(`/api/ads?showBlocked=1&filter=${f4}`, { cookie })))).body.total).toBe(4);
+    expect((await j(await listAds(req(`/api/ads?showBlocked=1&rejected=1&filter=${f4}`, { cookie })))).body.total).toBe(4);
 
     expect((await listAds(req("/api/ads?filter=bestaatniet", { cookie }))).status).toBe(404);
   });

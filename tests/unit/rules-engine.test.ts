@@ -362,6 +362,13 @@ describe("voorinstelling van Twan", () => {
     expect(c.dynamic.presets).toEqual({ marktplaats: "normaal", vinted: "normaal" });
     expect(c.filters).toMatchObject({ enabled: true, outsideList: "reject" });
     expect(c.minIphoneGeneration).toBe(14);
+    expect(c.accessories.terms).toEqual(expect.arrayContaining(["funda", "fundas", "hoesje"]));
+  });
+  it("eigen accessoire-woorden blijven staan en er komen geen dubbelen", () => {
+    const base = defaultRules();
+    const c = applyTwanPreset({ ...base, accessories: { ...base.accessories, terms: ["hoesje", "mijnwoord"] } });
+    expect(c.accessories.terms).toContain("mijnwoord");
+    expect(c.accessories.terms.filter((t) => t === "hoesje")).toHaveLength(1);
   });
   it("laat andere instellingen en een hogere eigen minimumprijs ongemoeid", () => {
     const base = defaultRules();

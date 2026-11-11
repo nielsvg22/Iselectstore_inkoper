@@ -9,6 +9,7 @@ import {
   searchConfigSchema,
 } from "@/lib/sources/marktplaats-search";
 import { buildPrefilter, isNoise } from "@/lib/sources/prefilter";
+import { applyTwanPreset, defaultRules } from "@/lib/rules/config";
 import {
   extractHtmlDescription,
   parseListingHtml,
@@ -279,8 +280,36 @@ describe("voorselectie op basis van het zoekprofiel", () => {
     expect(f(ad("iPhone 16 128GB", 70000))).toBe(true);
     expect(f(ad("iPhone 15 Pro Max 256GB", 90000))).toBe(false); // niet in de lijst
     expect(f(ad("iPhone 13 128GB", 30000))).toBe(false); // ouder dan generatie 14
-    expect(f(ad("Mooie telefoon", 20000))).toBe(true); // onzekere herkenning: de regels beslissen
-    expect(dropped).toEqual(["buiten-modellenlijst", "iphone-te-oud"]);
+    expect(f(ad("Mooie telefoon", 20000))).toBe(false); // geen herkend model en geen Apple-woord: niet wat Twan zoekt
+    expect(f(ad("Apple telefoon 256GB", 60000))).toBe(true); // Apple-woord maar model onduidelijk: de regels beslissen
+    expect(dropped).toEqual(["buiten-modellenlijst", "iphone-te-oud", "geen-apple-product"]);
+  });
+  it("hoesjes, goedkope rommel en niet-Apple-producten komen er niet in", () => {
+    const dropped: string[] = [];
+    const rules = defaultRules();
+    const f = buildPrefilter({ op: "AND", children: [] }, { accessories: applyTwanPreset(rules).accessories, scope: { allowedModelKeys: null, minIphoneGeneration: 14, minPrice: applyTwanPreset(rules).minPrice }, onDrop: (r) => dropped.push(r) })!;
+    expect(f(ad("Funda iPhone 15 pro Max", 500))).toBe(false); // Spaans voor hoesje
+    expect(f(ad("Fundas iphone 16 plus", 1700))).toBe(false);
+    expect(f(ad("COLMi R12 Smart Ring met LED-display - Maat M", 1500))).toBe(false); // geen Apple
+    expect(f(ad("J'ai met une fois", 500))).toBe(false);
+    expect(f(ad("iPhone 15 Pro Max 256GB", 500))).toBe(false); // vast €5: onder de minimumprijs
+    expect(f(ad("iPhone 15 Pro Max 256GB", 70000))).toBe(true);
+    expect(f(ad("iPhone 16 128GB", 60000))).toBe(true);
+    expect(dropped).toEqual(["accessory", "accessory", "geen-apple-product", "geen-apple-product", "onder-minimumprijs"]);
+  });
+  it("een lage 'bieden vanaf' telt niet als prijs (die is door de verkoper of Marktplaats ingevuld)", () => {
+    const rules = applyTwanPreset(defaultRules());
+    const f = buildPrefilter({ op: "AND", children: [] }, { accessories: rules.accessories, scope: { allowedModelKeys: null, minIphoneGeneration: 14, minPrice: rules.minPrice } })!;
+    const bid = { ...ad("iPhone 15 Pro Max 256GB", 500), attributes: { priceType: "MIN_BID" } };
+    expect(f(bid)).toBe(true);
+  });
+  it("ook bij een OR-profiel blijven de wensen van de klant gelden", () => {
+    const rules = applyTwanPreset(defaultRules());
+    const f = buildPrefilter({ op: "OR", children: [] }, { accessories: rules.accessories, scope: { allowedModelKeys: null, minIphoneGeneration: 14, minPrice: rules.minPrice } })!;
+    expect(f(ad("Fundas iphone 16 plus", 1700))).toBe(false);
+    expect(f(ad("iPhone 13 128GB", 30000))).toBe(false);
+    expect(f(ad("iPhone 15 Pro 256GB", 60000))).toBe(true);
+    expect(buildPrefilter({ op: "OR", children: [] })).toBeUndefined();
   });
   it("zonder modellenlijst geldt alleen de generatie", () => {
     const f = buildPrefilter({ op: "AND", children: [] }, { scope: { allowedModelKeys: null, minIphoneGeneration: 14 } })!;
