@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { assumedBatteryPct, batteryAdjustEuro, batteryDeductionEuro, modelAgeMonths } from "@/lib/rules/battery";
 import { assessBid } from "@/lib/rules/bid";
-import { defaultRules, findBasePrice, type BasePrice } from "@/lib/rules/config";
+import { applyTwanPreset, defaultRules, findBasePrice, TWAN_PRESET_VERSION, type BasePrice } from "@/lib/rules/config";
 import { allowedPrices } from "@/lib/rules/margin";
 import { analyzeScratch } from "@/lib/rules/scratch";
 import { shippingEligibility } from "@/lib/rules/shipping";
@@ -347,5 +347,25 @@ describe("hoge marge valt op in de melding", () => {
     const m = buildDealMessage(msg([]));
     expect(m.text).not.toMatch(/HOGE MARGE —/);
     expect(buildPushPayload(msg([]), "/x").title).not.toMatch(/HOGE MARGE/);
+  });
+});
+
+describe("voorinstelling van Twan", () => {
+  it("overschrijft een oude opgeslagen configuratie met Twans waarden", () => {
+    const old = { ...defaultRules(), marginTable: "A" as const, priceBase: "buy85" as const, battery: { ...defaultRules().battery, table: "standard" as const, assumeFromAge: false }, highMargin: { ...defaultRules().highMargin, enabled: false }, bid: { ...defaultRules().bid, requireKnownPriceSeries: [] }, dynamic: { ...defaultRules().dynamic, presets: { marktplaats: "druk" as const, vinted: "druk" as const } }, minPrice: { ...defaultRules().minPrice, globalEuro: 0 } };
+    const c = applyTwanPreset(old);
+    expect(c).toMatchObject({ presetVersion: TWAN_PRESET_VERSION, priceBase: "sell", marginTable: "TWAN", highMarginBidMode: "same" });
+    expect(c.battery).toMatchObject({ table: "twan", assumeFromAge: true, excludeBelowPct: 80 });
+    expect(c.highMargin.enabled).toBe(true);
+    expect(c.bid.requireKnownPriceSeries).toEqual(["iphone-15"]);
+    expect(c.minPrice.globalEuro).toBe(50);
+    expect(c.dynamic.presets).toEqual({ marktplaats: "normaal", vinted: "normaal" });
+  });
+  it("laat andere instellingen en een hogere eigen minimumprijs ongemoeid", () => {
+    const base = defaultRules();
+    const c = applyTwanPreset({ ...base, minPrice: { ...base.minPrice, globalEuro: 90 }, distance: { ...base.distance, pickupMaxKm: 35 }, bid: { ...base.bid, requireKnownPriceSeries: ["iphone-16"] } });
+    expect(c.minPrice.globalEuro).toBe(90);
+    expect(c.distance.pickupMaxKm).toBe(35);
+    expect(c.bid.requireKnownPriceSeries).toEqual(["iphone-16"]);
   });
 });

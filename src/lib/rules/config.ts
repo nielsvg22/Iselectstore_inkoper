@@ -38,6 +38,8 @@ const tier = z.object({
 
 export const rulesSchema = z.object({
   enabled: z.boolean().default(true),
+  /** versie van de eenmalige instellingsupdate (Twan-voorinstelling); 0 = nog niet toegepast */
+  presetVersion: z.number().int().min(0).default(0),
   /** "sell" = zoekprijs is de verkoopprijs in perfecte staat (nieuwe manier); "buy85" = zoekprijs is max inkoop bij 85% batterij (oude vuistregel). */
   priceBase: z.enum(["sell", "buy85"]).default("sell"),
   /** wat als er geen basisprijs voor model/opslag is: bestaande waardering gebruiken of overslaan */
@@ -268,10 +270,41 @@ const CONFIG_KEY = "rules:bbp";
 const PRICES_KEY = "rules:bbp:prices";
 const HISTORY_ACTION = "rules.prices_changed";
 
+/** Huidige versie van de voorinstelling van Twan. Bij een hoger getal wordt ze één keer opnieuw toegepast. */
+export const TWAN_PRESET_VERSION = 1;
+
+/**
+ * Zet de instellingen zoals Twan ze heeft aangegeven: margetabel (vraag/bieden/extra), batterijaftrek, waarderen vanaf de
+ * verkoopprijs in top staat, batterij schatten op leeftijd, bieden-vanaf-gemiddelde, alleen bekende prijs voor de 15-serie,
+ * minimumprijs, hoge marge aan en de margeknop op Normaal. Andere instellingen (afstanden, verzendregels, accessoires, kosten) blijven staan.
+ */
+export function applyTwanPreset(c: RulesConfig): RulesConfig {
+  return {
+    ...c,
+    presetVersion: TWAN_PRESET_VERSION,
+    priceBase: "sell",
+    marginTable: "TWAN",
+    highMarginBidMode: "same",
+    highMargin: { ...c.highMargin, enabled: true },
+    battery: { ...c.battery, table: "twan", assumeFromAge: true, excludeBelowPct: 80 },
+    bid: { ...c.bid, requireKnownPriceSeries: c.bid.requireKnownPriceSeries.length ? c.bid.requireKnownPriceSeries : ["iphone-15"] },
+    minPrice: { ...c.minPrice, globalEuro: Math.max(c.minPrice.globalEuro, 50) },
+    dynamic: { ...c.dynamic, presets: { marktplaats: "normaal", vinted: "normaal" } },
+  };
+}
+
 export async function getRules(): Promise<RulesConfig> {
   const row = await prisma.appSettings.findUnique({ where: { key: CONFIG_KEY } });
   const parsed = rulesSchema.safeParse(row?.value ?? {});
-  return parsed.success ? parsed.data : defaultRules();
+  const cfg = parsed.success ? parsed.data : defaultRules();
+  if (cfg.presetVersion >= TWAN_PRESET_VERSION) return cfg;
+  // eerste keer met deze versie: Twan-voorinstelling toepassen en opslaan, zodat niemand dit handmatig hoeft te doen
+  const next = applyTwanPreset(cfg);
+  try {
+    await prisma.appSettings.upsert({ where: { key: CONFIG_KEY }, create: { key: CONFIG_KEY, value: next as object }, update: { value: next as object } });
+    await prisma.auditLog.create({ data: { userId: null, action: "rules.twan_preset", entity: "Rules", meta: { version: TWAN_PRESET_VERSION } } });
+  } catch { /* opslaan mislukt: de voorinstelling geldt dan alleen in het geheugen en wordt de volgende keer opnieuw geprobeerd */ }
+  return next;
 }
 
 export async function saveRules(input: unknown): Promise<RulesConfig> {
