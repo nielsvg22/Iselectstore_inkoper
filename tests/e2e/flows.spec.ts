@@ -684,7 +684,7 @@ test("inkoopregels: basisprijs invullen, regels testen, gebruiker aanmaken als b
   await page.getByRole("button", { name: "Toevoegen aan lijst" }).click();
   await page.getByRole("button", { name: "Opslaan" }).first().click();
   await expect(page.getByText(/basisprijzen opgeslagen/)).toBeVisible();
-  // tester: 90% batterij (−75), krasvrij, 10 km rijfilter (verkoper onbekend, −10) → 615
+  // tester: 90% batterij (−110, tabel van Twan), krasvrij, 10 km rijfilter (verkoper onbekend, −10) → 580
   await page.getByLabel("Opslag (GB)").fill("256");
   await page.getByLabel("Batterij %").fill("90");
   await page.getByLabel("Vraagprijs €").fill("300");
@@ -692,7 +692,7 @@ test("inkoopregels: basisprijs invullen, regels testen, gebruiker aanmaken als b
   await page.getByLabel("Titel + omschrijving").fill("Krasvrij, altijd in hoesje");
   await page.getByRole("button", { name: "Beoordeel" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Toegestane vraagprijs" })).toBeVisible();
-  await expect(page.getByRole("status").filter({ hasText: "€615" }).first()).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: "€580" }).first()).toBeVisible();
   // verzending meenemen uitzetten en bewaren
   const ship = page.getByRole("switch", { name: "Verzending meenemen" });
   await expect(ship).toHaveAttribute("aria-checked", "true");

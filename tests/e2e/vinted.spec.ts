@@ -50,7 +50,7 @@ test("platforms, algemene filters, modellenlijst en filterlogboek zijn bereikbaa
   await expect(page.getByRole("heading", { name: "Filterlogboek", level: 1 })).toBeVisible();
   await expect(page.getByRole("link", { name: "Vinted" }).first()).toBeVisible();
   await page.getByRole("link", { name: "Vinted" }).first().click();
-  await expect(page).toHaveURL(/platform=vinted/);
+  await expect(page).toHaveURL(/\/vinted|platform=vinted/);
 
   // geen horizontale scroll op de nieuwe pagina's (telefoonbreedte)
   await page.setViewportSize({ width: 390, height: 800 });
