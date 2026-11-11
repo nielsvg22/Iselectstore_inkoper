@@ -7,6 +7,8 @@ import { analyzeScratch } from "@/lib/rules/scratch";
 import { shippingEligibility } from "@/lib/rules/shipping";
 import { isNewestPro, minPriceEuro } from "@/lib/rules/release";
 import { evaluateRules, type VerdictInput } from "@/lib/rules/verdict";
+import { presetForRate } from "@/lib/rules/apply";
+import { buildDealMessage, buildPushPayload, type DealMessageInput, type RulesSummary } from "@/lib/notify/message";
 
 const cfg = { ...defaultRules(), marginTable: "A" as const, battery: { ...defaultRules().battery, table: "standard" as const } }; // oude tabellen vastgezet; Twan-tabellen apart getest onderaan
 const NOW = new Date("2026-10-22T10:00:00Z");
@@ -265,5 +267,85 @@ describe("tabellen van Twan", () => {
     expect(allowedPrices(1400, c)).toMatchObject({ askMargin: 245, bidMargin: 335, askHigh: 140 });
     expect(allowedPrices(5000, c).bidMargin).toBe(335);
     expect(allowedPrices(260, c)).toMatchObject({ allowedAsk: 180, allowedBid: 165, highAsk: 150 });
+  });
+});
+
+describe("margeknop (rustig / normaal / druk)", () => {
+  const seller = { ageMonths: 130, reviews: 5, rating: 4.9, verified: true };
+  const withPreset = (mp: "rustig" | "normaal" | "druk", vinted: "rustig" | "normaal" | "druk" = "normaal") => ({ ...cfg, dynamic: { ...cfg.dynamic, presets: { marktplaats: mp, vinted } } });
+  it("normaal verandert niets", () => {
+    const v = evaluateRules(input({ distanceKm: 5, seller }), PRICES, withPreset("normaal"));
+    expect(v.allowedAsk).toBe(325 - 80);
+  });
+  it("druk verlaagt de toegestane prijs met het bedrag, rustig verhoogt hem", () => {
+    const base = evaluateRules(input({ distanceKm: 5, seller }), PRICES, withPreset("normaal"));
+    const druk = evaluateRules(input({ distanceKm: 5, seller }), PRICES, withPreset("druk"));
+    const rustig = evaluateRules(input({ distanceKm: 5, seller }), PRICES, withPreset("rustig"));
+    expect(druk.allowedAsk).toBe(base.allowedAsk! - 40);
+    expect(druk.highAsk).toBe(base.highAsk! - 40);
+    expect(rustig.allowedAsk).toBe(base.allowedAsk! + 20);
+    expect(druk.notes.join(" ")).toMatch(/Margeknop druk: \+€40/);
+  });
+  it("een deal net binnen de normale marge valt af bij druk", () => {
+    const edge = input({ distanceKm: 5, seller, askEuro: 240 });
+    expect(evaluateRules(edge, PRICES, withPreset("normaal")).status).not.toBe("reject");
+    expect(evaluateRules(edge, PRICES, withPreset("druk")).status).toBe("reject");
+    expect(evaluateRules(edge, PRICES, withPreset("rustig")).status).not.toBe("reject");
+  });
+  it("de stand geldt per platform: Vinted-druk raakt Marktplaats niet", () => {
+    const mp = evaluateRules(input({ distanceKm: 5, seller }), PRICES, withPreset("normaal", "druk"));
+    expect(mp.allowedAsk).toBe(325 - 80);
+  });
+  it("automatische stand volgt het aanbod per uur", () => {
+    const t = { busyPerHour: 80, quietPerHour: 20 };
+    expect(presetForRate(120, t)).toBe("druk");
+    expect(presetForRate(80, t)).toBe("druk");
+    expect(presetForRate(50, t)).toBe("normaal");
+    expect(presetForRate(20, t)).toBe("rustig");
+    expect(presetForRate(0, t)).toBe("rustig");
+  });
+});
+
+describe("prijs bekend per serie en minimumprijs", () => {
+  const zero = (o: Partial<VerdictInput>) => evaluateRules(input({ priceType: "MIN_BID", askEuro: null, bidEuro: 0, batteryPct: 95, text: "Krasvrij, altijd in hoesje", seller: { ageMonths: 130, reviews: 50, rating: 5, verified: true }, ...o }), PRICES, { ...cfg, bid: { ...cfg.bid, zeroBidMode: "annotate" as const } });
+  it("de 15-serie komt zonder prijs niet door, ook niet als de rest klopt", () => {
+    const v = zero({ modelKey: "iphone-15-pro", modelLabel: "iPhone 15 Pro" });
+    expect(v.status).toBe("reject");
+    expect(v.reasons.join(" ")).toMatch(/bekende prijs/);
+  });
+  it("andere series blijven gewoon beoordeeld (bieden blanco mag hier nog)", () => {
+    expect(zero({}).status).not.toBe("reject");
+  });
+  it("de serielijst is instelbaar", () => {
+    const c = { ...cfg, bid: { ...cfg.bid, zeroBidMode: "annotate" as const, requireKnownPriceSeries: ["iphone-14"] } };
+    const v = evaluateRules(input({ priceType: "MIN_BID", askEuro: null, bidEuro: 0, batteryPct: 95, seller: { ageMonths: 130, reviews: 50, rating: 5, verified: true } }), PRICES, c);
+    expect(v.status).toBe("reject");
+  });
+  it("een bekende prijs bij de 15-serie wordt gewoon beoordeeld", () => {
+    const v = evaluateRules(input({ modelKey: "iphone-15-pro", modelLabel: "iPhone 15 Pro", askEuro: 200 }), PRICES, cfg);
+    expect(v.reasons.join(" ")).not.toMatch(/bekende prijs/);
+  });
+  it("globale minimumprijs wijst lage bedragen af", () => {
+    const c = { ...cfg, minPrice: { ...cfg.minPrice, globalEuro: 120 } };
+    const v = evaluateRules(input({ askEuro: 90 }), PRICES, c);
+    expect(v.status).toBe("reject");
+    expect(v.decidedBy).toBe("min-price");
+    expect(evaluateRules(input({ askEuro: 90 }), PRICES, cfg).decidedBy).not.toBe("min-price");
+  });
+});
+
+describe("hoge marge valt op in de melding", () => {
+  const rules = (flags: string[]): RulesSummary => ({ status: flags.includes("high") ? "high" : "match", flags, maxSellEuro: 400, allowedAsk: 320, allowedBid: 310, highAsk: 290, highBid: 280, effectiveEuro: 250, marginEuro: 150, priceKind: "ask", lines: [{ label: "Basisprijs", euro: 400 }], notes: [], reasons: [], battery: { pct: 90, assumed: false }, baseKind: "sell" });
+  const msg = (flags: string[]): DealMessageInput => ({ title: "t", modelLabel: "iPhone 14 Pro", storageGb: 128, askingCents: 25000, expectedCents: 40000, netProfitCents: 12000, maxBidCents: 24000, roiPct: 40, score: 80, band: "INTERESTING", riskLevel: "LOW", uncertain: false, url: "https://x.nl/a", rules: rules(flags) });
+  it("💰-banner bovenaan, vet in Telegram, en in de pushtitel", () => {
+    const m = buildDealMessage(msg(["high"]));
+    expect(m.text.split("\n")[0]).toMatch(/^💰💰💰 HOGE MARGE — €150 marge/);
+    expect(m.html).toContain("<b>💰💰💰 HOGE MARGE");
+    expect(buildPushPayload(msg(["high"]), "/x").title).toMatch(/^💰 HOGE MARGE · /);
+  });
+  it("gewone deals krijgen geen banner", () => {
+    const m = buildDealMessage(msg([]));
+    expect(m.text).not.toMatch(/HOGE MARGE —/);
+    expect(buildPushPayload(msg([]), "/x").title).not.toMatch(/HOGE MARGE/);
   });
 });

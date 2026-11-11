@@ -1,4 +1,7 @@
 import { pickupOnlyKm } from "@/lib/rules/apply";
+import { getRules } from "@/lib/rules/config";
+import { getCurrentUser } from "@/lib/auth";
+import { MarginKnob } from "@/components/rules/margin-knob";
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/client";
@@ -20,6 +23,7 @@ export default async function DashboardPage({
   const tab = sp.tab === "top" ? "top" : sp.tab === "saved" ? "saved" : "new";
   const cfg = await getConfig();
   const pickupKm = await pickupOnlyKm();
+  const [rulesCfg, me] = await Promise.all([getRules(), getCurrentUser()]);
   const base: Prisma.AdvertisementWhereInput = {
     isDemo: cfg.demoMode,
     duplicateOfId: null,
@@ -108,6 +112,7 @@ export default async function DashboardPage({
           </div>
         ))}
       </section>
+      <MarginKnob initial={{ presets: rulesCfg.dynamic.presets, auto: rulesCfg.dynamic.auto.enabled, offsetsEuro: rulesCfg.dynamic.offsetsEuro }} isAdmin={me?.role === "ADMIN"} />
       <div className="flex items-center justify-between border-b border-card-border pb-3">
         <nav aria-label="Dealfeed" className="flex gap-5">
           {[

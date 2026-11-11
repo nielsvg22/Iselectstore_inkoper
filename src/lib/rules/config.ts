@@ -123,6 +123,8 @@ export const rulesSchema = z.object({
     neverBelowMonths: num(24),
   }).default({}),
   minPrice: z.object({
+    /** minimumprijs voor alle advertenties met een bekende prijs (0 = uit); filtert hoesjes en accessoires ook als het model niet herkend is */
+    globalEuro: num(0),
     newerEuro: num(70),
     olderEuro: num(50),
     /** iPhone-generatie vanaf waar 'nieuwer' geldt */
@@ -132,6 +134,8 @@ export const rulesSchema = z.object({
     /** bieden vanaf onder dit aandeel van de vraagprijs = door Marktplaats ingevuld → gemiddelde gebruiken */
     minShareOfAsk: num(0.65),
     maxGapEuro: num(250),
+    /** series waarvoor alleen advertenties met een bekende prijs doorkomen (geen "bieden blanco"), bijv. "iphone-15" = de hele 15-serie */
+    requireKnownPriceSeries: z.array(z.string().max(60)).max(40).default(["iphone-15"]),
     /** alleen bieden vanaf (geen vraagprijs): verwachte prijs bij 'bieden vanaf 0' */
     zeroBidMinusEuro: num(50),
     /** bieden vanaf 0 zonder prijs: filter of alleen markeren */
@@ -140,6 +144,21 @@ export const rulesSchema = z.object({
       minBatteryPct: num(85),
       requireScratchFree: z.boolean().default(true),
       requireTrustedOrNearKm: num(20),
+    }).default({}),
+  }).default({}),
+  /** Dynamische margeknop: tel per platform een bedrag op de vereiste marge (Rustig = lager, Druk = hoger), direct werkend */
+  dynamic: z.object({
+    presets: z.object({
+      marktplaats: z.enum(["rustig", "normaal", "druk"]).default("normaal"),
+      vinted: z.enum(["rustig", "normaal", "druk"]).default("normaal"),
+    }).default({}),
+    /** bedrag (euro) dat bij de vereiste marge opgeteld wordt per stand */
+    offsetsEuro: z.object({ rustig: z.number().min(-500).max(500).default(-20), normaal: z.number().min(-500).max(500).default(0), druk: z.number().min(-500).max(500).default(40) }).default({}),
+    /** automatisch: het aantal nieuwe advertenties in het laatste uur bepaalt de stand (hoger dan "druk" = druk, lager dan "rustig" = rustig) */
+    auto: z.object({
+      enabled: z.boolean().default(false),
+      marktplaats: z.object({ busyPerHour: num(80), quietPerHour: num(20) }).default({}),
+      vinted: z.object({ busyPerHour: num(40), quietPerHour: num(10) }).default({}),
     }).default({}),
   }).default({}),
   macbook: z.object({

@@ -5,7 +5,7 @@ import { classifyAccessory } from "./accessory";
 import { checkFilterDistance, checkFilterSeller, classifyCondition, evaluateFilters, type SearchFilter } from "./filters";
 import { marginFor, type MarginResult } from "./margin-filter";
 import { centerHits } from "./geo";
-import { allowedPrices } from "./margin";
+import { allowedPrices, marginOffsetEuro } from "./margin";
 import { belowMinIphone, isNewestPro, minPriceEuro } from "./release";
 import { analyzeScratch, type ScratchState } from "./scratch";
 import { shippingEligibility, type SellerFacts, type ShipResult } from "./shipping";
@@ -134,6 +134,14 @@ export function evaluateRules(i: VerdictInput, prices: BasePrice[], cfg: RulesCo
   if (i.directBuy) v.flags.push("directBuy");
   const platform = i.platform ?? "marktplaats";
   const purchaseEuro = ask ?? bidKnown;
+  // series waarvoor alleen een bekende prijs telt (geen "bieden blanco" / prijs onbekend)
+  if (v.priceKind === "bid0" || v.priceKind === "none") {
+    const series = cfg.bid.requireKnownPriceSeries.find((p) => i.modelKey === p || i.modelKey.startsWith(`${p}-`));
+    if (series) return reject(`Prijs onbekend (bieden blanco): ${i.modelLabel} komt alleen door met een bekende prijs (serie ${series})`, "bid-zero");
+  }
+  // margeknop: Rustig/Normaal/Druk telt een bedrag op de vereiste marge (per platform)
+  const dynOffset = marginOffsetEuro(cfg, platform);
+  if (dynOffset !== 0) v.notes.push(`Margeknop ${cfg.dynamic.presets[platform === "vinted" ? "vinted" : "marktplaats"]}: ${dynOffset > 0 ? "+" : "−"}€${Math.abs(dynOffset)} op de vereiste marge (${platform === "vinted" ? "Vinted" : "Marktplaats"})`);
 
   // ---- 3. staat het model op de gewenste lijst (modellenlijst/zoekfilters)? ----
   const variant = i.family === "ipad" && /^ipad-air-m\d$/.test(i.modelKey) && i.screenInch != null ? String(Math.round(i.screenInch)) : "";
@@ -169,7 +177,7 @@ export function evaluateRules(i: VerdictInput, prices: BasePrice[], cfg: RulesCo
 
   // ---- 7. winstmarge ----
   if (cfg.margin.enabled && filterHit?.resaleEuro != null && purchaseEuro != null) {
-    const m = marginFor({ platform, purchaseEuro, resaleEuro: filterHit.resaleEuro, modelMinMarginEuro: filterHit.minMarginEuro, listedProtectionCents: i.listedProtectionCents, listedShippingCents: i.listedShippingCents }, cfg.margin);
+    const m = marginFor({ platform, purchaseEuro, resaleEuro: filterHit.resaleEuro, modelMinMarginEuro: filterHit.minMarginEuro, listedProtectionCents: i.listedProtectionCents, listedShippingCents: i.listedShippingCents }, cfg.margin, dynOffset);
     v.profit = m;
     v.notes.push(`Marge: €${m.resaleEuro} − €${m.purchaseEuro}${m.costLines.map((l) => ` − €${l.euro} ${l.label.toLowerCase()}`).join("")} = €${m.profitEuro} (gewenst €${m.requiredEuro}; maximale inkoop €${m.maxPurchaseEuro})`);
     if (!m.ok) return reject(`Verwachte winst €${m.profitEuro} is lager dan de gewenste marge €${m.requiredEuro} (maximale inkoopprijs €${m.maxPurchaseEuro})`, "margin");
@@ -322,12 +330,12 @@ export function evaluateRules(i: VerdictInput, prices: BasePrice[], cfg: RulesCo
 
   // ---- toegestane prijzen ----
   if (found.price.kind === "buy" || cfg.priceBase === "buy85") {
-    v.allowedAsk = v.allowedBid = round(sell);
-    const row = allowedPrices(sell, cfg);
-    v.highAsk = found.price.kind === "buy" ? null : round(sell - row.askHigh);
-    v.highBid = found.price.kind === "buy" ? null : round(sell - row.askHigh);
+    v.allowedAsk = v.allowedBid = round(sell - dynOffset);
+    const row = allowedPrices(sell, cfg, dynOffset);
+    v.highAsk = found.price.kind === "buy" ? null : round(sell - dynOffset - row.askHigh);
+    v.highBid = found.price.kind === "buy" ? null : round(sell - dynOffset - row.askHigh);
   } else {
-    const a = allowedPrices(sell, cfg);
+    const a = allowedPrices(sell, cfg, dynOffset);
     v.allowedAsk = round(a.allowedAsk);
     v.allowedBid = round(a.allowedBid);
     v.highAsk = round(a.highAsk);
@@ -335,7 +343,7 @@ export function evaluateRules(i: VerdictInput, prices: BasePrice[], cfg: RulesCo
   }
 
   // ---- beoordeel de prijs ----
-  const minP = filterHit && filterHit.minEuro > 0 ? filterHit.minEuro : minPriceEuro(i.modelKey, i.family, cfg.minPrice);
+  const minP = Math.max(cfg.minPrice.globalEuro, filterHit && filterHit.minEuro > 0 ? filterHit.minEuro : minPriceEuro(i.modelKey, i.family, cfg.minPrice));
   let eff: number | null = null;
   let pass = false;
   let high = false;

@@ -116,6 +116,11 @@ export function buildDealMessage(m: DealMessageInput): {
       ? "🔶 MOGELIJK INTERESSANTE DEAL (voorlopig)"
       : "🔶 VOORLOPIGE DEAL"
     : HEAD[m.band];
+  const high = !!m.rules?.flags.includes("high");
+  if (high) {
+    lines.push(`💰💰💰 HOGE MARGE${m.rules?.marginEuro != null ? ` — ${eur0(m.rules.marginEuro)} marge` : ""} 💰💰💰`);
+    lines.push("");
+  }
   lines.push(`${m.isTest ? "🧪 TESTMELDING — " : ""}${head}`);
   if (provisional && m.provisionalReasons?.length)
     lines.push(`Controleer eerst: ${m.provisionalReasons.join("; ")}`);
@@ -154,7 +159,7 @@ export function buildDealMessage(m: DealMessageInput): {
     .map((l) =>
       l === m.url
         ? `<a href="${escapeHtml(m.url)}">Directe advertentielink</a>`
-        : escapeHtml(l),
+        : l.startsWith("💰💰💰") ? `<b>${escapeHtml(l)}</b>` : escapeHtml(l),
     )
     .join("\n");
   return { html, text };
@@ -174,13 +179,14 @@ export function buildPushPayload(
 } {
   const name = `${m.modelLabel}${m.storageGb ? ` ${m.storageGb}GB` : ""}`;
   const provisional = m.definitive === false;
-  const prefix = m.isTest
+  const highPrefix = m.rules?.flags.includes("high") ? "💰 HOGE MARGE · " : "";
+  const prefix = highPrefix + (m.isTest
     ? "Test · "
     : provisional
       ? "Voorlopig · "
       : m.band === "TOP"
         ? "Topdeal · "
-        : "";
+        : "");
   const lines = [
     `${formatEuro(m.askingCents)}${m.location ? ` · ${m.location}` : ""}${m.driveSeconds != null ? ` · ±${Math.ceil(m.driveSeconds / 60)} min rijden` : m.distanceKm != null ? ` · ${Math.round(m.distanceKm)} km` : " · afstand onbekend"}`,
     m.uncertain

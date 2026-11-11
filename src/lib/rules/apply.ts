@@ -10,10 +10,29 @@ let cache: { at: number; cfg: RulesConfig; prices: BasePrice[]; filters: SearchF
 /** Regels + basisprijzen, 15 seconden in het geheugen (de worker verwerkt veel advertenties achter elkaar). */
 export async function loadRules(force = false): Promise<{ cfg: RulesConfig; prices: BasePrice[]; filters: SearchFilter[] }> {
   if (!force && cache && Date.now() - cache.at < 15_000) return cache;
-  const [cfg, prices, filters] = await Promise.all([getRules(), getBasePrices(), getFilters()]);
+  const [stored, prices, filters] = await Promise.all([getRules(), getBasePrices(), getFilters()]);
+  const cfg = await withAutoPresets(stored);
   cache = { at: Date.now(), cfg, prices, filters };
   return cache;
 }
+/** Stand van de margeknop volgens het aanbod: meer nieuwe advertenties in het laatste uur dan de drukte-grens = druk, minder dan de rustig-grens = rustig. */
+export function presetForRate(perHour: number, t: { busyPerHour: number; quietPerHour: number }): "rustig" | "normaal" | "druk" {
+  if (perHour >= t.busyPerHour) return "druk";
+  if (perHour <= t.quietPerHour) return "rustig";
+  return "normaal";
+}
+
+/** Bij "automatisch" bepaalt het aanbod van het laatste uur de stand per platform (alleen in het geheugen; de opgeslagen handmatige stand blijft staan). */
+async function withAutoPresets(cfg: RulesConfig): Promise<RulesConfig> {
+  if (!cfg.dynamic.auto.enabled) return cfg;
+  const since = new Date(Date.now() - 3600_000);
+  const [mp, vi] = await Promise.all([
+    prisma.advertisement.count({ where: { source: "marktplaats", firstSeenAt: { gte: since } } }),
+    prisma.advertisement.count({ where: { source: "vinted", firstSeenAt: { gte: since } } }),
+  ]);
+  return { ...cfg, dynamic: { ...cfg.dynamic, presets: { marktplaats: presetForRate(mp, cfg.dynamic.auto.marktplaats), vinted: presetForRate(vi, cfg.dynamic.auto.vinted) } } };
+}
+
 export const clearRulesCache = () => { cache = null; };
 
 export interface AdForRules {

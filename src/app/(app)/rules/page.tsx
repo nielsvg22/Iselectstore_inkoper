@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { MarginKnob } from "@/components/rules/margin-knob";
 import { RulesEditor } from "@/components/rules/rules-editor";
 import { getCurrentUser } from "@/lib/auth";
 import { getBasePrices, getRules } from "@/lib/rules/config";
@@ -22,6 +23,7 @@ export default async function RulesPage() {
           <Link href="/rules/beslisboom" className="rounded-full border border-card-border px-4 py-2 text-sm font-medium hover:bg-muted-bg">Beslisboom</Link>
         </div>
       </div>
+      <MarginKnob initial={{ presets: rules.dynamic.presets, auto: rules.dynamic.auto.enabled, offsetsEuro: rules.dynamic.offsetsEuro }} isAdmin={user?.role === "ADMIN"} />
       <RulesEditor initialRules={rules} initialPrices={prices} isAdmin={user?.role === "ADMIN"} />
     </div>
   );

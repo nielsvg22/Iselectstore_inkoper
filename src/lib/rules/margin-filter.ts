@@ -30,7 +30,7 @@ export interface MarginResult {
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
 /** Marge in de volgorde van de klant: verwachte winst = doorverkoopprijs − inkoopprijs − bijkomende kosten. */
-export function marginFor(i: MarginInput, cfg: RulesConfig["margin"]): MarginResult {
+export function marginFor(i: MarginInput, cfg: RulesConfig["margin"], offsetEuro = 0): MarginResult {
   const c: MarginCosts = cfg.costs[i.platform === "vinted" ? "vinted" : "marktplaats"];
   const useListed = i.platform === "vinted" && cfg.useListedPlatformCosts;
   const lines: Array<{ label: string; euro: number }> = [];
@@ -41,7 +41,7 @@ export function marginFor(i: MarginInput, cfg: RulesConfig["margin"]): MarginRes
   if (c.otherEuro) lines.push({ label: "Overige inkoopkosten", euro: r2(c.otherEuro) });
   const costs = r2(shipping + protection + c.otherEuro);
   const segment = [...cfg.segments].sort((a, b) => b.fromResaleEuro - a.fromResaleEuro).find((s) => i.resaleEuro >= s.fromResaleEuro);
-  const required = i.modelMinMarginEuro ?? segment?.minMarginEuro ?? cfg.defaultMinMarginEuro;
+  const required = (i.modelMinMarginEuro ?? segment?.minMarginEuro ?? cfg.defaultMinMarginEuro) + offsetEuro;
   const profit = r2(i.resaleEuro - i.purchaseEuro - costs);
   // protectie met percentage hangt van de prijs af: maximale inkoop = (verkoop − marge − vaste kosten) / (1 + pct)
   const fixed = shipping + c.otherEuro + (useListed && i.listedProtectionCents != null ? protection : c.protectionFixedEuro);

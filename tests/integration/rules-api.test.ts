@@ -39,7 +39,7 @@ describe("inkoopregels-API", () => {
     const r = await testPost(req("/api/rules/test", { method: "POST", cookie: admin.cookie, body: { modelKey: "iphone-15-pro", storageGb: 256, batteryPct: 90, distanceKm: 10, text: "Krasvrij. Vraagprijs €400", seller: { ageMonths: 130, reviews: 5, rating: 4.9, verified: true } } }));
     const j = (await r.json()) as { verdict: { status: string; maxSellEuro: number; lines: unknown[] }; priceFromText: { ask: number } };
     expect(j.priceFromText.ask).toBe(400);
-    expect(j.verdict.maxSellEuro).toBe(625); // 700 − 75 (90% batterij), krasvrij, verkoper voldoet aan verzendfilter
+    expect(j.verdict.maxSellEuro).toBe(590); // 700 − 110 (90% batterij, tabel van Twan), krasvrij, verkoper voldoet aan verzendfilter
     expect(["match", "high"]).toContain(j.verdict.status);
     expect((await testPost(req("/api/rules/test", { method: "POST", cookie: admin.cookie, body: { modelKey: "" } }))).status).toBe(400);
   });
