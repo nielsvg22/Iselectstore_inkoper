@@ -44,6 +44,45 @@ export const MARGIN_ROWS: MarginRow[] = [
   [1400, 270, 270, 140, 365, 180],
 ];
 
+/** Margetabel van Twan (nieuwste versie): [vanaf verkoopprijs, marge vraagprijs, marge vraagprijs, extra hoge marge, marge bieden vanaf, extra hoge marge bieden]. Eén "extra"-kolom voor beide. */
+export const MARGIN_ROWS_TWAN: MarginRow[] = [
+  [0, 45, 45, 20, 55, 20],
+  [50, 50, 50, 25, 60, 25],
+  [100, 60, 60, 25, 75, 25],
+  [150, 70, 70, 30, 80, 30],
+  [200, 80, 80, 30, 90, 30],
+  [250, 80, 80, 30, 95, 30],
+  [300, 80, 80, 35, 105, 35],
+  [350, 85, 85, 40, 115, 40],
+  [400, 90, 90, 45, 115, 45],
+  [450, 95, 95, 50, 125, 50],
+  [500, 100, 100, 50, 130, 50],
+  [550, 110, 110, 50, 140, 50],
+  [600, 120, 120, 50, 150, 50],
+  [650, 130, 130, 50, 160, 50],
+  [700, 135, 135, 60, 165, 60],
+  [750, 150, 150, 60, 180, 60],
+  [800, 155, 155, 70, 190, 70],
+  [850, 165, 165, 70, 205, 70],
+  [900, 175, 175, 90, 215, 90],
+  [950, 190, 190, 90, 240, 90],
+  [1000, 205, 205, 100, 250, 100],
+  [1050, 215, 215, 100, 265, 100],
+  [1100, 215, 215, 100, 275, 100],
+  [1150, 230, 230, 105, 295, 105],
+  [1200, 235, 235, 110, 300, 110],
+  [1250, 240, 240, 115, 320, 115],
+  [1300, 240, 240, 120, 325, 120],
+  [1350, 245, 245, 130, 335, 130],
+  [1400, 245, 245, 140, 335, 140],
+];
+
+/** Batterijaftrek van Twan (euro, t.o.v. een toestel met 100% batterij). Onder 80% wordt niet gekocht. */
+export const BATTERY_DEDUCTION_TWAN: Record<number, number> = {
+  80: 140, 81: 140, 82: 140, 83: 140, 84: 140, 85: 140, 86: 135, 87: 130, 88: 125, 89: 120, 90: 110,
+  91: 95, 92: 80, 93: 70, 94: 70, 95: 60, 96: 50, 97: 40, 98: 30, 99: 20, 100: 0,
+};
+
 /** Releasemaand per iPhone-generatie/-model (voor de batterij-aanname naar leeftijd en "nieuwste Pro/Pro Max"). */
 export const IPHONE_RELEASE: Record<string, string> = {
   "iphone-11": "2019-09", "iphone-11-pro": "2019-09", "iphone-11-pro-max": "2019-09",

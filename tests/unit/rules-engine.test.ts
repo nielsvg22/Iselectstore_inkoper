@@ -8,7 +8,7 @@ import { shippingEligibility } from "@/lib/rules/shipping";
 import { isNewestPro, minPriceEuro } from "@/lib/rules/release";
 import { evaluateRules, type VerdictInput } from "@/lib/rules/verdict";
 
-const cfg = defaultRules();
+const cfg = { ...defaultRules(), marginTable: "A" as const, battery: { ...defaultRules().battery, table: "standard" as const } }; // oude tabellen vastgezet; Twan-tabellen apart getest onderaan
 const NOW = new Date("2026-10-22T10:00:00Z");
 /** vóór de iPhone 18-serie (sept. 2026): dan zijn de 17 Pro-modellen de nieuwste */
 const BEFORE_18 = new Date("2026-06-01T00:00:00Z");
@@ -241,5 +241,29 @@ describe("totaaloordeel", () => {
     expect(findBasePrice(PRICES, "ipad-air-m2", 128, "13").price?.priceEuro).toBe(650);
     expect(findBasePrice(PRICES, "iphone-14-pro", 512).price).toBeNull();
     expect(findBasePrice(PRICES, "iphone-14-pro", null)).toMatchObject({ storageAssumed: true });
+  });
+});
+
+
+describe("tabellen van Twan", () => {
+  it("batterijaftrek volgens Twan", () => {
+    expect(batteryDeductionEuro(100, "twan")).toBe(0);
+    expect(batteryDeductionEuro(80, "twan")).toBe(140);
+    expect(batteryDeductionEuro(85, "twan")).toBe(140);
+    expect(batteryDeductionEuro(90, "twan")).toBe(110);
+    expect(batteryDeductionEuro(95, "twan")).toBe(60);
+    expect(batteryDeductionEuro(99, "twan")).toBe(20);
+    expect(batteryDeductionEuro(89.5, "twan")).toBe(115);
+    expect(batteryDeductionEuro(90)).toBe(75); // oude tabel blijft standaard bij expliciete keuze
+  });
+  it("margetabel van Twan: vraag, bieden en extra per klasse", () => {
+    const c = { marginTable: "TWAN" as const, highMarginBidMode: "same" as const };
+    expect(allowedPrices(49.99, c)).toMatchObject({ askMargin: 45, bidMargin: 55, askHigh: 20 });
+    expect(allowedPrices(175, c)).toMatchObject({ askMargin: 70, bidMargin: 80, askHigh: 30 });
+    expect(allowedPrices(230, c)).toMatchObject({ askMargin: 80, bidMargin: 90, askHigh: 30 });
+    expect(allowedPrices(575, c)).toMatchObject({ askMargin: 110, bidMargin: 140, askHigh: 50, bidHigh: 50 });
+    expect(allowedPrices(1400, c)).toMatchObject({ askMargin: 245, bidMargin: 335, askHigh: 140 });
+    expect(allowedPrices(5000, c).bidMargin).toBe(335);
+    expect(allowedPrices(260, c)).toMatchObject({ allowedAsk: 180, allowedBid: 165, highAsk: 150 });
   });
 });

@@ -1,5 +1,5 @@
 import type { RulesConfig } from "./config";
-import { BATTERY_ADJUST_EURO, IPHONE_RELEASE } from "./tables";
+import { BATTERY_ADJUST_EURO, BATTERY_DEDUCTION_TWAN, IPHONE_RELEASE } from "./tables";
 
 /** Bijtelling (+) of aftrek (−) op de maximale prijs voor een batterijpercentage, ten opzichte van 85%. Onder 80% is er geen waarde (nooit kopen). */
 export function batteryAdjustEuro(pct: number): number {
@@ -13,7 +13,15 @@ export function batteryAdjustEuro(pct: number): number {
 }
 
 /** Aftrek t.o.v. een toestel met 100% batterij (voor prijzen die voor perfecte staat zijn ingevuld). */
-export function batteryDeductionEuro(pct: number): number {
+export function batteryDeductionEuro(pct: number, table: "standard" | "twan" = "standard"): number {
+  if (table === "twan") {
+    const p = Math.max(80, Math.min(100, pct));
+    const lo = Math.floor(p);
+    const hi = Math.ceil(p);
+    const a = BATTERY_DEDUCTION_TWAN[lo];
+    const b = BATTERY_DEDUCTION_TWAN[hi];
+    return Math.round((lo === hi ? a : a + (b - a) * (p - lo)) * 100) / 100;
+  }
   return Math.round((batteryAdjustEuro(100) - batteryAdjustEuro(pct)) * 100) / 100;
 }
 

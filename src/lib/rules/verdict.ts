@@ -299,7 +299,7 @@ export function evaluateRules(i: VerdictInput, prices: BasePrice[], cfg: RulesCo
 
   if (found.price.kind === "sell") {
     if (batteryFamily && batteryPct != null) {
-      if (cfg.priceBase === "sell") add(`Batterij ${batteryPct}%${v.battery.assumed ? " (aangenomen)" : ""}`, -batteryDeductionEuro(batteryPct));
+      if (cfg.priceBase === "sell") add(`Batterij ${batteryPct}%${v.battery.assumed ? " (aangenomen)" : ""}`, -batteryDeductionEuro(batteryPct, cfg.battery.table));
       else add(`Batterij ${batteryPct}%${v.battery.assumed ? " (aangenomen)" : ""}`, batteryAdjustEuro(batteryPct));
     }
     const sf = scratchFactor(i.modelKey, i.now, cfg.scratch.ageScaling);

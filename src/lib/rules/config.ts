@@ -46,7 +46,8 @@ export const rulesSchema = z.object({
   replaceDistancePolicy: z.boolean().default(false),
   /** alleen iPhones vanaf deze generatie inkopen (14 = iPhone 14 en nieuwer, dus ook 16e en Air; SE en 13 en ouder vallen af). 0 = alle modellen */
   minIphoneGeneration: num(0),
-  marginTable: z.enum(["A", "B"]).default("A"),
+  /** A/B = oude tabellen; TWAN = nieuwste tabel van Twan (vraag, bieden, extra) */
+  marginTable: z.enum(["A", "B", "TWAN"]).default("TWAN"),
   /** hoge-marge extra: "same" = de extra van de vraagprijs-kolom voor beide (zoals in het voorbeeld), "table" = eigen kolom per soort */
   highMarginBidMode: z.enum(["same", "table"]).default("same"),
   highMargin: z.object({
@@ -58,6 +59,8 @@ export const rulesSchema = z.object({
   }).default({}),
   battery: z.object({
     excludeBelowPct: num(80),
+    /** aftrek t.o.v. 100% batterij: "twan" = tabel van Twan (strenger), "standard" = oude tabel */
+    table: z.enum(["standard", "twan"]).default("twan"),
     /** batterij onbekend → schatten op leeftijd van het model */
     assumeFromAge: z.boolean().default(true),
     fullUntilMonths: num(6),
