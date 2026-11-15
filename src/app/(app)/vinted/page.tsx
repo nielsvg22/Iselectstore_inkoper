@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { customProfilesAllowed } from "@/lib/profile-lock";
 import { VintedPanel } from "@/components/vinted/vinted-panel";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,7 +32,7 @@ export default async function VintedPage() {
       </div>
       <Card>
         <CardHeader><div><CardTitle>Radar</CardTitle><CardDescription>Alleen openbare pagina&apos;s van vinted.nl, met eigen requestlimiet en pauze bij een blokkade. Niet beschikbaar op Vinted: afstand en locatie, accountleeftijd en land van de verkoper.</CardDescription></div></CardHeader>
-        <CardContent><VintedPanel initial={status} isAdmin={user?.role === "ADMIN"} /></CardContent>
+        <CardContent><VintedPanel initial={status} isAdmin={user?.role === "ADMIN"} locked={!customProfilesAllowed()} /></CardContent>
       </Card>
       <Card>
         <CardHeader><div><CardTitle>Laatst gevonden ({ads.length})</CardTitle><CardDescription>Nieuwste eerst. &quot;Gevonden&quot; is het moment waarop de app de advertentie voor het eerst zag; de plaatsingstijd geeft Vinted alleen bij benadering.</CardDescription></div></CardHeader>

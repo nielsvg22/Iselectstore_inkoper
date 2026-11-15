@@ -8,7 +8,7 @@ import { Notice } from "@/components/ui/states";
 import type { VintedState } from "@/components/rules/general-filters-editor";
 import { api } from "@/lib/client-api";
 
-export function VintedPanel({ initial, isAdmin }: { initial: VintedState; isAdmin: boolean }) {
+export function VintedPanel({ initial, isAdmin, locked = false }: { initial: VintedState; isAdmin: boolean; locked?: boolean }) {
   const router = useRouter();
   const toast = useToast();
   const [v, setV] = React.useState(initial);
@@ -41,10 +41,10 @@ export function VintedPanel({ initial, isAdmin }: { initial: VintedState; isAdmi
       {isAdmin && (
         <div className="flex flex-wrap items-end gap-3">
           <label className="block min-w-[16rem] flex-1"><span className="mb-1.5 block text-[13px] font-medium text-foreground/80">Zoektermen (komma, nieuwste eerst)</span>
-            <Input aria-label="Vinted-zoektermen" value={queries} onChange={(e) => setQueries(e.target.value)} placeholder="iphone, ipad, macbook" /></label>
+            <Input aria-label="Vinted-zoektermen" value={queries} disabled={locked} onChange={(e) => setQueries(e.target.value)} placeholder="iphone, ipad, macbook" />{locked && <span className="mt-1 block text-xs text-muted">Vast: volgt de modellenlijst en de inkoopregels.</span>}</label>
           <label className="block"><span className="mb-1.5 block text-[13px] font-medium text-foreground/80">Elke (seconden)</span>
             <Input aria-label="Interval in seconden" type="number" min={30} className="w-28" value={v.settings.intervalSeconds} onChange={(e) => setV({ ...v, settings: { ...v.settings, intervalSeconds: Number(e.target.value) } })} /></label>
-          <Button loading={busy} onClick={() => apply({ enabled: true, intervalSeconds: v.settings.intervalSeconds, queries: queries.split(/[,\n]/).map((q) => q.trim()).filter((q) => q.length >= 2) }, "Vinted-radar bijgewerkt")}>{v.profile ? "Zoekprofiel bijwerken" : "Zoekprofiel aanmaken en aanzetten"}</Button>
+          <Button loading={busy} onClick={() => apply({ enabled: true, intervalSeconds: v.settings.intervalSeconds, ...(locked ? {} : { queries: queries.split(/[,\n]/).map((q) => q.trim()).filter((q) => q.length >= 2) }) }, "Vinted-radar bijgewerkt")}>{v.profile ? "Zoekprofiel bijwerken" : "Zoekprofiel aanmaken en aanzetten"}</Button>
         </div>
       )}
     </div>
