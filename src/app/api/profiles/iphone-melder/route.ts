@@ -1,5 +1,6 @@
 import { route } from "@/lib/api";
 import { prisma } from "@/lib/db/client";
+import { assertCustomProfilesAllowed } from "@/lib/profile-lock";
 import { provisionIphoneMelder } from "@/lib/provision";
 import { saveConfig } from "@/lib/settings/store";
 
@@ -9,6 +10,7 @@ import { saveConfig } from "@/lib/settings/store";
  */
 export const POST = route(
   async (_req, { user }) => {
+    assertCustomProfilesAllowed();
     const r = await provisionIphoneMelder(user.id);
     const cfg = await saveConfig({ scheduler: { fast: { enabled: true } } });
     await prisma.auditLog.create({ data: { userId: user.id, action: "profile.iphone-melder", entity: "SearchProfile", entityId: r.id } });

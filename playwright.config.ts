@@ -28,6 +28,7 @@ export default defineConfig({
       APP_SECRET: "e2e-secret-e2e-secret-e2e-secret-0123456789",
       CRON_SECRET: "e2e-cron-secret-1234567890",
       INSECURE_COOKIES: "1",
+      ALLOW_CUSTOM_PROFILES: "1", // de bestaande browsertests maken zelf profielen aan; in productie staat dit niet aan
       NODE_ENV: "production",
     },
   },

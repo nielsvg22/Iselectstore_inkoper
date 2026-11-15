@@ -2,6 +2,7 @@ import { readJson, route } from "@/lib/api";
 import { prisma } from "@/lib/db/client";
 import { saveTree } from "@/lib/pipeline/tree";
 import { profileInput } from "@/lib/profile-schema";
+import { assertCustomProfilesAllowed } from "@/lib/profile-lock";
 
 export const GET = route(async (_req, { user }) => {
   const profiles = await prisma.searchProfile.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" } });
@@ -9,6 +10,7 @@ export const GET = route(async (_req, { user }) => {
 });
 
 export const POST = route(async (req, { user }) => {
+  assertCustomProfilesAllowed();
   const { tree, ...input } = await readJson(req, profileInput);
   const p = await prisma.searchProfile.create({ data: { ...input, sourceConfig: input.sourceConfig as object, userId: user.id } });
   await saveTree(p.id, tree);

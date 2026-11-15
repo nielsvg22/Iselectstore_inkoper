@@ -152,17 +152,17 @@ export function ActionPill({ badge }: { badge: DealBadgeInfo }) {
 /* ----------------------------------- banner ----------------------------------- */
 export function CtaBanner() {
   return (
-    <section className="relative overflow-hidden rounded-[26px] bg-navy-2 px-7 py-6 text-white sm:px-8" aria-label="Nieuwe zoekopdracht">
+    <section className="relative overflow-hidden rounded-[26px] bg-navy-2 px-7 py-6 text-white sm:px-8" aria-label="Zoekprofiel">
       <div className="relative flex flex-col items-start gap-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-5">
           <LogoMark size={52} tile />
           <div>
             <h2 className="text-[18px] font-semibold tracking-tight">Laat de tool voor jou werken</h2>
-            <p className="mt-0.5 text-[14px] text-white/70">Stel je zoekopdrachten in en ontvang direct meldingen bij de beste deals.</p>
+            <p className="mt-0.5 text-[14px] text-white/70">Het zoekprofiel staat vast ingesteld; je ontvangt direct meldingen bij de beste deals.</p>
           </div>
         </div>
-        <Link href="/profiles/new" className="inline-flex h-12 items-center gap-3 rounded-[16px] bg-gradient-to-r from-[#F9858B] to-[#EF6570] px-7 text-[15px] font-semibold text-white transition hover:brightness-105 active:scale-[0.98]">
-          Nieuwe zoekopdracht aanmaken <ArrowRight className="h-5 w-5" />
+        <Link href="/profiles" className="inline-flex h-12 items-center gap-3 rounded-[16px] bg-gradient-to-r from-[#F9858B] to-[#EF6570] px-7 text-[15px] font-semibold text-white transition hover:brightness-105 active:scale-[0.98]">
+          Zoekprofiel bekijken <ArrowRight className="h-5 w-5" />
         </Link>
       </div>
     </section>

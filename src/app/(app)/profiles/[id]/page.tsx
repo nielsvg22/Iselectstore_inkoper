@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { customProfilesAllowed } from "@/lib/profile-lock";
 import { notFound } from "next/navigation";
 import { ProfileEditor } from "@/components/profile/profile-editor";
 import type { Group } from "@/lib/engines/filters";
@@ -12,6 +14,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Zoekprofiel bewerken" };
 
 export default async function EditProfilePage({ params }: { params: Promise<{ id: string }> }) {
+  if (!customProfilesAllowed()) redirect("/profiles"); // het zoekprofiel staat vast
   const { id } = await params;
   const user = await getCurrentUser();
   const [p, saved, cats] = await Promise.all([prisma.searchProfile.findUnique({ where: { id } }), prisma.savedFilter.findMany({ where: { userId: user!.id }, orderBy: { name: "asc" } }), getAppleCategories()]);

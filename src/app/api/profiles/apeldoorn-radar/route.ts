@@ -1,9 +1,13 @@
 import { route } from "@/lib/api";
 import { installApeldoornRadar } from "@/lib/radar/provision";
+import { assertCustomProfilesAllowed } from "@/lib/profile-lock";
 
 /** Eenmalige, expliciete vervanging; back-up gebeurt vóór verwijderen. */
 export const POST = route(
-  async (_req, { user }) => await installApeldoornRadar(user.id),
+  async (_req, { user }) => {
+    assertCustomProfilesAllowed();
+    return installApeldoornRadar(user.id);
+  },
   { admin: true },
 );
 
@@ -20,6 +24,7 @@ export const GET = route(
 
 export const PATCH = route(
   async (req, { user }) => {
+    assertCustomProfilesAllowed();
     const { readJson } = await import("@/lib/api");
     const { z } = await import("zod");
     const { restoreRadarProfiles } = await import("@/lib/radar/provision");

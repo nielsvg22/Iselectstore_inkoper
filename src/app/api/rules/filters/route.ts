@@ -2,6 +2,7 @@ import { z } from "zod";
 import { route, readJson } from "@/lib/api";
 import { getFilters, parseFiltersText, saveFilters } from "@/lib/rules/filters";
 import { clearRulesCache } from "@/lib/rules/apply";
+import { ensureTwanProfiles } from "@/lib/radar/twan-profile";
 
 export const GET = route(async () => ({ filters: await getFilters() }));
 
@@ -10,6 +11,7 @@ export const PUT = route(async (req, { user }) => {
   const body = await readJson(req, z.object({ filters: z.array(z.unknown()), reason: z.string().max(100).optional() }));
   const filters = await saveFilters(body.filters, user.id, body.reason ?? "handmatig");
   clearRulesCache();
+  await ensureTwanProfiles(user.id).catch(() => undefined); // het zoekprofiel volgt de lijst direct
   return { filters };
 }, { admin: true });
 

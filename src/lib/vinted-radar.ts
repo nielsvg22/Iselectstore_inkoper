@@ -2,8 +2,8 @@ import { z } from "zod";
 import { prisma } from "./db/client";
 import { getCooldown } from "./jobs/cooldown";
 import { saveTree } from "./pipeline/tree";
-import { getFilters } from "./rules/filters";
-import { modelByKey } from "./catalog/apple";
+import { customProfilesAllowed } from "./profile-lock";
+import { twanScope } from "./radar/twan-scope";
 import { saveConfig, getConfig } from "./settings/store";
 
 export const vintedRadarInput = z.object({
@@ -16,18 +16,9 @@ export const vintedRadarInput = z.object({
   priceTo: z.number().min(0).max(100000).nullable().optional(),
 });
 
-/** Zoektermen per productgroep uit de actieve modellenlijst: nieuwste eerst per categorie (de modelfilters zitten in onze eigen keten). */
+/** Zoektermen volgen uit de modellenlijst (zelfde als Marktplaats); eigen zoektermen kunnen niet meer worden ingesteld. */
 export async function defaultVintedQueries(): Promise<string[]> {
-  const active = (await getFilters()).filter((f) => f.active);
-  const fams = new Set(active.map((f) => modelByKey(f.modelKey)?.family).filter(Boolean));
-  const q: string[] = [];
-  if (!active.length || fams.has("iphone")) q.push("iphone");
-  if (fams.has("ipad")) q.push("ipad");
-  if (fams.has("macbook_air") || fams.has("macbook_pro") || fams.has("macbook")) q.push("macbook");
-  if (fams.has("mac_mini") || fams.has("imac") || fams.has("mac_studio")) q.push("mac mini", "imac");
-  if (fams.has("watch")) q.push("apple watch");
-  if (fams.has("airpods")) q.push("airpods");
-  return q.length ? q : ["iphone"];
+  return (await twanScope()).queries;
 }
 
 /** Maakt of werkt het Vinted-zoekprofiel bij (één per gebruiker) en past de Vinted-schaalinstellingen toe. Idempotent. */
@@ -40,7 +31,7 @@ export async function provisionVintedRadar(userId: string, input: z.infer<typeof
       ...(input.pages ? { pages: input.pages } : {}),
     } },
   });
-  const queries = input.queries?.length ? input.queries : await defaultVintedQueries();
+  const queries = customProfilesAllowed() && input.queries?.length ? input.queries : await defaultVintedQueries();
   const existing = (await prisma.searchProfile.findMany({ where: { userId, sourceKind: "SEARCH" } })).find((p) => (p.sourceConfig as { platform?: string } | null)?.platform === "vinted");
   const sourceConfig = {
     ...((existing?.sourceConfig ?? {}) as object),

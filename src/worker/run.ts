@@ -5,6 +5,7 @@ import { processJobs } from "../lib/jobs/queue";
 import { prisma } from "../lib/db/client";
 import { pollMailbox } from "../lib/mail/poll";
 import { installApeldoornRadar } from "../lib/radar/provision";
+import { ensureTwanProfiles } from "../lib/radar/twan-profile";
 import { getConfig } from "../lib/settings/store";
 import { jobLanes } from "../lib/jobs/lanes";
 import { upgradeRadarPolling } from "../lib/radar/fast-polling";
@@ -68,10 +69,27 @@ async function rulesLoop() {
   }
 }
 
+/** Houdt het zoekprofiel vast zoals Twan het wil: één profiel per platform, volgens de modellenlijst; eigen profielen worden gepauzeerd. */
+async function twanProfileLoop() {
+  while (!stop) {
+    try {
+      const admin = await prisma.user.findFirst({ where: { role: "ADMIN" }, orderBy: { createdAt: "asc" } });
+      if (admin) {
+        const r = await ensureTwanProfiles(admin.id);
+        if (r.updated.length || r.deactivated) console.log(`[worker] zoekprofiel bijgewerkt: ${r.updated.join(", ") || "-"}; eigen profielen gepauzeerd: ${r.deactivated}`);
+      }
+    } catch (e) {
+      console.error("[worker] zoekprofiel controleren mislukt:", (e as Error).message);
+    }
+    await new Promise((r) => setTimeout(r, 60_000).unref());
+  }
+}
+
 async function main() {
   console.log(`[worker] gestart, wachttijd bij leegloop ${idleMs / 1000}s`);
   void mailLoop();
   void rulesLoop();
+  void twanProfileLoop();
   // Standaardprofielen (iPhone-melder) automatisch aanmaken zodra er een beheerder is; controleert periodiek tot dat gelukt is
   const provision = async () => {
     try {

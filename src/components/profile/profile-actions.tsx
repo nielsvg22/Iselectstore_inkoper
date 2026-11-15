@@ -7,16 +7,20 @@ import { useToast } from "@/components/toast";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/client-api";
 
-export function ProfileActions({ id, active, runnable }: { id: string; active: boolean; runnable: boolean }) {
+export function ProfileActions({ id, active, runnable, locked = false }: { id: string; active: boolean; runnable: boolean; locked?: boolean }) {
   const router = useRouter();
   const toast = useToast();
   const [busy, setBusy] = React.useState<string | null>(null);
   async function toggle() {
     setBusy("toggle");
     try {
-      const { profile, tree } = await api<{ profile: Record<string, unknown>; tree: unknown }>(`/api/profiles/${id}`);
-      const p = profile as { name: string; query: string; sourceKind: string; sourceConfig: unknown; intervalMinutes: number; notifyEnabled: boolean; notifyChannels: string[]; notifyMinScore: number; prioritizeNew: boolean };
-      await api(`/api/profiles/${id}`, { method: "PUT", body: { name: p.name, query: p.query, sourceKind: p.sourceKind, sourceConfig: p.sourceConfig, intervalMinutes: p.intervalMinutes, notifyEnabled: p.notifyEnabled, notifyChannels: p.notifyChannels, notifyMinScore: p.notifyMinScore, prioritizeNew: p.prioritizeNew, active: !active, tree } });
+      // vast profiel: alleen pauzeren/activeren (PATCH); een eigen profiel (alleen test/ontwikkeling) wordt volledig bijgewerkt
+      if (locked) await api(`/api/profiles/${id}`, { method: "PATCH", body: { active: !active } });
+      else {
+        const { profile, tree } = await api<{ profile: Record<string, unknown>; tree: unknown }>(`/api/profiles/${id}`);
+        const p = profile as { name: string; query: string; sourceKind: string; sourceConfig: unknown; intervalMinutes: number; notifyEnabled: boolean; notifyChannels: string[]; notifyMinScore: number; prioritizeNew: boolean };
+        await api(`/api/profiles/${id}`, { method: "PUT", body: { name: p.name, query: p.query, sourceKind: p.sourceKind, sourceConfig: p.sourceConfig, intervalMinutes: p.intervalMinutes, notifyEnabled: p.notifyEnabled, notifyChannels: p.notifyChannels, notifyMinScore: p.notifyMinScore, prioritizeNew: p.prioritizeNew, active: !active, tree } });
+      }
       toast(active ? "Profiel gepauzeerd" : "Profiel geactiveerd");
       router.refresh();
     } catch (e) {
@@ -48,8 +52,9 @@ export function ProfileActions({ id, active, runnable }: { id: string; active: b
           <Play className="h-3.5 w-3.5" />Nu controleren
         </Button>
       )}
-      <Link href={`/profiles/${id}`}><Button size="sm" variant="secondary"><Pencil className="h-3.5 w-3.5" />Bewerken</Button></Link>
+      {!locked && <Link href={`/profiles/${id}`}><Button size="sm" variant="secondary"><Pencil className="h-3.5 w-3.5" />Bewerken</Button></Link>}
       <Button size="sm" variant="outline" loading={busy === "toggle"} onClick={toggle}>{active ? <><Pause className="h-3.5 w-3.5" />Pauzeren</> : <><Play className="h-3.5 w-3.5" />Activeren</>}</Button>
+      {!locked && (
       <Button
         size="sm"
         variant="ghost"
@@ -67,6 +72,7 @@ export function ProfileActions({ id, active, runnable }: { id: string; active: b
       >
         <Trash2 className="h-3.5 w-3.5 text-danger" />
       </Button>
+      )}
     </div>
   );
 }

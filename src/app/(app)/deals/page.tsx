@@ -80,7 +80,7 @@ async function Deals({ sp, userId }: { sp: Awaited<SP>; userId: string }) {
         action={
           <>
             <Link href="/import"><Button>Advertenties importeren</Button></Link>
-            <Link href="/profiles/new"><Button variant="outline">Zoekprofiel maken</Button></Link>
+            <Link href="/profiles"><Button variant="outline">Zoekprofiel bekijken</Button></Link>
           </>
         }
       />
