@@ -27,6 +27,8 @@ services:
       VAPID_SUBJECT: ${VAPID_SUBJECT:-}
       WORKER_INTERVAL_SECONDS: ${WORKER_INTERVAL_SECONDS:-5}
       WORKER_SCRAPING: ${WORKER_SCRAPING:-off}
+      # welke platformen zoeken: vinted | marktplaats | marktplaats,vinted | geen (leeg = de app bepaalt zelf)
+      ACTIVE_PLATFORMS: ${ACTIVE_PLATFORMS:-}
     expose: ["3000"]
 
   worker:

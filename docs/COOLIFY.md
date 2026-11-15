@@ -18,3 +18,21 @@ De service `worker` heeft een healthcheck via `scripts/worker-health.ts` en schr
 Vercel biedt de webinterface en dagelijkse cron, geen permanente worker. De Vercel-build wijzigt de database niet meer. Pas migraties uitsluitend toe als aparte release-stap tegen de juiste database. De centrale request-gate deelt de bron-pacing tussen web, worker en cron; meerdere workers verhogen het toegestane requestbudget niet.
 
 Voor een serververificatie zijn het echte Coolify-project, de VPS-host en ingestelde toegang nodig. GitHub Preview-deployments bewijzen niet dat de worker op de VPS actief is. Na aanvullende toestemming is de featurebranch op 2026-10-17 succesvol op de bestaande Coolify-app uitgerold. Zie de aantallen, back-uplocatie en healthchecks in het implementatierapport.
+
+## Platformen aan of uit zetten (testomgeving)
+
+Met de omgevingsvariabele `ACTIVE_PLATFORMS` bepaal je zonder inlog welke platformen zoeken:
+
+| Waarde | Effect |
+|---|---|
+| `vinted` | Marktplaats gepauzeerd, Vinted aan |
+| `marktplaats` | Marktplaats aan, Vinted uit |
+| `marktplaats,vinted` | Beide aan |
+| `geen` | Beide uit |
+| leeg of niet gezet | Niets doen: de app bepaalt zelf (knoppen in het scherm) |
+
+- De worker past de waarde **één keer per wijziging** toe (binnen ongeveer een minuut na de herstart). Daarna kan een beheerder in de app nog bijsturen; pas een nieuwe waarde schakelt opnieuw.
+- Marktplaats uit = het vaste zoekprofiel wordt **gepauzeerd**, niet verwijderd. Vinted aan maakt het Vinted-profiel aan als het nog niet bestaat.
+- Een onbekend woord (typefout) wordt genegeerd; er verandert dan niets.
+- `WORKER_SCRAPING=off` blijft de noodstop voor al het zoeken.
+- Vinted heeft eigen gebruiksvoorwaarden; zie `docs/VINTED-EN-FILTERS.md`.
