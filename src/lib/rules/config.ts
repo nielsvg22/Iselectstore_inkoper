@@ -48,8 +48,8 @@ export const rulesSchema = z.object({
   replaceDistancePolicy: z.boolean().default(false),
   /** alleen iPhones vanaf deze generatie inkopen (14 = iPhone 14 en nieuwer, dus ook 16e en Air; SE en 13 en ouder vallen af). 0 = alle modellen */
   minIphoneGeneration: num(0),
-  /** A/B = oude tabellen; TWAN = nieuwste tabel van Twan (vraag, bieden, extra) */
-  marginTable: z.enum(["A", "B", "TWAN"]).default("TWAN"),
+  /** A = tabel uit het document/de mail (standaard); B = tabel van de 💰-indicator; TWAN = alternatieve tabel uit Twans code (alleen als keuze) */
+  marginTable: z.enum(["A", "B", "TWAN"]).default("A"),
   /** hoge-marge extra: "same" = de extra van de vraagprijs-kolom voor beide (zoals in het voorbeeld), "table" = eigen kolom per soort */
   highMarginBidMode: z.enum(["same", "table"]).default("same"),
   highMargin: z.object({
@@ -61,8 +61,8 @@ export const rulesSchema = z.object({
   }).default({}),
   battery: z.object({
     excludeBelowPct: num(80),
-    /** aftrek t.o.v. 100% batterij: "twan" = tabel van Twan (strenger), "standard" = oude tabel */
-    table: z.enum(["standard", "twan"]).default("twan"),
+    /** aftrek t.o.v. 100% batterij: "standard" = tabel uit het document (standaard); "twan" = strengere tabel uit Twans code (alleen als keuze) */
+    table: z.enum(["standard", "twan"]).default("standard"),
     /** batterij onbekend → schatten op leeftijd van het model */
     assumeFromAge: z.boolean().default(true),
     fullUntilMonths: num(6),
@@ -273,7 +273,7 @@ const PRICES_KEY = "rules:bbp:prices";
 const HISTORY_ACTION = "rules.prices_changed";
 
 /** Huidige versie van de voorinstelling van Twan. Bij een hoger getal wordt ze één keer opnieuw toegepast. */
-export const TWAN_PRESET_VERSION = 4;
+export const TWAN_PRESET_VERSION = 5;
 
 /**
  * Zet de instellingen zoals Twan ze heeft aangegeven: margetabel (vraag/bieden/extra), batterijaftrek, waarderen vanaf de
@@ -285,10 +285,10 @@ export function applyTwanPreset(c: RulesConfig): RulesConfig {
     ...c,
     presetVersion: TWAN_PRESET_VERSION,
     priceBase: "sell",
-    marginTable: "TWAN",
+    marginTable: "A", // tabel uit Twans document; de extra is voor vraag en bieden gelijk
     highMarginBidMode: "same",
     highMargin: { ...c.highMargin, enabled: true },
-    battery: { ...c.battery, table: "twan", assumeFromAge: true, excludeBelowPct: 80 },
+    battery: { ...c.battery, table: "standard", assumeFromAge: true, excludeBelowPct: 80 },
     bid: { ...c.bid, requireKnownPriceSeries: c.bid.requireKnownPriceSeries.length ? c.bid.requireKnownPriceSeries : ["iphone-15"] },
     minPrice: { ...c.minPrice, globalEuro: Math.max(c.minPrice.globalEuro, 50) },
     dynamic: { ...c.dynamic, presets: { marktplaats: "normaal", vinted: "normaal" } },

@@ -354,8 +354,8 @@ describe("voorinstelling van Twan", () => {
   it("overschrijft een oude opgeslagen configuratie met Twans waarden", () => {
     const old = { ...defaultRules(), marginTable: "A" as const, priceBase: "buy85" as const, battery: { ...defaultRules().battery, table: "standard" as const, assumeFromAge: false }, highMargin: { ...defaultRules().highMargin, enabled: false }, bid: { ...defaultRules().bid, requireKnownPriceSeries: [] }, dynamic: { ...defaultRules().dynamic, presets: { marktplaats: "druk" as const, vinted: "druk" as const } }, minPrice: { ...defaultRules().minPrice, globalEuro: 0 } };
     const c = applyTwanPreset(old);
-    expect(c).toMatchObject({ presetVersion: TWAN_PRESET_VERSION, priceBase: "sell", marginTable: "TWAN", highMarginBidMode: "same" });
-    expect(c.battery).toMatchObject({ table: "twan", assumeFromAge: true, excludeBelowPct: 80 });
+    expect(c).toMatchObject({ presetVersion: TWAN_PRESET_VERSION, priceBase: "sell", marginTable: "A", highMarginBidMode: "same" });
+    expect(c.battery).toMatchObject({ table: "standard", assumeFromAge: true, excludeBelowPct: 80 });
     expect(c.highMargin.enabled).toBe(true);
     expect(c.bid.requireKnownPriceSeries).toEqual(["iphone-15"]);
     expect(c.minPrice.globalEuro).toBe(50);
@@ -398,5 +398,38 @@ describe("onlogisch lage prijs", () => {
     expect(evaluateRules(input({ distanceKm: 5, seller, askEuro: 90 }), PRICES, off).flags).not.toContain("priceTooLow");
     const strict = { ...cfg, minPrice: { ...cfg.minPrice, lowPricePct: 70 } };
     expect(evaluateRules(input({ distanceKm: 5, seller, askEuro: 200 }), PRICES, strict).flags).toContain("priceTooLow");
+  });
+});
+
+describe("uit Twans document", () => {
+  it("bieden vanaf: verschil van 250 of meer geeft het gemiddelde (>= 250)", () => {
+    const c = defaultRules().bid;
+    expect(assessBid(1200, 800, c)).toMatchObject({ effectiveEuro: 1000, realistic: false }); // voorbeeld 16 Pro 256GB
+    expect(assessBid(1000, 750, c)).toMatchObject({ effectiveEuro: 875, realistic: false }); // verschil precies 250
+    expect(assessBid(250, 150, c)).toMatchObject({ effectiveEuro: 200, realistic: false }); // 13 Mini: 60%
+    expect(assessBid(280, 168, c)).toMatchObject({ effectiveEuro: 224 }); // iPhone 13: 60%
+    expect(assessBid(450, 400, c)).toMatchObject({ effectiveEuro: 400, realistic: true }); // minder dan 50 van de vraagprijs: realistisch
+    expect(assessBid(1200, 951, c)).toMatchObject({ realistic: true }); // verschil 249
+  });
+  it("rekent het e-mailvoorbeeld uit het document na: 360 − 50 − 50 = 260; vraag 185, bieden 165, hoge marge 155 / 135", () => {
+    const a = allowedPrices(260, { marginTable: "A", highMarginBidMode: "same" });
+    expect([a.allowedAsk, a.allowedBid, a.highAsk, a.highBid]).toEqual([185, 165, 155, 135]);
+  });
+});
+
+describe("standaard volgens het document", () => {
+  it("margetabel A, batterijaftrek uit het document, verzenden vanaf 2 jaar", () => {
+    const c = applyTwanPreset(defaultRules());
+    expect(c.marginTable).toBe("A");
+    expect(c.highMarginBidMode).toBe("same");
+    expect(batteryDeductionEuro(90, c.battery.table)).toBe(75);
+    expect(batteryDeductionEuro(80, c.battery.table)).toBe(125);
+    expect(c.shipping.neverBelowMonths).toBe(24);
+    expect(c.shipping.tiers.map((t) => [t.fromMonths, t.minReviews, t.minRating, t.requireVerified])).toEqual([[24, 30, 5, true], [36, 20, 4.5, true], [60, 8, 4.5, false], [96, 3, 4.5, false], [120, 2, 4.5, false]]);
+    expect(c.highMargin).toMatchObject({ enabled: true, minAskMarginEuro: 80, minBidMarginEuro: 100 });
+    expect(c.battery).toMatchObject({ excludeBelowPct: 80, fullUntilMonths: 6, dropPerMonthPct: 1, floorPct: 82 });
+    expect(c.bid).toMatchObject({ minShareOfAsk: 0.65, maxGapEuro: 250 });
+    expect(c.distance).toMatchObject({ pickupMaxKm: 50, newestProMaxKm: 50, maxKmDefault: 300, perKmEuro: 1 });
+    expect(c.minPrice).toMatchObject({ newerEuro: 70, olderEuro: 50 });
   });
 });

@@ -41,8 +41,8 @@ test("Twan-voorinstelling staat er vanzelf in en de margeknop werkt per platform
   await expect(page.getByRole("group", { name: "Margestand Vinted" }).getByRole("button", { name: /Rustig/ })).toBeEnabled();
 
   // de voorinstelling van Twan is zonder handmatig werk toegepast
-  await expect(page.getByLabel("Margetabel")).toHaveValue("TWAN");
-  await expect(page.getByLabel("Batterijaftrek-tabel")).toHaveValue("twan");
+  await expect(page.getByLabel("Margetabel")).toHaveValue("A");
+  await expect(page.getByLabel("Batterijaftrek-tabel")).toHaveValue("standard");
   await expect(page.getByLabel("Alleen met bekende prijs (series)")).toHaveValue("iphone-15");
   await expect(page.getByLabel(/Onlogisch lage prijs/)).toHaveValue("35");
   await expect(page.getByLabel(/Minimumprijs voor alle advertenties/)).toHaveValue("50");

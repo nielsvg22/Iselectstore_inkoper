@@ -18,7 +18,7 @@ export function assessBid(askEuro: number, bidEuro: number, cfg: RulesConfig["bi
   if (bidEuro >= askEuro) return { effectiveEuro: askEuro, realistic: true, adjusted: false, note: "Bieden vanaf gelijk aan vraagprijs" };
   const share = bidEuro / askEuro;
   const gap = askEuro - bidEuro;
-  if (share < cfg.minShareOfAsk || gap > cfg.maxGapEuro) {
+  if (share < cfg.minShareOfAsk || gap >= cfg.maxGapEuro) {
     const avg = Math.round((askEuro + bidEuro) / 2);
     const why = share < cfg.minShareOfAsk ? `bieden vanaf is ${Math.round(share * 100)}% van de vraagprijs (door Marktplaats ingevuld)` : `gat van €${Math.round(gap)} tussen vraag en bieden vanaf`;
     return { effectiveEuro: avg, realistic: false, adjusted: true, note: `Gemiddelde €${avg} gebruikt: ${why}` };

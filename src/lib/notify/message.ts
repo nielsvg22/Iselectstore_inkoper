@@ -75,6 +75,7 @@ export function rulesLines(r: RulesSummary): string[] {
   if (r.marginEuro != null) out.push(`Marge op deze prijs: ${eur0(r.marginEuro)}`);
   if (r.battery.assumed && r.battery.pct != null) out.push(`Batterij onbekend: ${r.battery.pct}% aangenomen`);
   if (r.flags.includes("storageUnknown")) out.push("Opslag onbekend (?): gemiddelde prijs gebruikt");
+  if (r.flags.includes("batteryUnknown")) out.push("Batterij onbekend (?): niet in de prijs verwerkt");
   if (r.flags.includes("sellerCheck")) out.push("Verkoper handmatig controleren");
   return out;
 }
@@ -199,7 +200,7 @@ export function buildPushPayload(
     lines.splice(1, 1, `Max ${eur0(m.rules.maxSellEuro)} · toegestaan vraag ${eur0(m.rules.allowedAsk)} / bieden ${eur0(m.rules.allowedBid)}${m.rules.marginEuro != null ? ` · marge ${eur0(m.rules.marginEuro)}` : ""}`);
   }
   return {
-    title: `${prefix}${name}${m.rules?.flags.includes("storageUnknown") ? "?" : ""}${rulesEmoji(m.rules) ? " " + rulesEmoji(m.rules) : ""}`,
+    title: `${prefix}${name}${m.rules?.flags.some((f) => f === "storageUnknown" || f === "batteryUnknown" || f === "batteryAssumed") ? "?" : ""}${rulesEmoji(m.rules) ? " " + rulesEmoji(m.rules) : ""}`,
     body: lines.join("\n"),
     url: portalPath,
     tag: m.adId ? `ad-${m.adId}` : "deal",
