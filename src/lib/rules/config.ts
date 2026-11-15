@@ -232,6 +232,13 @@ export const rulesSchema = z.object({
     minReviews: num(0),
     unknownPolicy: z.enum(["show", "exclude", "mark"]).default("show"),
   }).default({}),
+  /** Betrouwbare verkoper op Vinted: alles gaat daar via verzenden en Vinted geeft geen accountleeftijd, dus beoordeling en aantal reviews (niet uit het document: keuze van de opdrachtgever) */
+  vintedSeller: z.object({
+    minRating: z.number().min(0).max(5).default(4.5),
+    minReviews: z.number().int().min(0).max(100000).default(8),
+    /** verkoper zonder beoordelingen (nieuw of onbekend) */
+    unknownPolicy: z.enum(["show", "exclude", "mark"]).default("exclude"),
+  }).default({}),
   /** zoekfilters van de klant (lijst met model/opslag/conditie/prijs/afstand per regel) */
   filters: z.object({
     enabled: z.boolean().default(false),
@@ -297,6 +304,7 @@ export function applyTwanPreset(c: RulesConfig): RulesConfig {
     minIphoneGeneration: 14,
     // Twans afstandsregel (verder dan 50 km alleen bij een betrouwbare verkoper) beslist; het oudere rijtijd-/afstandsbeleid loopt er niet meer naast
     replaceDistancePolicy: true,
+    vintedSeller: { ...c.vintedSeller },
     // nieuwe standaardwoorden voor accessoires (funda, carcasa, …) toevoegen aan de opgeslagen lijst; eigen woorden blijven staan
     accessories: { ...c.accessories, terms: [...new Set([...c.accessories.terms, ...DEFAULT_ACCESSORY_TERMS])] },
   };

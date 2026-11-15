@@ -11,6 +11,8 @@ import { analyzeScratch, type ScratchState } from "./scratch";
 import { shippingEligibility, type SellerFacts, type ShipResult } from "./shipping";
 
 export interface VerdictInput {
+  /** false = de volledige advertentiepagina is nog niet opgehaald (voorlopig oordeel); leeg = wel/onbekend */
+  detailLoaded?: boolean;
   modelKey: string;
   modelLabel: string;
   family: string;
@@ -257,6 +259,19 @@ export function evaluateRules(i: VerdictInput, prices: BasePrice[], cfg: RulesCo
       if (!req) continue;
       if (val === false) return reject(`${what} is bij deze advertentie niet beschikbaar`, "protection");
       if (val == null) { const r = unknown(cfg.protection.unknownPolicy, what, "protection", flag); if (r) return r; }
+    }
+  }
+  // Vinted: alles gaat via verzenden, dus alleen betrouwbare verkopers (beoordeling en aantal reviews; accountleeftijd levert Vinted niet)
+  if (platform === "vinted") {
+    const vs = cfg.vintedSeller;
+    if (vs.minRating > 0 || vs.minReviews > 0) {
+      const { rating, reviews } = i.seller;
+      if (rating != null && vs.minRating > 0 && rating < vs.minRating) return reject(`Vinted-verkoper heeft ${String(rating).replace(".", ",")} sterren, minimaal ${String(vs.minRating).replace(".", ",")}`, "seller-filter");
+      if (reviews != null && vs.minReviews > 0 && reviews < vs.minReviews) return reject(`Vinted-verkoper heeft ${reviews} beoordelingen, minimaal ${vs.minReviews}`, "seller-filter");
+      if ((rating == null && vs.minRating > 0) || (reviews == null && vs.minReviews > 0)) {
+        // vóór de advertentiepagina is de verkoper nog onbekend: voorlopig markeren, pas daarna uitsluiten
+        const policy = i.detailLoaded === false && vs.unknownPolicy === "exclude" ? "mark" : vs.unknownPolicy;
+        const r = unknown(policy, "Verkopersbeoordeling op Vinted", "seller-filter", "sellerCheck"); if (r) return r; }
     }
   }
   const sf = cfg.sellerFilter;

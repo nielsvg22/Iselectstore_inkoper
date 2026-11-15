@@ -10,6 +10,7 @@ import { adapterForProfile } from "../sources/adapters";
 import { bumpPrefilterStats } from "../rules/prefilter-stats";
 import { getRules } from "../rules/config";
 import { getFilters } from "../rules/filters";
+import { loadSellerReputation } from "../radar/seller-gate";
 import { fetchVintedDetail, platformOf } from "../sources/vinted-search";
 import { officialAdapter, officialReady, OFFICIAL_SOURCE } from "../sources/marktplaats-official";
 import { planSmartUnits, smartPageBudget } from "../sources/smart-plan";
@@ -136,7 +137,7 @@ export async function runProfileCheck(
     const dropped: Record<string, number> = {};
     // alleen zoeken wat de klant heeft aangegeven: modellen uit de modellenlijst en iPhones vanaf de ingestelde generatie
     const listed = rulesCfg?.enabled && rulesCfg.filters.enabled && rulesCfg.filters.outsideList === "reject" ? (await getFilters()).filter((f) => f.active) : [];
-    const scope = rulesCfg?.enabled ? { allowedModelKeys: listed.length ? new Set(listed.map((f) => f.modelKey)) : null, minIphoneGeneration: rulesCfg.minIphoneGeneration, minPrice: rulesCfg.minPrice } : undefined;
+    const scope = rulesCfg?.enabled ? { allowedModelKeys: listed.length ? new Set(listed.map((f) => f.modelKey)) : null, minIphoneGeneration: rulesCfg.minIphoneGeneration, minPrice: rulesCfg.minPrice, sellers: { platform, reputation: await loadSellerReputation(platform), distance: rulesCfg.distance, shipping: rulesCfg.shipping, vintedSeller: rulesCfg.vintedSeller, now: new Date() } } : undefined;
     const prefilter = tree
       ? buildPrefilter(tree, { accessories: rulesCfg?.enabled ? rulesCfg.accessories : undefined, scope, onDrop: (r) => { dropped[r] = (dropped[r] ?? 0) + 1; } })
       : undefined;

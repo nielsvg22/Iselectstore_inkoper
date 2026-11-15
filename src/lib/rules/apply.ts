@@ -46,6 +46,8 @@ export interface AdForRules {
   sellerSignals: unknown;
   conditionText: string | null;
   rawPayload: unknown;
+  /** wanneer de volledige advertentiepagina is opgehaald; leeg = nog niet (dan zijn verkopergegevens nog onbekend) */
+  detailFetchedAt?: Date | null;
 }
 
 const numOrNull = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
@@ -111,6 +113,7 @@ export function buildVerdictInput(a: {
     electronicsVerification: attrs.electronicsVerification === "yes" ? true : attrs.electronicsVerification === "no" ? false : null,
     listedProtectionCents: numOrNull(attrs.buyerProtectionCents),
     listedShippingCents: numOrNull(attrs.shippingCents),
+    detailLoaded: a.ad.detailFetchedAt === undefined ? undefined : a.ad.detailFetchedAt != null,
     batteryEvidence: typeof a.rec.facts.batteryHealth?.evidence === "string" ? a.rec.facts.batteryHealth.evidence : null,
   };
   return { input, textPrices };

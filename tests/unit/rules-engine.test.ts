@@ -433,3 +433,30 @@ describe("standaard volgens het document", () => {
     expect(c.minPrice).toMatchObject({ newerEuro: 70, olderEuro: 50 });
   });
 });
+
+describe("Vinted: betrouwbare verkoper (beoordeling en reviews)", () => {
+  const v = (seller: { rating: number | null; reviews: number | null }, o: Partial<VerdictInput> = {}) =>
+    evaluateRules(input({ platform: "vinted", distanceKm: null, seller: { ageMonths: null, verified: null, ...seller }, ...o }), PRICES, cfg);
+  it("onder 4,5 sterren of onder 8 reviews valt af", () => {
+    expect(v({ rating: 4.4, reviews: 50 })).toMatchObject({ status: "reject", decidedBy: "seller-filter" });
+    expect(v({ rating: 4.9, reviews: 7 })).toMatchObject({ status: "reject", decidedBy: "seller-filter" });
+    expect(v({ rating: 4.5, reviews: 8 }).decidedBy).not.toBe("seller-filter");
+  });
+  it("een verkoper zonder beoordelingen valt af (standaard: onbekend uitsluiten)", () => {
+    expect(v({ rating: null, reviews: null })).toMatchObject({ status: "reject", decidedBy: "seller-filter" });
+  });
+  it("voorlopig oordeel (advertentiepagina nog niet opgehaald): onbekend wordt gemarkeerd, niet uitgesloten", () => {
+    const r = v({ rating: null, reviews: null }, { detailLoaded: false });
+    expect(r.status).not.toBe("reject");
+    expect(r.flags).toContain("sellerCheck");
+    expect(v({ rating: null, reviews: null }, { detailLoaded: true }).status).toBe("reject");
+  });
+  it("onbekend kan ook gemarkeerd of getoond worden", () => {
+    const mark = evaluateRules(input({ platform: "vinted", distanceKm: null, seller: { ageMonths: null, verified: null, rating: null, reviews: null } }), PRICES, { ...cfg, vintedSeller: { ...cfg.vintedSeller, unknownPolicy: "mark" as const } });
+    expect(mark.flags).toContain("sellerCheck");
+    expect(mark.status).not.toBe("reject");
+  });
+  it("geldt niet voor Marktplaats", () => {
+    expect(evaluateRules(input({ distanceKm: 5, seller: { ageMonths: 60, reviews: 2, rating: 3, verified: true } }), PRICES, cfg).decidedBy).not.toBe("seller-filter");
+  });
+});

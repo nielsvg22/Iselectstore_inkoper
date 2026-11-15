@@ -1,6 +1,7 @@
 import { recognizeByRules } from "../engines/recognition";
 import { belowMinIphone, minPriceEuro } from "../rules/release";
 import type { RulesConfig } from "../rules/config";
+import { sellerDropReason, type SellerGate } from "../radar/seller-gate";
 import { classifyAccessory, type AccessoryConfig } from "../rules/accessory";
 import { isGroup, type Group } from "../engines/filters";
 import type { RawAd } from "./types";
@@ -42,6 +43,8 @@ export interface PrefilterScope {
   minIphoneGeneration?: number;
   /** minimumprijzen: een vaste vraagprijs eronder (hoesje, kabel) komt er niet in; "bieden vanaf" telt niet mee */
   minPrice?: RulesConfig["minPrice"];
+  /** afstand en betrouwbare verkoper (Twans verzendfilter) al bij het zoeken, voor zover de gegevens bekend zijn */
+  sellers?: SellerGate;
 }
 /** Woorden die erop wijzen dat het om een Apple-product gaat; zonder herkend model en zonder zo'n woord is het geen Apple (bijv. een slimme ring). */
 const APPLE_WORD = /\b(iphone|ipad|macbook|imac|mac\s?mini|mac\s?studio|apple|airpods?|ipod)\b/i;
@@ -69,6 +72,10 @@ export function buildPrefilter(tree: Group, opts: { accessories?: AccessoryConfi
       if (opts.scope.minPrice && ad.askingCents != null && ad.askingCents > 0 && FIXED_PRICE.has(typeof pt === "string" ? pt : undefined)) {
         const min = Math.max(opts.scope.minPrice.globalEuro, known ? minPriceEuro(r.modelKey, r.family, opts.scope.minPrice) : 0);
         if (min > 0 && ad.askingCents / 100 < min) { opts.onDrop?.("onder-minimumprijs"); return false; }
+      }
+      {
+        const why = opts.scope.sellers ? sellerDropReason(ad, known ? r.modelKey : null, opts.scope.sellers) : null;
+        if (why) { opts.onDrop?.(why); return false; }
       }
       if (known) {
         if (belowMinIphone(r.modelKey, r.family, opts.scope.minIphoneGeneration ?? 0)) { opts.onDrop?.("iphone-te-oud"); return false; }
