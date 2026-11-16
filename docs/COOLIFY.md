@@ -36,3 +36,13 @@ Met de omgevingsvariabele `ACTIVE_PLATFORMS` bepaal je zonder inlog welke platfo
 - Een onbekend woord (typefout) wordt genegeerd; er verandert dan niets.
 - `WORKER_SCRAPING=off` blijft de noodstop voor al het zoeken.
 - Vinted heeft eigen gebruiksvoorwaarden; zie `docs/VINTED-EN-FILTERS.md`.
+
+## Gevonden resultaten wissen (testomgeving)
+
+Met `WIPE_RESULTS=<label>` (bijv. `2026-11-16-a`) wist de worker **één keer per nieuw label** alle gevonden advertenties, binnen ongeveer een minuut na de herstart.
+
+- **Weg:** advertenties met foto's, analyses, meldinghistorie en profielkoppelingen, en nog wachtende analyse-, detail- en meldingstaken.
+- **Blijft:** inkopen en verkopen (alleen het linkje naar de advertentie vervalt), modellenlijst, inkoopregels, zoekprofielen, instellingen, accounts, pushapparaten.
+- De nulmeting en de zoekvoortgang worden teruggezet: de eerste ronde daarna meldt niets, de ronde daarna alleen wat nieuw is.
+- Zelfde label opnieuw = niets. Wil je nogmaals wissen, kies een nieuw label. Dit is **niet terug te draaien**.
+- Alleen in `docker-compose.test.yml`; de productie-compose geeft deze variabele niet door.

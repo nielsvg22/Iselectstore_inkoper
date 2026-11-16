@@ -7,6 +7,7 @@ import { pollMailbox } from "../lib/mail/poll";
 import { installApeldoornRadar } from "../lib/radar/provision";
 import { ensureTwanProfiles } from "../lib/radar/twan-profile";
 import { applyPlatformEnv } from "../lib/radar/platform-switch";
+import { applyWipeResults } from "../lib/maintenance/wipe-results";
 import { getConfig } from "../lib/settings/store";
 import { jobLanes } from "../lib/jobs/lanes";
 import { upgradeRadarPolling } from "../lib/radar/fast-polling";
@@ -78,6 +79,8 @@ async function twanProfileLoop() {
       if (admin) {
         const r = await ensureTwanProfiles(admin.id);
         if (r.updated.length || r.deactivated) console.log(`[worker] zoekprofiel bijgewerkt: ${r.updated.join(", ") || "-"}; eigen profielen gepauzeerd: ${r.deactivated}`);
+        const wipe = await applyWipeResults();
+        if (wipe.applied) console.log(`[worker] WIPE_RESULTS: ${wipe.deletedAds} advertenties gewist, ${wipe.resetProfiles} nulmetingen teruggezet`);
         const sw = await applyPlatformEnv(admin.id);
         if (sw.applied) console.log(`[worker] platformen volgens ACTIVE_PLATFORMS: Marktplaats ${sw.platforms!.marktplaats ? "aan" : "uit"}, Vinted ${sw.platforms!.vinted ? "aan" : "uit"}`);
       }

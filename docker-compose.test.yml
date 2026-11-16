@@ -29,6 +29,8 @@ services:
       WORKER_SCRAPING: ${WORKER_SCRAPING:-off}
       # welke platformen zoeken: vinted | marktplaats | marktplaats,vinted | geen (leeg = de app bepaalt zelf)
       ACTIVE_PLATFORMS: ${ACTIVE_PLATFORMS:-}
+      # wist één keer per nieuw label alle gevonden advertenties (nulmeting wordt teruggezet); leeg = niets doen
+      WIPE_RESULTS: ${WIPE_RESULTS:-}
     expose: ["3000"]
 
   worker:
