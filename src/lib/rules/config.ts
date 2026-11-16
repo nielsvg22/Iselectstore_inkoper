@@ -235,7 +235,7 @@ export const rulesSchema = z.object({
   /** Betrouwbare verkoper op Vinted: alles gaat daar via verzenden en Vinted geeft geen accountleeftijd, dus beoordeling en aantal reviews (niet uit het document: keuze van de opdrachtgever) */
   vintedSeller: z.object({
     minRating: z.number().min(0).max(5).default(4.5),
-    minReviews: z.number().int().min(0).max(100000).default(8),
+    minReviews: z.number().int().min(0).max(100000).default(10),
     /** verkoper zonder beoordelingen (nieuw of onbekend) */
     unknownPolicy: z.enum(["show", "exclude", "mark"]).default("exclude"),
   }).default({}),
@@ -280,7 +280,7 @@ const PRICES_KEY = "rules:bbp:prices";
 const HISTORY_ACTION = "rules.prices_changed";
 
 /** Huidige versie van de voorinstelling van Twan. Bij een hoger getal wordt ze één keer opnieuw toegepast. */
-export const TWAN_PRESET_VERSION = 5;
+export const TWAN_PRESET_VERSION = 6;
 
 /**
  * Zet de instellingen zoals Twan ze heeft aangegeven: margetabel (vraag/bieden/extra), batterijaftrek, waarderen vanaf de
@@ -304,7 +304,8 @@ export function applyTwanPreset(c: RulesConfig): RulesConfig {
     minIphoneGeneration: 14,
     // Twans afstandsregel (verder dan 50 km alleen bij een betrouwbare verkoper) beslist; het oudere rijtijd-/afstandsbeleid loopt er niet meer naast
     replaceDistancePolicy: true,
-    vintedSeller: { ...c.vintedSeller },
+    // Vinted: 4,5 sterren en 10 reviews, zonder beoordelingen niet melden (accountleeftijd levert Vinted niet)
+    vintedSeller: { ...c.vintedSeller, minRating: 4.5, minReviews: 10, unknownPolicy: "exclude" },
     // nieuwe standaardwoorden voor accessoires (funda, carcasa, …) toevoegen aan de opgeslagen lijst; eigen woorden blijven staan
     accessories: { ...c.accessories, terms: [...new Set([...c.accessories.terms, ...DEFAULT_ACCESSORY_TERMS])] },
   };

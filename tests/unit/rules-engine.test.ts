@@ -431,16 +431,17 @@ describe("standaard volgens het document", () => {
     expect(c.bid).toMatchObject({ minShareOfAsk: 0.65, maxGapEuro: 250 });
     expect(c.distance).toMatchObject({ pickupMaxKm: 50, newestProMaxKm: 50, maxKmDefault: 300, perKmEuro: 1 });
     expect(c.minPrice).toMatchObject({ newerEuro: 70, olderEuro: 50 });
+    expect(c.vintedSeller).toEqual({ minRating: 4.5, minReviews: 10, unknownPolicy: "exclude" });
   });
 });
 
 describe("Vinted: betrouwbare verkoper (beoordeling en reviews)", () => {
   const v = (seller: { rating: number | null; reviews: number | null }, o: Partial<VerdictInput> = {}) =>
     evaluateRules(input({ platform: "vinted", distanceKm: null, seller: { ageMonths: null, verified: null, ...seller }, ...o }), PRICES, cfg);
-  it("onder 4,5 sterren of onder 8 reviews valt af", () => {
+  it("onder 4,5 sterren of onder 10 reviews valt af", () => {
     expect(v({ rating: 4.4, reviews: 50 })).toMatchObject({ status: "reject", decidedBy: "seller-filter" });
-    expect(v({ rating: 4.9, reviews: 7 })).toMatchObject({ status: "reject", decidedBy: "seller-filter" });
-    expect(v({ rating: 4.5, reviews: 8 }).decidedBy).not.toBe("seller-filter");
+    expect(v({ rating: 4.9, reviews: 9 })).toMatchObject({ status: "reject", decidedBy: "seller-filter" });
+    expect(v({ rating: 4.5, reviews: 10 }).decidedBy).not.toBe("seller-filter");
   });
   it("een verkoper zonder beoordelingen valt af (standaard: onbekend uitsluiten)", () => {
     expect(v({ rating: null, reviews: null })).toMatchObject({ status: "reject", decidedBy: "seller-filter" });

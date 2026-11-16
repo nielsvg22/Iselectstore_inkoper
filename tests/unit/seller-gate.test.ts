@@ -60,10 +60,11 @@ describe("al bij het zoeken: afstand en betrouwbare verkoper (Marktplaats)", () 
 });
 
 describe("al bij het zoeken: Vinted (beoordeling en aantal reviews)", () => {
-  it("4,5 sterren en 8 reviews; onbekend komt door (het oordeel sluit dat uit)", () => {
-    const g = gate({ low: f(null, 3, 4.9), stars: f(null, 50, 4.2), good: f(null, 9, 4.6), none: f(null, null, null) }, "vinted");
+  it("4,5 sterren en 10 reviews; onbekend komt door (het oordeel sluit dat uit)", () => {
+    const g = gate({ low: f(null, 3, 4.9), stars: f(null, 50, 4.2), good: f(null, 10, 4.6), nine: f(null, 9, 4.9), none: f(null, null, null) }, "vinted");
     expect(sellerDropReason(ad({ seller: { id: "low" } }), null, g)).toBe("verkoper-niet-betrouwbaar");
     expect(sellerDropReason(ad({ seller: { id: "stars" } }), null, g)).toBe("verkoper-niet-betrouwbaar");
+    expect(sellerDropReason(ad({ seller: { id: "nine" } }), null, g)).toBe("verkoper-niet-betrouwbaar"); // 9 reviews: net te weinig
     expect(sellerDropReason(ad({ seller: { id: "good" } }), null, g)).toBeNull();
     expect(sellerDropReason(ad({ seller: { id: "none" } }), null, g)).toBeNull();
     expect(sellerDropReason(ad({ seller: { id: "nieuw" } }), null, g)).toBeNull();
